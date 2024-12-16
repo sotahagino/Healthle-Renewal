@@ -1,101 +1,76 @@
-import Image from "next/image";
+import { Button } from "@/components/ui/button"
+import { Textarea } from "@/components/ui/textarea"
+import { Card, CardContent } from "@/components/ui/card"
+import { SiteHeader } from '@/components/site-header'
+import { Footer } from '@/components/footer'
+import { Clock, Clipboard, ShieldCheck, CheckCircle, MessageCircle } from 'lucide-react'
 
 export default function Home() {
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+    <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#E6F3EF] to-white">
+      <SiteHeader />
+      <main className="flex-grow container mx-auto px-4 py-12 mt-16">
+        <h1 className="text-3xl font-bold text-center mb-6 text-[#333333] leading-tight">
+          あなたの悩みに寄り添い、<br />適切な回答を提供します
+        </h1>
+        <p className="text-center text-[#666666] mb-10">
+          日々の不調に対するセルフケアのお手伝いをします
+        </p>
+        <div className="space-y-12">
+          <Card className="bg-white shadow-lg">
+            <CardContent className="p-6">
+              <h2 className="text-xl font-semibold text-[#4C9A84] mb-4 text-center">
+                健康相談を始めましょう
+              </h2>
+              <Textarea
+                placeholder="あなたの健康の悩みを入力してください..."
+                className="min-h-[120px] text-[#333333] border-[#A7D7C5] focus:border-[#4C9A84] focus:ring-[#4C9A84] mb-4"
+              />
+              <p className="text-sm text-[#666666] mb-6">
+                ご入力いただいた悩みに応じて、個別の質問票を用意します。
+                見落としがちな情報も整理し、より的確な情報提供を行います。
+              </p>
+              <Button className="w-full bg-[#3A8B73] hover:bg-[#2E7A62] text-white text-lg py-6 font-bold rounded-lg shadow-md transition-all duration-300 ease-in-out transform hover:translate-y-[-2px] hover:shadow-lg">
+                無料で相談を始める
+              </Button>
+            </CardContent>
+          </Card>
+          <div className="grid grid-cols-2 gap-6">
+            {[
+              { icon: Clock, text: '24時間いつでも対応' },
+              { icon: Clipboard, text: '丁寧な質問票で根本要因を把握' },
+              { icon: MessageCircle, text: '追加の質問も無制限' },
+              { icon: CheckCircle, text: '的確な情報と一般用医薬品の紹介' }
+            ].map((feature, index) => (
+              <div key={index} className="flex flex-col items-center bg-white p-4 rounded-lg shadow">
+                <feature.icon className="w-10 h-10 text-[#4C9A84] mb-3" />
+                <p className="text-sm font-semibold text-[#333333] text-center">{feature.text}</p>
+              </div>
+            ))}
+          </div>
+          <Card className="bg-white">
+            <CardContent className="p-6">
+              <h2 className="text-2xl font-bold text-[#4C9A84] mb-6 pb-2 border-b border-[#A7D7C5]">
+                Healthleが選ばれる理由
+              </h2>
+              <ul className="space-y-4 text-sm text-[#333333]">
+                {[
+                  '独自の質問票で見過ごされがちな背景情報を抽出',
+                  'お悩みに合わせたセルフケア情報を丁寧に紹介',
+                  'プライバシーを重視した安全な相談環境',
+                  '完全無料でいつでもご利用可能'
+                ].map((feature, index) => (
+                  <li key={index} className="flex items-start">
+                    <CheckCircle className="w-5 h-5 text-[#4C9A84] mr-3 flex-shrink-0 mt-0.5" />
+                    <span className="leading-relaxed">{feature}</span>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
         </div>
       </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      <Footer />
     </div>
-  );
+  )
 }
