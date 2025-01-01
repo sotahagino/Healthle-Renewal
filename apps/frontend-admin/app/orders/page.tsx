@@ -1,16 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import {
   Table,
   TableBody,
@@ -19,127 +10,224 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Search } from 'lucide-react'
-import { 
-  Pagination, 
-  PaginationContent, 
-  PaginationEllipsis, 
-  PaginationItem, 
-  PaginationLink, 
-  PaginationNext, 
-  PaginationPrevious
-} from "@/components/ui/pagination"
-import { Header } from "@/components/Header"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Eye } from 'lucide-react'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
-// Mock data for orders
-const orders = [
-  { id: 'ORD001', userId: 'USR123', products: 'マルチビタミン x 2', status: '発送済み', date: '2023-06-01' },
-  { id: 'ORD002', userId: 'USR456', products: 'プロテイン x 1, ビタミンC x 3', status: '準備中', date: '2023-06-02' },
-  { id: 'ORD003', userId: 'USR789', products: 'オメガ3 x 1', status: '配送中', date: '2023-06-03' },
-  { id: 'ORD004', userId: 'USR101', products: 'マルチビタミン x 1, プロテイン x 2', status: '完了', date: '2023-06-04' },
-  { id: 'ORD005', userId: 'USR202', products: 'ビタミンD x 4', status: 'キャンセル', date: '2023-06-05' },
-]
+interface Order {
+  id: string
+  user_id: string
+  vendor_id: string
+  total_amount: number
+  status: string
+  payment_status: string
+  created_at: string
+  updated_at: string
+  vendor_name: string
+  user_name: string
+}
 
-const statuses = ['全て', '準備中', '発送済み', '配送中', '完了', 'キャンセル']
-
-export default function OrderList() {
+export default function OrdersPage() {
+  const [orders, setOrders] = useState<Order[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
   const router = useRouter()
-  const [searchTerm, setSearchTerm] = useState('')
-  const [statusFilter, setStatusFilter] = useState('全て')
 
-  const filteredOrders = orders.filter(order => 
-    (order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-     order.userId.toLowerCase().includes(searchTerm.toLowerCase())) &&
-    (statusFilter === '全て' || order.status === statusFilter)
-  )
+  useEffect(() => {
+    const fetchOrders = async () => {
+      try {
+        const supabase = createClientComponentClient()
+        const { data: { session } } = await supabase.auth.getSession()
+        console.log('Current user ID:', session?.user?.id)
+        console.log('Current user email:', session?.user?.email)
+
+        const res = await fetch('/api/admin/orders', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        })
+
+        if (!res.ok) {
+          const errorData = await res.json()
+          throw new Error(errorData.error || '注文情報の取得に失敗しました')
+        }
+
+        const data = await res.json()
+        setOrders(data)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : '予期せぬエラーが発生しました')
+        console.error('Error fetching orders:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchOrders()
+  }, [])
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
+      </div>
+    )
+  }
+
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat('ja-JP', { style: 'currency', currency: 'JPY' }).format(price)
+  }
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return <Badge variant="default">処理待ち</Badge>
+      case 'processing':
+        return <Badge variant="secondary">処理中</Badge>
+      case 'shipped':
+        return <Badge variant="success">発送済み</Badge>
+      case 'delivered':
+        return <Badge>配達済み</Badge>
+      case 'cancelled':
+        return <Badge variant="destructive">キャンセル</Badge>
+      default:
+        return <Badge variant="outline">{status}</Badge>
+    }
+  }
+
+  const getPaymentStatusBadge = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return <Badge variant="default">未決済</Badge>
+      case 'completed':
+        return <Badge variant="success">決済完了</Badge>
+      case 'failed':
+        return <Badge variant="destructive">決済失敗</Badge>
+      default:
+        return <Badge variant="outline">{status}</Badge>
+    }
+  }
+
+  const filteredOrders = orders.filter(order => {
+    if (statusFilter !== 'all' && order.status !== statusFilter) {
+      return false
+    }
+    
+    const orderDate = new Date(order.created_at)
+    if (startDate && new Date(startDate) > orderDate) {
+      return false
+    }
+    if (endDate && new Date(endDate) < orderDate) {
+      return false
+    }
+    
+    return true
+  })
 
   return (
-    <div className="min-h-screen bg-[#F9FAFB]">
-      <Header />
-      <div className="container mx-auto p-6">
-        <h1 className="text-2xl font-bold mb-6">注文一覧</h1>
+    <div className="container mx-auto py-10 px-4">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">注文一覧</h1>
+      </div>
 
-        <div className="mb-6 flex flex-wrap gap-4">
-          <div className="relative flex-1 min-w-[200px]">
-            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="注文ID・ユーザーIDで検索"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-8"
-            />
-          </div>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[200px]">
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+          {error}
+        </div>
+      )}
+
+      <div className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="status">ステータス</Label>
+          <Select
+            value={statusFilter}
+            onValueChange={setStatusFilter}
+          >
+            <SelectTrigger id="status">
               <SelectValue placeholder="ステータスで絞り込み" />
             </SelectTrigger>
-            <SelectContent>
-              {statuses.map(status => (
-                <SelectItem key={status} value={status}>{status}</SelectItem>
-              ))}
+            <SelectContent className="bg-white">
+              <SelectItem value="all">すべて</SelectItem>
+              <SelectItem value="pending">処理待ち</SelectItem>
+              <SelectItem value="processing">処理中</SelectItem>
+              <SelectItem value="shipped">発送済み</SelectItem>
+              <SelectItem value="delivered">配達済み</SelectItem>
+              <SelectItem value="cancelled">キャンセル</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
-        <div className="bg-white rounded-md shadow overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>注文ID</TableHead>
-                <TableHead>ユーザーID</TableHead>
-                <TableHead>購入商品</TableHead>
-                <TableHead>ステータス</TableHead>
-                <TableHead>日付</TableHead>
-                <TableHead>操作</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredOrders.map((order) => (
-                <TableRow key={order.id}>
-                  <TableCell className="font-medium">{order.id}</TableCell>
-                  <TableCell>{order.userId}</TableCell>
-                  <TableCell>{order.products}</TableCell>
-                  <TableCell>
-                    <span className={`px-2 py-1 rounded-full text-xs ${
-                      order.status === '完了' ? 'bg-green-100 text-green-800' :
-                      order.status === 'キャンセル' ? 'bg-red-100 text-red-800' :
-                      'bg-blue-100 text-blue-800'
-                    }`}>
-                      {order.status}
-                    </span>
-                  </TableCell>
-                  <TableCell>{order.date}</TableCell>
-                  <TableCell>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => router.push(`/orders/${order.id}`)}
-                    >
-                      詳細
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+        <div className="space-y-2">
+          <Label htmlFor="startDate">開始日</Label>
+          <Input
+            id="startDate"
+            type="date"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+          />
         </div>
 
-        <Pagination className="mt-4">
-          <PaginationContent>
-            <PaginationItem>
-              <PaginationPrevious href="#" />
-            </PaginationItem>
-            <PaginationItem>
-              <PaginationLink href="#">1</PaginationLink>
-            </PaginationItem>
-            <PaginationItem>
-              <PaginationEllipsis />
-            </PaginationItem>
-            <PaginationItem>
-              <PaginationNext href="#" />
-            </PaginationItem>
-          </PaginationContent>
-        </Pagination>
+        <div className="space-y-2">
+          <Label htmlFor="endDate">終了日</Label>
+          <Input
+            id="endDate"
+            type="date"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+          />
+        </div>
+      </div>
+
+      <div className="border rounded-lg">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>注文ID</TableHead>
+              <TableHead>注文日時</TableHead>
+              <TableHead>出店者</TableHead>
+              <TableHead>購入者</TableHead>
+              <TableHead>合計金額</TableHead>
+              <TableHead>ステータス</TableHead>
+              <TableHead>決済状況</TableHead>
+              <TableHead className="text-right">操作</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredOrders.map((order) => (
+              <TableRow key={order.id}>
+                <TableCell className="font-medium">{order.id}</TableCell>
+                <TableCell>{new Date(order.created_at).toLocaleString('ja-JP')}</TableCell>
+                <TableCell>{order.vendor_name}</TableCell>
+                <TableCell>{order.user_name}</TableCell>
+                <TableCell>{formatPrice(order.total_amount)}</TableCell>
+                <TableCell>{getStatusBadge(order.status)}</TableCell>
+                <TableCell>{getPaymentStatusBadge(order.payment_status)}</TableCell>
+                <TableCell className="text-right">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => router.push(`/orders/${order.id}`)}
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       </div>
     </div>
   )
