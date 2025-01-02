@@ -137,7 +137,7 @@ async function updateUserShippingInfo(
         postal_code: shippingDetails.address?.postal_code || undefined,
         prefecture: shippingDetails.address?.state || undefined,
         city: shippingDetails.address?.city || undefined,
-        address: shippingDetails.address?.line1 || undefined,
+        address: `${shippingDetails.address?.line1 || ''}${shippingDetails.address?.line2 ? ' ' + shippingDetails.address.line2 : ''}` || undefined,
         phone: shippingDetails.phone || undefined,
         updated_at: new Date().toISOString()
       })
@@ -173,7 +173,7 @@ async function createOrderRecords(
       postal_code: session.shipping_details?.address?.postal_code || '',
       prefecture: session.shipping_details?.address?.state || '',
       city: session.shipping_details?.address?.city || '',
-      address: session.shipping_details?.address?.line1 || '',
+      address: `${session.shipping_details?.address?.line1 || ''}${session.shipping_details?.address?.line2 ? ' ' + session.shipping_details.address.line2 : ''}`,
       phone: session.shipping_details?.phone || '',
     };
 
