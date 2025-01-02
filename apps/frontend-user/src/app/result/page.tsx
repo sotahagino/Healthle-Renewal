@@ -6,16 +6,16 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { MessageCircle, Send } from 'lucide-react'
+import { MessageCircle, Send, ShoppingBag, ArrowRight, CheckCircle, Star, HelpCircle, Phone } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
-import { SiteHeader } from '@/components/site-header'
 import { useRouter } from 'next/navigation'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Provider } from '@supabase/supabase-js'
-import { useAuth } from '@/hooks/useAuth'
-import { LoginContent } from '../../components/login-content'
+
+// Supabaseクライアントの初期化
+const supabase = createClientComponentClient()
 
 interface Question {
   id: string
@@ -34,7 +34,7 @@ interface ChatMessage {
   text: string
 }
 
-// 商品レコメンド用の
+// 商品レコメンド用の型定義
 type RecommendedProduct = {
   id: string;
   name: string;
@@ -47,19 +47,10 @@ type DifyProductResponse = {
   recommended_products: { product_id: string }[];
 };
 
-// ユーザーステータスの型定義を修正
-type UserStatus = 'loading' | 'unregistered' | 'registered'
-
-// 配送情報の型定義
-interface DeliveryInfo {
-  name: string
-  age: string
-  phone: string
-  postal_code: string
-  prefecture: string
-  city: string
-  address_line: string
-  deliveryDate: string
+interface FollowUpData {
+  question: string;
+  answer: string;
+  created_at: string;
 }
 
 export default function ResultPage() {
@@ -75,8 +66,6 @@ export default function ResultPage() {
   const [isLoadingProducts, setIsLoadingProducts] = useState(false)
   const [productError, setProductError] = useState<string | null>(null)
   const router = useRouter()
-  const supabase = createClientComponentClient()
-  const { user, loading } = useAuth()
 
   useEffect(() => {
     const fetchData = async () => {
@@ -173,7 +162,6 @@ export default function ResultPage() {
           };
         }) || [];
 
-        // questionsステートを設定
         setQuestions(questions);
 
         // チャット履歴の初期化
@@ -186,7 +174,7 @@ export default function ResultPage() {
 
         // 追加質問と回答を追加（followUpDataが存在する場合のみ）
         if (followUpData && followUpData.length > 0) {
-          followUpData.forEach((item) => {
+          followUpData.forEach((item: FollowUpData) => {
             initialHistory.push(
               { type: 'question', text: item.question },
               { type: 'answer', text: item.answer }
@@ -481,18 +469,9 @@ export default function ResultPage() {
 
     try {
       setIsStreaming(true)
-      // 質問をチャット履歴に追加
       setChatHistory(prev => [...prev, { type: 'question', text: followUpQuestion }])
 
-      // 匿名セッションを作成
-      const { data: { session }, error: authError } = await supabase.auth.getSession()
-      
-      if (authError) {
-        console.error('Auth error:', authError)
-        throw new Error('認証エラーが発生しました')
-      }
-
-      // session_idを取得
+      // セッションIDを取得
       const { data: consultationData, error: consultationError } = await supabase
         .from('consultations')
         .select('session_id')
@@ -604,7 +583,7 @@ export default function ResultPage() {
           question: followUpQuestion,
           answer: newResponse,
           created_at: new Date().toISOString(),
-          user_id: session?.user?.id || null // ユーザーIDを追加
+          user_id: null // 常にnullを設定
         }]);
 
       if (saveError) {
@@ -614,10 +593,10 @@ export default function ResultPage() {
 
       setFollowUpQuestion('')
     } catch (error) {
-      console.error("Error in follow-up:", error);
-      setChatHistory(prev => [...prev, { type: 'answer', text: 'エラーが発生しました。もう一度お試しください。' }]);
+      console.error("Error in follow-up:", error)
+      setChatHistory(prev => [...prev, { type: 'answer', text: 'エラーが発生しました。もう一度お試しください。' }])
     } finally {
-      setIsStreaming(false);
+      setIsStreaming(false)
     }
   }
 
@@ -656,125 +635,205 @@ export default function ResultPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#E6F3EF] to-white">
-      <SiteHeader />
-      <main className="flex-grow container mx-auto px-4 py-8 mt-16 mb-32">
-        <h1 className="text-3xl font-bold text-center mb-8 text-[#333333]">
-          あなたの健康相談結果
-        </h1>
+    <div className="min-h-screen bg-gradient-to-b from-[#F8FBFA] via-white to-[#F8FBFA]">
+      <header className="bg-white border-b border-[#E2E8F0] sticky top-0 z-50 shadow-sm">
+        <div className="container mx-auto px-4 py-4">
+          <nav className="text-sm text-[#4A5568] mb-2">
+            <ol className="flex items-center space-x-2">
+              <li><a href="/" className="hover:text-[#4C9A84]">ホーム</a></li>
+              <li className="flex items-center space-x-2">
+                <span>/</span>
+                <span>健康相談結果</span>
+              </li>
+            </ol>
+          </nav>
+        </div>
+      </header>
 
-        <div className="bg-[#F0F8F5] p-4 rounded-lg mb-8">
-          <h2 className="text-sm font-semibold text-[#4C9A84] mb-2 flex items-center">
-            <MessageCircle className="w-4 h-4 mr-2" />
-            あなたの相談内容
-          </h2>
-          <p className="text-sm text-[#666666]">{consultationText}</p>
+      <main className="container mx-auto px-4 py-8 md:py-12 max-w-4xl">
+        <div className="text-center mb-16">
+          <h1 className="text-2xl md:text-3xl font-bold text-[#2D3748] inline-flex items-center justify-center bg-white px-8 py-4 rounded-full shadow-sm">
+            <MessageCircle className="w-7 h-7 md:w-8 md:h-8 mr-4 text-[#4C9A84]" />
+            健康相談結果
+          </h1>
+          <p className="mt-4 text-[#4A5568] text-center mx-auto max-w-2xl">AIがあなたの健康状態を分析し、最適なアドバイスをお届けします</p>
         </div>
 
-        {chatHistory.map((message, index) => (
-          <Card key={index} className="bg-white shadow-lg mb-4">
-            <CardContent className="p-4">
-              <div className="flex items-start">
-                <div className="w-6 flex-shrink-0 mr-2 flex items-center justify-center">
-                  <MessageCircle className="w-6 h-6 text-[#4C9A84]" />
+        <section className="mb-12 md:mb-16">
+          <Card className="bg-white shadow-lg hover:shadow-xl transition-all duration-300 border-none rounded-2xl overflow-hidden w-full">
+            <CardContent className="p-6 md:p-8">
+              <div className="flex items-start space-x-4">
+                <div className="flex-shrink-0">
+                  <div className="w-12 h-12 rounded-full bg-[#E6F3EF] flex items-center justify-center">
+                    <MessageCircle className="w-7 h-7 text-[#4C9A84]" aria-hidden="true" />
+                  </div>
                 </div>
                 <div className="flex-grow">
-                  <h2 className="text-xl font-semibold mb-4 text-[#333333]">
-                    {message.type === 'question' ? '追加の質問' : '回答'}
+                  <h2 className="text-xl font-bold mb-4 text-[#2D3748] flex items-center">
+                    相談内容
                   </h2>
-                  <div className="markdown-body">
-                    <ReactMarkdown>{message.text}</ReactMarkdown>
+                  <div className="prose prose-lg max-w-none text-[#4A5568] leading-relaxed">
+                    <ReactMarkdown>{consultationText}</ReactMarkdown>
                   </div>
                 </div>
               </div>
             </CardContent>
           </Card>
-        ))}
+        </section>
 
-        {isStreaming && chatHistory.length === 0 && (
-          <Card className="bg-white shadow-lg mb-4">
-            <CardContent className="p-4">
-              <div className="flex items-start">
-                <div className="w-6 flex-shrink-0 mr-2 flex items-center justify-center">
-                  <MessageCircle className="w-6 h-6 text-[#4C9A84]" />
-                </div>
-                <div className="flex-grow">
-                  <h2 className="text-xl font-semibold mb-4 text-[#333333]">回答</h2>
-                  <div className="markdown-body">
-                    <ReactMarkdown>{response}</ReactMarkdown>
+        <section className="space-y-8 md:space-y-10">
+          {chatHistory.map((message, index) => (
+            <Card key={index} className="bg-white shadow-lg hover:shadow-xl transition-all duration-300 border-none rounded-2xl overflow-hidden">
+              <CardContent className="p-6 md:p-8">
+                <div className="flex items-start space-x-4">
+                  <div className="flex-shrink-0">
+                    <div className="w-12 h-12 rounded-full bg-[#E6F3EF] flex items-center justify-center">
+                      {message.type === 'question' ? (
+                        <MessageCircle className="w-7 h-7 text-[#4C9A84]" aria-hidden="true" />
+                      ) : (
+                        <CheckCircle className="w-7 h-7 text-[#4C9A84]" aria-hidden="true" />
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex-grow">
+                    <h2 className="text-xl font-bold mb-4 text-[#2D3748] flex items-center">
+                      {message.type === 'question' ? '追加の質問' : '回答'}
+                    </h2>
+                    <div className="prose prose-lg max-w-none text-[#4A5568] leading-relaxed">
+                      <ReactMarkdown>{message.text}</ReactMarkdown>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+              </CardContent>
+            </Card>
+          ))}
+        </section>
 
-        {/* 商品提案表示部 */}
-        <div className="mt-8">
-          <h2 className="text-xl font-bold mb-4">おすすめ商品</h2>
+        <section className="mt-16 md:mt-20 mb-24 bg-[#F8FBFA] p-6 md:p-8 rounded-3xl">
+          <h2 className="text-2xl font-bold mb-8 text-[#2D3748] flex items-center justify-center">
+            <div className="bg-white px-8 py-4 rounded-full shadow-sm inline-flex items-center">
+              <ShoppingBag className="w-7 h-7 mr-4 text-[#4C9A84]" aria-hidden="true" />
+              おすすめ商品
+            </div>
+          </h2>
           
           {isLoadingProducts && (
-            <div className="text-center">
-              <p>商品を読み込中...</p>
+            <div className="text-center py-12">
+              <div className="animate-spin rounded-full h-16 w-16 border-4 border-[#E6F3EF] border-t-[#4C9A84] mx-auto" role="status">
+                <span className="sr-only">読み込み中...</span>
+              </div>
+              <p className="mt-6 text-[#4A5568] font-medium">商品を読み込んでいます...</p>
             </div>
           )}
 
           {productError && (
-            <div className="text-red-500">
+            <div className="bg-red-50 text-red-600 p-6 rounded-xl mb-8 text-center font-medium" role="alert">
               {productError}
             </div>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
             {recommendedProducts.length > 0 ? (
               recommendedProducts.map((product) => (
-                <div key={product.id} className="border rounded-lg p-4 shadow-md hover:shadow-lg transition-shadow">
+                <div key={product.id} className="group bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1">
                   {product.image_url && (
-                    <img 
-                      src={product.image_url} 
-                      alt={product.name}
-                      className="w-full h-48 object-cover rounded-lg mb-4"
-                    />
+                    <div className="relative h-48 overflow-hidden">
+                      <img 
+                        src={product.image_url} 
+                        alt={`${product.name}の商品画像`}
+                        className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500"
+                      />
+                    </div>
                   )}
-                  <h3 className="font-bold text-lg mb-2">{product.name}</h3>
-                  <p className="text-sm text-gray-600 mb-4">{product.description}</p>
-                  <div className="flex flex-col space-y-3">
-                    <p className="font-bold text-lg">¥{product.price.toLocaleString()}</p>
-                    <Button
-                      onClick={() => handlePurchaseClick(product)}
-                      className="w-full bg-[#FF9900] hover:bg-[#FF8C00] text-white px-6 py-3 rounded-lg transition-all duration-300 ease-in-out transform hover:translate-y-[-2px] hover:shadow-lg font-bold text-lg flex items-center justify-center space-x-2"
-                    >
-                      <span>今すぐ購入</span>
-                      <span className="text-sm">→</span>
-                    </Button>
+                  <div className="p-6">
+                    <h3 className="font-bold text-xl mb-3 text-[#2D3748] line-clamp-2">{product.name}</h3>
+                    <p className="text-[#4A5568] mb-4 line-clamp-2 text-base leading-relaxed">{product.description}</p>
+                    <div className="space-y-4">
+                      <p className="text-2xl font-bold text-[#2D3748]">¥{product.price.toLocaleString()}</p>
+                      <Button
+                        onClick={() => handlePurchaseClick(product)}
+                        className="w-full bg-gradient-to-r from-[#FF9900] to-[#FF8C00] hover:from-[#FF8C00] hover:to-[#FF7A00] text-white px-6 py-4 rounded-xl transition-all duration-300 ease-in-out transform hover:-translate-y-1 hover:shadow-lg font-bold text-lg flex items-center justify-center space-x-2"
+                        aria-label={`${product.name}の商品詳細を見る`}
+                      >
+                        <span>商品を見る</span>
+                        <ArrowRight className="w-5 h-5" aria-hidden="true" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
               ))
             ) : (
-              <p className="col-span-full text-center text-gray-500">
-                おすすめ商品はありません
-              </p>
+              <div className="col-span-full text-center py-16">
+                <div className="bg-white p-8 rounded-2xl shadow-lg inline-block">
+                  <ShoppingBag className="w-16 h-16 text-[#E2E8F0] mx-auto mb-4" aria-hidden="true" />
+                  <p className="text-[#4A5568] font-medium">
+                    おすすめ商品はありません
+                  </p>
+                </div>
+              </div>
             )}
           </div>
-        </div>
+        </section>
+
+        <section className="mb-24">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card className="bg-white shadow-lg hover:shadow-xl transition-all duration-300 border-none rounded-2xl overflow-hidden">
+              <CardContent className="p-6">
+                <h3 className="text-lg font-bold mb-4 text-[#2D3748] flex items-center">
+                  <HelpCircle className="w-5 h-5 mr-2 text-[#4C9A84]" aria-hidden="true" />
+                  よくある質問
+                </h3>
+                <ul className="space-y-2">
+                  <li><a href="#" className="text-[#4A5568] hover:text-[#4C9A84]">商品の返品について</a></li>
+                  <li><a href="#" className="text-[#4A5568] hover:text-[#4C9A84]">支払い方法について</a></li>
+                  <li><a href="#" className="text-[#4A5568] hover:text-[#4C9A84]">配送について</a></li>
+                </ul>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white shadow-lg hover:shadow-xl transition-all duration-300 border-none rounded-2xl overflow-hidden">
+              <CardContent className="p-6">
+                <h3 className="text-lg font-bold mb-4 text-[#2D3748] flex items-center">
+                  <Phone className="w-5 h-5 mr-2 text-[#4C9A84]" aria-hidden="true" />
+                  お問い合わせ
+                </h3>
+                <p className="text-[#4A5568] mb-4">
+                  ご不明な点がございましたら、お気軽にお問い合わせください。
+                </p>
+                <Button className="w-full bg-[#4C9A84] hover:bg-[#3A8B73] text-white rounded-xl py-2">
+                  お問い合わせフォーム
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </section>
       </main>
 
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-[#A7D7C5] p-4 shadow-md">
-        <div className="container mx-auto">
-          <form onSubmit={handleFollowUpSubmit} className="flex items-center">
+      <div className="fixed bottom-0 left-0 right-0 bg-white/95 border-t border-[#E2E8F0] p-4 md:p-6 shadow-lg backdrop-blur-lg">
+        <div className="container mx-auto max-w-4xl">
+          <form onSubmit={handleFollowUpSubmit} className="flex items-center space-x-4">
             <Input
               type="text"
               placeholder="追加で相談できます..."
               value={followUpQuestion}
               onChange={(e) => setFollowUpQuestion(e.target.value)}
-              className="flex-grow mr-3 py-2 px-4 rounded-full border-[#A7D7C5] focus:border-[#4C9A84] focus:ring-[#4C9A84]"
+              className="flex-grow py-4 px-6 rounded-xl border-[#E2E8F0] focus:border-[#4C9A84] focus:ring-[#4C9A84] text-lg shadow-sm"
+              disabled={isStreaming}
+              aria-label="追加の質問を入力"
             />
             <Button 
               type="submit" 
-              className="bg-[#4C9A84] hover:bg-[#3A8B73] text-white rounded-full p-3"
+              className="bg-[#4C9A84] hover:bg-[#3A8B73] text-white rounded-xl p-4 min-w-[60px] h-[56px] flex items-center justify-center transition-all duration-300 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={isStreaming}
+              aria-label={isStreaming ? "送信中..." : "質問を送信"}
             >
-              <Send className="h-5 w-5" />
+              {isStreaming ? (
+                <div className="animate-spin rounded-full h-6 w-6 border-2 border-white border-t-transparent" role="status">
+                  <span className="sr-only">送信中...</span>
+                </div>
+              ) : (
+                <Send className="h-6 w-6" aria-hidden="true" />
+              )}
             </Button>
           </form>
         </div>

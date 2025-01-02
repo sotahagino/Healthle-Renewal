@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label"
 import { ArrowLeft } from 'lucide-react'
 import { Textarea } from "@/components/ui/textarea"
 
-// APIから返される質問の型定義を修正
+// APIから返される質問の型定義
 interface Option {
   id: string
   text: string
@@ -74,7 +74,6 @@ export default function QuestionnairePage() {
     }
   }, [searchParams])
 
-  // エラー状態が変��されたときにスクロールする
   useEffect(() => {
     if (error) {
       errorRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -206,9 +205,9 @@ export default function QuestionnairePage() {
     }
   }
 
-  if (error) {
-    return (
-      <div className="container mx-auto py-10 px-4 sm:px-6 lg:px-8">
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-[#E6F3EF] to-white">
+      <main className="container mx-auto px-4 py-8">
         <div className="max-w-4xl mx-auto">
           <div className="flex items-center mb-6">
             <Button
@@ -257,51 +256,7 @@ export default function QuestionnairePage() {
             )}
           </div>
         </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="container mx-auto py-10 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-4xl mx-auto">
-        <div className="flex items-center mb-6">
-          <Button
-            variant="ghost"
-            onClick={() => router.back()}
-            className="mr-4"
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            戻る
-          </Button>
-          <h1 className="text-2xl font-bold">質問票</h1>
-        </div>
-
-        <div className="space-y-8">
-          {questions.map((question, index) => (
-            <Card key={question.id} className="shadow-sm">
-              <CardContent className="p-6">
-                <div className="mb-4">
-                  <h3 className="text-lg font-semibold mb-4">
-                    Q{index + 1}. {question.text}
-                  </h3>
-                  {renderQuestionInput(question, index)}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-
-          {questions.length > 0 && (
-            <div className="flex justify-end mt-8">
-              <Button
-                onClick={handleSubmit}
-                className="bg-[#3A8B73] hover:bg-[#2E7A62] text-white px-8 py-2"
-              >
-                回答を送信
-              </Button>
-            </div>
-          )}
-        </div>
-      </div>
+      </main>
     </div>
   )
 }

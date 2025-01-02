@@ -122,6 +122,39 @@ const ORDER_STATUS = {
   CANCELLED: 'cancelled'       // キャンセル
 } as const;
 
+// ユーザー情報を更新する関数
+async function updateUserShippingInfo(
+  userId: string,
+  shippingDetails: Stripe.Checkout.Session.ShippingDetails | null
+) {
+  if (!shippingDetails) return;
+
+  try {
+    const { error: updateError } = await supabase
+      .from('users')
+      .update({
+        name: shippingDetails.name || undefined,
+        postal_code: shippingDetails.address?.postal_code || undefined,
+        prefecture: shippingDetails.address?.state || undefined,
+        city: shippingDetails.address?.city || undefined,
+        address: shippingDetails.address?.line1 || undefined,
+        phone: shippingDetails.phone || undefined,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', userId);
+
+    if (updateError) {
+      console.error('Failed to update user shipping info:', updateError);
+      throw updateError;
+    }
+
+    console.log('User shipping info updated successfully');
+  } catch (error) {
+    console.error('Error updating user shipping info:', error);
+    throw error;
+  }
+}
+
 // 注文情報を保存する関数
 async function createOrderRecords(
   session: Stripe.Checkout.Session,
@@ -129,22 +162,38 @@ async function createOrderRecords(
   orderNumber: string
 ) {
   try {
+    // ユーザーが存在する場合のみユーザー情報を更新
+    if (session.client_reference_id) {
+      await updateUserShippingInfo(session.client_reference_id, session.shipping_details);
+    }
+
+    // 配送情報の取得
+    const shippingInfo = {
+      name: session.shipping_details?.name || '',
+      postal_code: session.shipping_details?.address?.postal_code || '',
+      prefecture: session.shipping_details?.address?.state || '',
+      city: session.shipping_details?.address?.city || '',
+      address: session.shipping_details?.address?.line1 || '',
+      phone: session.shipping_details?.phone || '',
+    };
+
+    // 完全な住所を生成
+    const fullAddress = `〒${shippingInfo.postal_code} ${shippingInfo.prefecture}${shippingInfo.city}${shippingInfo.address}`;
+
     // 基本的な注文情報
     const orderData = {
       order_number: orderNumber,
-      user_id: session.client_reference_id,
+      user_id: session.client_reference_id || null,
       product_id: product.id,
       vendor_id: product.vendor_id,
       status: ORDER_STATUS.PAID,
       total_amount: session.amount_total,
       stripe_payment_link_id: session.payment_link,
       stripe_session_id: session.id,
-      shipping_name: session.shipping_details?.name || '',
-      shipping_postal_code: session.shipping_details?.address?.postal_code || '',
-      shipping_prefecture: session.shipping_details?.address?.state || '',
-      shipping_city: session.shipping_details?.address?.city || '',
-      shipping_address: session.shipping_details?.address?.line1 || '',
-      shipping_phone: session.shipping_details?.phone || '',
+      shipping_name: shippingInfo.name,
+      shipping_address: fullAddress,
+      shipping_phone: shippingInfo.phone,
+      customer_email: session.customer_details?.email || '',
       payment_status: 'paid',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
@@ -168,14 +217,10 @@ async function createOrderRecords(
       status: ORDER_STATUS.PAID,
       total_amount: session.amount_total,
       commission_rate: product.commission_rate || 10,
-      shipping_info: {
-        name: session.shipping_details?.name,
-        postal_code: session.shipping_details?.address?.postal_code,
-        prefecture: session.shipping_details?.address?.state,
-        city: session.shipping_details?.address?.city,
-        address: session.shipping_details?.address?.line1,
-        phone: session.shipping_details?.phone
-      },
+      shipping_name: shippingInfo.name,
+      shipping_address: fullAddress,
+      shipping_phone: shippingInfo.phone,
+      customer_email: session.customer_details?.email || '',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };

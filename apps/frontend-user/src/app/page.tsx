@@ -35,11 +35,6 @@ export default function Home() {
       const sessionId = localStorage.getItem('session_id') || uuidv4()
       localStorage.setItem('session_id', sessionId)
 
-      if (!user?.id) {
-        console.error('ユーザーが見つかりません')
-        throw new Error('ログインが必要です')
-      }
-
       // 相談内容をDBに保存
       const consultationRes = await fetch("/api/consultations", {
         method: "POST",
@@ -50,7 +45,7 @@ export default function Home() {
         body: JSON.stringify({ 
           symptom_text: symptomText,
           session_id: sessionId,
-          user_id: user.id
+          user_id: user?.id || null // ユーザーIDがない場合はnull
         })
       })
 
@@ -76,7 +71,8 @@ export default function Home() {
         body: JSON.stringify({ 
           symptom_text: symptomText,
           consultation_id,
-          user_id: user.id
+          session_id: sessionId,
+          user_id: user?.id || null // ユーザーIDがない場合はnull
         })
       })
 

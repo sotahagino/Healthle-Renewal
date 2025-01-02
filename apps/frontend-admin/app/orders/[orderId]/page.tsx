@@ -1,10 +1,23 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import { ArrowLeft } from 'lucide-react'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import {
   Table,
   TableBody,
@@ -13,50 +26,57 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { AlertCircle, CheckCircle } from 'lucide-react'
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
-// Mock data for an order
-const mockOrder = {
-  id: 'ORD001',
-  userId: 'USR123',
-  userName: '山田 太郎',
-  userEmail: 'yamada@example.com',
-  shippingAddress: '東京都渋谷区恵比寿1-1-1',
-  status: '準備中',
-  totalAmount: 5500,
-  products: [
-    { id: 'PROD1', name: 'マルチビタミン', quantity: 2, price: 2000, requiresApproval: false },
-    { id: 'PROD2', name: '第3類医薬品A', quantity: 1, price: 1500, requiresApproval: true, approvalStatus: '承認済み' },
-  ],
-  createdAt: '2023-06-01T10:00:00Z',
+interface OrderItem {
+  id: string
+  product_id: string
+  product_name: string
+  quantity: number
+  price: number
 }
 
-const orderStatuses = ['準備中', '発送済み', '配送中', '完了', 'キャンセル']
+interface Order {
+  id: string
+  user_id: string
+  vendor_id: string
+  total_amount: number
+  status: string
+  payment_status: string
+  created_at: string
+  updated_at: string
+  vendor_name: string
+  user_name: string
+  user_email: string
+  shipping_address: string
+  items: OrderItem[]
+}
 
-export default function OrderDetail({ params }: { params: { orderId: string } }) {
-  const router = useRouter()
-  const [order, setOrder] = useState(mockOrder)
+export default function OrderDetailPage({
+  params,
+}: {
+  params: { orderId: string }
+}) {
+  const [order, setOrder] = useState<Order | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const router = useRouter()
 
   useEffect(() => {
-    // Simulate API call
     const fetchOrder = async () => {
       try {
-        // In a real application, you would fetch the order data here
-        await new Promise(resolve => setTimeout(resolve, 1000))
-        setOrder(mockOrder)
-        setLoading(false)
+        const res = await fetch(`/api/admin/orders/${params.orderId}`)
+        
+        if (!res.ok) {
+          const errorData = await res.json()
+          throw new Error(errorData.error || '注文情報の取得に失敗しました')
+        }
+
+        const data = await res.json()
+        setOrder(data)
       } catch (err) {
-        setError('注文情報の取得に失敗しました。')
+        setError(err instanceof Error ? err.message : '予期せぬエラーが発生しました')
+        console.error('Error fetching order:', err)
+      } finally {
         setLoading(false)
       }
     }
@@ -66,113 +86,205 @@ export default function OrderDetail({ params }: { params: { orderId: string } })
 
   const handleStatusChange = async (newStatus: string) => {
     try {
-      // Here you would typically call your API to update the order status
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      setOrder(prev => ({ ...prev, status: newStatus }))
+      const res = await fetch(`/api/admin/orders/${params.orderId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status: newStatus }),
+      })
+
+      if (!res.ok) {
+        const errorData = await res.json()
+        throw new Error(errorData.error || 'ステータスの更新に失敗しました')
+      }
+
+      const updatedOrder = await res.json()
+      setOrder(updatedOrder)
     } catch (err) {
-      setError('ステータスの更新に失敗しました。')
+      setError(err instanceof Error ? err.message : '予期せぬエラーが発生しました')
     }
   }
 
   if (loading) {
-    return <div className="flex justify-center items-center h-screen">読み込み中...</div>
-  }
-
-  if (error) {
     return (
-      <Alert variant="destructive" className="m-4">
-        <AlertCircle className="h-4 w-4" />
-        <AlertTitle>エラー</AlertTitle>
-        <AlertDescription>{error}</AlertDescription>
-      </Alert>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
+      </div>
     )
   }
 
+  if (error || !order) {
+    return (
+      <div className="container mx-auto py-10 px-4">
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+          {error || '注文が見つかりません'}
+        </div>
+      </div>
+    )
+  }
+
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat('ja-JP', { style: 'currency', currency: 'JPY' }).format(price)
+  }
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return <Badge variant="default">処理待ち</Badge>
+      case 'processing':
+        return <Badge variant="secondary">処理中</Badge>
+      case 'shipped':
+        return <Badge variant="success">発送済み</Badge>
+      case 'delivered':
+        return <Badge>配達済み</Badge>
+      case 'cancelled':
+        return <Badge variant="destructive">キャンセル</Badge>
+      default:
+        return <Badge variant="outline">{status}</Badge>
+    }
+  }
+
+  const getPaymentStatusBadge = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return <Badge variant="default">未決済</Badge>
+      case 'completed':
+        return <Badge variant="success">決済完了</Badge>
+      case 'failed':
+        return <Badge variant="destructive">決済失敗</Badge>
+      default:
+        return <Badge variant="outline">{status}</Badge>
+    }
+  }
+
   return (
-    <div className="container mx-auto p-6">
-      <h1 className="text-2xl font-bold mb-6">注文詳細 - {order.id}</h1>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>ユーザー情報</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p><strong>名前:</strong> {order.userName}</p>
-            <p><strong>メール:</strong> {order.userEmail}</p>
-            <p><strong>配送先:</strong> {order.shippingAddress}</p>
-          </CardContent>
-        </Card>
+    <div className="container mx-auto py-10 px-4">
+      <div className="flex justify-between items-center mb-6">
+        <div className="flex items-center">
+          <Button
+            variant="ghost"
+            onClick={() => router.back()}
+            className="mr-4"
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            戻る
+          </Button>
+          <h1 className="text-2xl font-bold">注文詳細</h1>
+        </div>
+      </div>
+
+      <div className="grid gap-6">
         <Card>
           <CardHeader>
             <CardTitle>注文情報</CardTitle>
           </CardHeader>
-          <CardContent>
-            <p><strong>注文日時:</strong> {new Date(order.createdAt).toLocaleString('ja-JP')}</p>
-            <p><strong>合計金額:</strong> {order.totalAmount.toLocaleString()}円</p>
-            <div className="mt-2">
-              <strong>ステータス:</strong>
-              <Badge className="ml-2" variant={order.status === 'キャンセル' ? 'destructive' : 'default'}>
-                {order.status}
-              </Badge>
-            </div>
-            <div className="mt-4">
-              <Select onValueChange={handleStatusChange} defaultValue={order.status}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="ステータス変更" />
-                </SelectTrigger>
-                <SelectContent>
-                  {orderStatuses.map(status => (
-                    <SelectItem key={status} value={status}>{status}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          <CardContent className="grid gap-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <h3 className="text-sm font-medium text-gray-500">注文ID</h3>
+                <p className="mt-1">{order.id}</p>
+              </div>
+              <div>
+                <h3 className="text-sm font-medium text-gray-500">注文日時</h3>
+                <p className="mt-1">{new Date(order.created_at).toLocaleString('ja-JP')}</p>
+              </div>
+              <div>
+                <h3 className="text-sm font-medium text-gray-500">出店者</h3>
+                <p className="mt-1">{order.vendor_name}</p>
+              </div>
+              <div>
+                <h3 className="text-sm font-medium text-gray-500">合計金額</h3>
+                <p className="mt-1">{formatPrice(order.total_amount)}</p>
+              </div>
+              <div>
+                <h3 className="text-sm font-medium text-gray-500">ステータス</h3>
+                <div className="mt-1 flex items-center space-x-2">
+                  {getStatusBadge(order.status)}
+                  <Select
+                    value={order.status}
+                    onValueChange={handleStatusChange}
+                  >
+                    <SelectTrigger className="w-[180px] ml-2">
+                      <SelectValue placeholder="ステータスを変更" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pending">処理待ち</SelectItem>
+                      <SelectItem value="processing">処理中</SelectItem>
+                      <SelectItem value="shipped">発送済み</SelectItem>
+                      <SelectItem value="delivered">配達済み</SelectItem>
+                      <SelectItem value="cancelled">キャンセル</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div>
+                <h3 className="text-sm font-medium text-gray-500">決済状況</h3>
+                <div className="mt-1">{getPaymentStatusBadge(order.payment_status)}</div>
+              </div>
             </div>
           </CardContent>
         </Card>
-      </div>
-      <Card className="mt-6">
-        <CardHeader>
-          <CardTitle>購入商品</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>商品名</TableHead>
-                <TableHead>数量</TableHead>
-                <TableHead>価格</TableHead>
-                <TableHead>小計</TableHead>
-                <TableHead>承認状況</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {order.products.map((product) => (
-                <TableRow key={product.id}>
-                  <TableCell>{product.name}</TableCell>
-                  <TableCell>{product.quantity}</TableCell>
-                  <TableCell>{product.price.toLocaleString()}円</TableCell>
-                  <TableCell>{(product.price * product.quantity).toLocaleString()}円</TableCell>
-                  <TableCell>
-                    {product.requiresApproval ? (
-                      <Badge variant={product.approvalStatus === '承認済み' ? 'default' : 'secondary'}>
-                        {product.approvalStatus === '承認済み' ? (
-                          <><CheckCircle className="mr-1 h-4 w-4" /> 承認済み</>
-                        ) : (
-                          <><AlertCircle className="mr-1 h-4 w-4" /> 承認待ち</>
-                        )}
-                      </Badge>
-                    ) : '不要'}
+
+        <Card>
+          <CardHeader>
+            <CardTitle>購入者情報</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <h3 className="text-sm font-medium text-gray-500">購入者名</h3>
+                <p className="mt-1">{order.user_name}</p>
+              </div>
+              <div>
+                <h3 className="text-sm font-medium text-gray-500">メールアドレス</h3>
+                <p className="mt-1">{order.user_email}</p>
+              </div>
+              <div className="col-span-2">
+                <h3 className="text-sm font-medium text-gray-500">配送先住所</h3>
+                <p className="mt-1">{order.shipping_address}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>注文商品</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>商品名</TableHead>
+                  <TableHead>数量</TableHead>
+                  <TableHead>単価</TableHead>
+                  <TableHead className="text-right">小計</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {order.items.map((item) => (
+                  <TableRow key={item.id}>
+                    <TableCell>{item.product_name}</TableCell>
+                    <TableCell>{item.quantity}</TableCell>
+                    <TableCell>{formatPrice(item.price)}</TableCell>
+                    <TableCell className="text-right">
+                      {formatPrice(item.price * item.quantity)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+                <TableRow>
+                  <TableCell colSpan={3} className="text-right font-medium">
+                    合計
+                  </TableCell>
+                  <TableCell className="text-right font-medium">
+                    {formatPrice(order.total_amount)}
                   </TableCell>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-      <div className="mt-6 flex justify-end">
-        <Button variant="outline" onClick={() => router.push('/orders')}>
-          注文一覧に戻る
-        </Button>
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
       </div>
     </div>
   )

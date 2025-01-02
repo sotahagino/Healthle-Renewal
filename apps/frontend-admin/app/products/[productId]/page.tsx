@@ -70,7 +70,7 @@ export default function ProductDetailPage({
 
   if (error || !product) {
     return (
-      <div className="container mx-auto py-10">
+      <div className="container mx-auto py-10 px-4">
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
           {error || '商品が見つかりません'}
         </div>
@@ -83,7 +83,7 @@ export default function ProductDetailPage({
   }
 
   return (
-    <div className="container mx-auto py-10">
+    <div className="container mx-auto py-10 px-4">
       <div className="flex justify-between items-center mb-6">
         <Button
           variant="ghost"

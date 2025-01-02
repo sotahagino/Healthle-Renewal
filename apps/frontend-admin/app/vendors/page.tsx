@@ -1,8 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { Button } from "@/components/ui/button"
 import {
   Table,
   TableBody,
@@ -11,105 +10,114 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Button } from "@/components/ui/button"
-import { PlusCircle } from 'lucide-react'
 import { Badge } from "@/components/ui/badge"
 
 interface Vendor {
   id: string
   vendor_name: string
+  status: string
   email: string
   phone: string
-  status: string
+  postal_code: string
+  address: string
+  business_hours: string
   created_at: string
-  vendor_users: Array<{
-    user_id: string
-    role: string
-  }>
 }
 
 export default function VendorsPage() {
   const [vendors, setVendors] = useState<Vendor[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const router = useRouter()
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const fetchVendors = async () => {
-      try {
-        const res = await fetch('/api/admin/vendors')
-        const data = await res.json()
-
-        if (!res.ok) {
-          throw new Error(data.error || '店舗情報の取得に失敗しました')
-        }
-
-        setVendors(data)
-      } catch (err) {
-        setError(err instanceof Error ? err.message : '予期せぬエラーが発生しました')
-      } finally {
-        setLoading(false)
-      }
-    }
-
     fetchVendors()
   }, [])
 
-  if (loading) {
+  const fetchVendors = async () => {
+    try {
+      setIsLoading(true)
+      setError(null)
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
+      const response = await fetch(`${baseUrl}/api/vendors`)
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'データの取得に失敗しました')
+      }
+      const data = await response.json()
+      setVendors(data)
+    } catch (error) {
+      console.error('Failed to fetch vendors:', error)
+      setError('データの取得中にエラーが発生しました')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const getStatusBadge = (status: string) => {
+    const statusStyles = {
+      active: 'bg-green-100 text-green-800',
+      inactive: 'bg-gray-100 text-gray-800',
+      pending: 'bg-yellow-100 text-yellow-800',
+    }
+    return <Badge className={statusStyles[status as keyof typeof statusStyles]}>{status}</Badge>
+  }
+
+  if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+        <div className="flex justify-center items-center h-64">
+          <div className="text-lg">読み込み中...</div>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+        <div className="flex justify-center items-center h-64">
+          <div className="text-lg text-red-600">{error}</div>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="container mx-auto py-10">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">出店者一覧</h1>
-        <Button onClick={() => router.push('/vendors/new')}>
-          <PlusCircle className="mr-2 h-4 w-4" />
-          新規登録
+        <Button onClick={() => window.location.href = '/vendors/new'}>
+          新規出店者登録
         </Button>
       </div>
 
-      {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-          {error}
-        </div>
-      )}
-
-      <div className="border rounded-lg">
+      <div className="rounded-md border bg-white shadow">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>店舗名</TableHead>
+              <TableHead>ステータス</TableHead>
               <TableHead>メールアドレス</TableHead>
               <TableHead>電話番号</TableHead>
-              <TableHead>ステータス</TableHead>
+              <TableHead>住所</TableHead>
               <TableHead>登録日</TableHead>
-              <TableHead className="text-right">操作</TableHead>
+              <TableHead>操作</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {vendors.map((vendor) => (
               <TableRow key={vendor.id}>
                 <TableCell className="font-medium">{vendor.vendor_name}</TableCell>
+                <TableCell>{getStatusBadge(vendor.status)}</TableCell>
                 <TableCell>{vendor.email}</TableCell>
-                <TableCell>{vendor.phone || '-'}</TableCell>
+                <TableCell>{vendor.phone}</TableCell>
+                <TableCell>{`〒${vendor.postal_code} ${vendor.address}`}</TableCell>
+                <TableCell>{new Date(vendor.created_at).toLocaleDateString('ja-JP')}</TableCell>
                 <TableCell>
-                  <Badge variant={vendor.status === 'active' ? 'success' : 'secondary'}>
-                    {vendor.status === 'active' ? '有効' : '無効'}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  {new Date(vendor.created_at).toLocaleDateString('ja-JP')}
-                </TableCell>
-                <TableCell className="text-right">
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => router.push(`/vendors/${vendor.id}`)}
+                    onClick={() => window.location.href = `/vendors/${vendor.id}`}
                   >
                     詳細
                   </Button>

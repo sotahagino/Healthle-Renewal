@@ -101,7 +101,7 @@ export default function NewProductPage() {
   }
 
   return (
-    <div className="container mx-auto py-10">
+    <div className="container mx-auto py-10 px-4">
       <div className="flex items-center mb-6">
         <Button
           variant="ghost"

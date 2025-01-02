@@ -8,7 +8,7 @@ export default function Home() {
   const router = useRouter()
 
   return (
-    <div className="container mx-auto py-10">
+    <div className="container mx-auto px-4 py-10">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <Card className="hover:shadow-lg transition-shadow">
           <CardHeader>
@@ -40,6 +40,20 @@ export default function Home() {
 
         <Card className="hover:shadow-lg transition-shadow">
           <CardHeader>
+            <CardTitle>注文管理</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-gray-500 mb-4">
+              注文の一覧確認と管理ができます。
+            </p>
+            <Button onClick={() => router.push('/orders')}>
+              注文一覧へ
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card className="hover:shadow-lg transition-shadow">
+          <CardHeader>
             <CardTitle>ユーザー管理</CardTitle>
           </CardHeader>
           <CardContent>
@@ -55,4 +69,3 @@ export default function Home() {
     </div>
   )
 }
-

@@ -1,10 +1,11 @@
 'use client'
 
+import { useParams } from 'next/navigation'
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Select,
   SelectContent,
@@ -12,68 +13,62 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { AlertCircle, ArrowLeft } from 'lucide-react'
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
-export default function NewStaffPage({
-  params
-}: {
-  params: { id: string }
-}) {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [role, setRole] = useState('Staff')
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
-  const router = useRouter()
+export default function NewStaffPage() {
+  const params = useParams()
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    role: 'Staff',
+    status: 'active'
+  })
+
+  const roles = [
+    { value: 'Staff', label: 'スタッフ' },
+    { value: 'Owner', label: 'オーナー' }
+  ]
+
+  const statuses = [
+    { value: 'active', label: '有効' },
+    { value: 'inactive', label: '無効' },
+    { value: 'pending', label: '保留中' }
+  ]
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setLoading(true)
-    setError('')
+    setIsLoading(true)
+    setError(null)
 
     try {
-      const res = await fetch(`/api/admin/vendors/${params.id}/staff`, {
+      const vendorId = params.id
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
+      const response = await fetch(`${baseUrl}/api/vendors/${vendorId}/staff`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          email,
-          password,
-          role
-        }),
+        body: JSON.stringify(formData),
       })
 
-      const data = await res.json()
-
-      if (!res.ok) {
-        throw new Error(data.error || '登録に失敗しました')
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.details || errorData.error || 'スタッフの追加に失敗しました')
       }
 
-      // 登録成功後、店舗詳細ページに戻る
-      router.push(`/vendors/${params.id}`)
-      router.refresh()
-
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '予期せぬエラーが発生しました')
+      window.location.href = `/vendors/${vendorId}`
+    } catch (error) {
+      console.error('Failed to add staff:', error)
+      setError(error instanceof Error ? error.message : 'スタッフの追加中にエラーが発生しました')
     } finally {
-      setLoading(false)
+      setIsLoading(false)
     }
   }
 
   return (
-    <div className="container mx-auto py-10">
-      <Button
-        variant="outline"
-        onClick={() => router.back()}
-        className="mb-6"
-      >
-        <ArrowLeft className="mr-2 h-4 w-4" />
-        戻る
-      </Button>
-
+    <div className="max-w-2xl mx-auto px-4 py-10">
       <Card>
         <CardHeader>
           <CardTitle>スタッフ追加</CardTitle>
@@ -81,59 +76,93 @@ export default function NewStaffPage({
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
+              <Label htmlFor="name">名前</Label>
+              <Input
+                id="name"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                required
+              />
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="email">メールアドレス</Label>
               <Input
                 id="email"
                 type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 required
               />
             </div>
-
             <div className="space-y-2">
-              <Label htmlFor="password">初期パスワード</Label>
+              <Label htmlFor="phone">電話番号</Label>
               <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                id="phone"
+                type="tel"
+                value={formData.phone}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                 required
-                minLength={8}
               />
             </div>
-
             <div className="space-y-2">
               <Label htmlFor="role">役割</Label>
               <Select
-                value={role}
-                onValueChange={setRole}
+                value={formData.role}
+                onValueChange={(value) => setFormData({ ...formData, role: value })}
               >
-                <SelectTrigger>
+                <SelectTrigger className="bg-white">
                   <SelectValue placeholder="役割を選択" />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Staff">スタッフ</SelectItem>
-                  <SelectItem value="Pharmacist">薬剤師</SelectItem>
+                <SelectContent className="bg-white">
+                  {roles.map((role) => (
+                    <SelectItem 
+                      key={role.value} 
+                      value={role.value}
+                      className="hover:bg-gray-100"
+                    >
+                      {role.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
-
+            <div className="space-y-2">
+              <Label htmlFor="status">ステータス</Label>
+              <Select
+                value={formData.status}
+                onValueChange={(value) => setFormData({ ...formData, status: value })}
+              >
+                <SelectTrigger className="bg-white">
+                  <SelectValue placeholder="ステータスを選択" />
+                </SelectTrigger>
+                <SelectContent className="bg-white">
+                  {statuses.map((status) => (
+                    <SelectItem 
+                      key={status.value} 
+                      value={status.value}
+                      className="hover:bg-gray-100"
+                    >
+                      {status.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             {error && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertTitle>エラー</AlertTitle>
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
+              <div className="text-red-600 text-sm">{error}</div>
             )}
-
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={loading}
-            >
-              {loading ? '登録中...' : '登録する'}
-            </Button>
+            <div className="flex justify-end space-x-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => window.location.href = `/vendors/${params.id}`}
+              >
+                キャンセル
+              </Button>
+              <Button type="submit" disabled={isLoading}>
+                {isLoading ? '処理中...' : '追加'}
+              </Button>
+            </div>
           </form>
         </CardContent>
       </Card>

@@ -1,173 +1,317 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useParams } from 'next/navigation'
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Users } from 'lucide-react'
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import { PlusCircle } from "lucide-react"
 
-interface VendorUser {
-  user_id: string
+interface User {
+  id: string
+  name: string
+  email: string
+  phone: string
+}
+
+interface StaffMember {
+  id: string
   role: string
   status: string
   created_at: string
-  users: {
+  user: User
+  users?: User
+}
+
+interface Pharmacist {
+  id: string
+  license_number: string
+  verification_status: string
+  created_at: string
+  user: {
+    name: string
     email: string
-    created_at: string
+    phone: string
   }
 }
 
 interface Vendor {
   id: string
   vendor_name: string
+  status: string
   email: string
   phone: string
   postal_code: string
   address: string
   business_hours: string
   description: string
-  status: string
   created_at: string
-  vendor_users: VendorUser[]
+  updated_at: string
+  staff_members: StaffMember[]
+  pharmacists: Pharmacist[]
 }
 
-export default function VendorDetailPage({
-  params
-}: {
-  params: { id: string }
-}) {
+export default function VendorDetailPage() {
+  const params = useParams()
   const [vendor, setVendor] = useState<Vendor | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const router = useRouter()
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const fetchVendor = async () => {
-      try {
-        const res = await fetch(`/api/admin/vendors/${params.id}`)
-        const data = await res.json()
-
-        if (!res.ok) {
-          throw new Error(data.error || '店舗情報の取得に失敗しました')
-        }
-
-        setVendor(data)
-      } catch (err) {
-        setError(err instanceof Error ? err.message : '予期せぬエラーが発生しました')
-      } finally {
-        setLoading(false)
-      }
+    if (params.id) {
+      fetchVendorDetail(params.id as string)
     }
-
-    fetchVendor()
   }, [params.id])
 
-  if (loading) {
+  const fetchVendorDetail = async (id: string) => {
+    try {
+      setIsLoading(true)
+      setError(null)
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
+      console.log('Fetching vendor details from:', `${baseUrl}/api/vendors/${id}`)
+
+      const response = await fetch(`${baseUrl}/api/vendors/${id}`)
+      const data = await response.json()
+
+      if (!response.ok) {
+        console.error('API Error:', data)
+        throw new Error(data.error || 'データの取得に失敗しました')
+      }
+
+      if (!data) {
+        throw new Error('データが見つかりません')
+      }
+
+      console.log('Received vendor data:', data)
+      setVendor(data)
+    } catch (error) {
+      console.error('Failed to fetch vendor:', error)
+      setError(error instanceof Error ? error.message : 'データの取得中にエラーが発生しました')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const getStatusBadge = (status: string) => {
+    const statusMap = {
+      active: '営業中',
+      inactive: '休業中',
+      pending: '審査中'
+    }
+    
+    const statusStyles = {
+      active: 'bg-green-100 text-green-800',
+      inactive: 'bg-gray-100 text-gray-800',
+      pending: 'bg-yellow-100 text-yellow-800',
+    }
+    
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
+      <Badge className={statusStyles[status as keyof typeof statusStyles]}>
+        {statusMap[status as keyof typeof statusMap] || status}
+      </Badge>
+    )
+  }
+
+  if (isLoading) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+        <div className="flex justify-center items-center h-64">
+          <div className="text-lg">読み込み中...</div>
+        </div>
       </div>
     )
   }
 
   if (error || !vendor) {
     return (
-      <div className="container mx-auto py-10">
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-          {error || '店舗情報が見つかりません'}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+        <div className="flex justify-center items-center h-64">
+          <div className="text-lg text-red-600">{error || '出店者が見つかりません'}</div>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="container mx-auto py-10">
-      <div className="mb-6">
-        <Button
-          variant="outline"
-          onClick={() => router.back()}
-          className="mb-4"
-        >
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          戻る
-        </Button>
-        
-        <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-bold">{vendor.vendor_name}</h1>
-          <Badge variant={vendor.status === 'active' ? 'success' : 'secondary'}>
-            {vendor.status === 'active' ? '有効' : '無効'}
-          </Badge>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">出店者詳細</h1>
+        <div className="space-x-4">
+          <Button
+            variant="outline"
+            onClick={() => window.location.href = '/vendors'}
+          >
+            一覧に戻る
+          </Button>
+          <Button
+            onClick={() => window.location.href = `/vendors/${vendor.id}/edit`}
+          >
+            編集
+          </Button>
         </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>基本情報</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle>{vendor.vendor_name}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <h3 className="text-sm font-medium text-gray-500">ステータス</h3>
+              <div className="mt-1">{getStatusBadge(vendor.status)}</div>
+            </div>
             <div>
               <h3 className="text-sm font-medium text-gray-500">メールアドレス</h3>
-              <p>{vendor.email}</p>
+              <div className="mt-1">{vendor.email}</div>
             </div>
             <div>
               <h3 className="text-sm font-medium text-gray-500">電話番号</h3>
-              <p>{vendor.phone || '-'}</p>
+              <div className="mt-1">{vendor.phone}</div>
             </div>
             <div>
               <h3 className="text-sm font-medium text-gray-500">住所</h3>
-              <p>{vendor.postal_code && `〒${vendor.postal_code}`}</p>
-              <p>{vendor.address || '-'}</p>
+              <div className="mt-1">{`〒${vendor.postal_code} ${vendor.address}`}</div>
             </div>
             <div>
               <h3 className="text-sm font-medium text-gray-500">営業時間</h3>
-              <p>{vendor.business_hours || '-'}</p>
+              <div className="mt-1">{vendor.business_hours}</div>
             </div>
             <div>
-              <h3 className="text-sm font-medium text-gray-500">店舗説明</h3>
-              <p className="whitespace-pre-wrap">{vendor.description || '-'}</p>
+              <h3 className="text-sm font-medium text-gray-500">登録日</h3>
+              <div className="mt-1">{new Date(vendor.created_at).toLocaleDateString('ja-JP')}</div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+          <div>
+            <h3 className="text-sm font-medium text-gray-500">説明</h3>
+            <div className="mt-1 whitespace-pre-wrap">{vendor.description}</div>
+          </div>
+        </CardContent>
+      </Card>
 
+      <div className="mt-8">
         <Card>
           <CardHeader>
             <div className="flex justify-between items-center">
-              <CardTitle className="flex items-center">
-                <Users className="mr-2 h-4 w-4" />
-                スタッフ一覧
-              </CardTitle>
+              <CardTitle>スタッフ一覧</CardTitle>
               <Button
-                size="sm"
-                onClick={() => router.push(`/vendors/${vendor.id}/staff/new`)}
+                onClick={() => window.location.href = `/vendors/${vendor.id}/staff/new`}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg flex items-center gap-2"
               >
-                スタッフ追加
+                <PlusCircle className="w-5 h-5" />
+                スタッフを追加
               </Button>
             </div>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {vendor.vendor_users.map((user) => (
-                <div
-                  key={user.user_id}
-                  className="flex justify-between items-center p-3 bg-gray-50 rounded-lg"
-                >
-                  <div>
-                    <p className="font-medium">{user.users.email}</p>
-                    <p className="text-sm text-gray-500">
-                      登録日: {new Date(user.created_at).toLocaleDateString('ja-JP')}
-                    </p>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Badge>{user.role}</Badge>
-                    <Badge variant={user.status === 'active' ? 'success' : 'secondary'}>
-                      {user.status === 'active' ? '有効' : '無効'}
-                    </Badge>
-                  </div>
-                </div>
-              ))}
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>名前</TableHead>
+                  <TableHead>メール</TableHead>
+                  <TableHead>電話番号</TableHead>
+                  <TableHead>役割</TableHead>
+                  <TableHead>ステータス</TableHead>
+                  <TableHead>登録日</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {vendor.staff_members.map((staff) => (
+                  <TableRow key={staff.id}>
+                    <TableCell>{(staff.users || staff.user)?.name}</TableCell>
+                    <TableCell>{(staff.users || staff.user)?.email}</TableCell>
+                    <TableCell>{(staff.users || staff.user)?.phone}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline">
+                        {staff.role === 'staff' ? 'スタッフ' : '管理者'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={
+                        staff.status === 'active' 
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-gray-100 text-gray-800'
+                      }>
+                        {staff.status === 'active' ? '有効' : '無効'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {new Date(staff.created_at).toLocaleDateString('ja-JP')}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="mt-8">
+        <Card>
+          <CardHeader>
+            <div className="flex justify-between items-center">
+              <CardTitle>薬剤師一覧</CardTitle>
+              <Button
+                onClick={() => window.location.href = `/vendors/${vendor.id}/pharmacists/new`}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg flex items-center gap-2"
+              >
+                <PlusCircle className="w-5 h-5" />
+                薬剤師を追加
+              </Button>
             </div>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>名前</TableHead>
+                  <TableHead>メール</TableHead>
+                  <TableHead>電話番号</TableHead>
+                  <TableHead>免許番号</TableHead>
+                  <TableHead>認証状態</TableHead>
+                  <TableHead>登録日</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {vendor.pharmacists.map((pharmacist) => (
+                  <TableRow key={pharmacist.id}>
+                    <TableCell>{pharmacist.user.name}</TableCell>
+                    <TableCell>{pharmacist.user.email}</TableCell>
+                    <TableCell>{pharmacist.user.phone}</TableCell>
+                    <TableCell>{pharmacist.license_number}</TableCell>
+                    <TableCell>
+                      <Badge className={
+                        pharmacist.verification_status === 'verified'
+                          ? 'bg-green-100 text-green-800'
+                          : pharmacist.verification_status === 'pending'
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : 'bg-red-100 text-red-800'
+                      }>
+                        {pharmacist.verification_status === 'verified' ? '認証済み'
+                          : pharmacist.verification_status === 'pending' ? '審査中'
+                          : '未認証'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {new Date(pharmacist.created_at).toLocaleDateString('ja-JP')}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </CardContent>
         </Card>
       </div>

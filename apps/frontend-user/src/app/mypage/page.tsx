@@ -52,24 +52,56 @@ export default function MyPage() {
   const [loadingProfile, setLoadingProfile] = useState(true)
 
   useEffect(() => {
-    if (!loading && !user) {
-      router.push('/login')
-      return
+    async function checkAdminUser() {
+      if (!user?.email) return false;
+      
+      const { data, error } = await supabase
+        .from('admin_users')
+        .select('id')
+        .eq('email', user.email)
+        .single();
+      
+      return data !== null;
     }
+
+    async function init() {
+      if (!loading) {
+        if (!user) {
+          router.push('/login')
+          return
+        }
+
+        // 管理者かどうかチェック
+        const isAdmin = await checkAdminUser()
+        if (isAdmin) {
+          handleLogout()
+          return
+        }
+      }
+    }
+
+    init()
   }, [user, loading, router])
 
   useEffect(() => {
     async function fetchUserProfile() {
-      if (!user) return
+      if (!user) {
+        console.log('No user found, skipping profile fetch')
+        return
+      }
 
       try {
+        console.log('Fetching session...')
         const { data: { session } } = await supabase.auth.getSession()
+        console.log('Session status:', session ? 'active' : 'inactive')
+
         if (!session) {
           console.log('No active session, redirecting to login')
           router.push('/login')
           return
         }
 
+        console.log('Fetching user profile...')
         const { data, error } = await supabase
           .from('users')
           .select('*')
@@ -78,6 +110,11 @@ export default function MyPage() {
 
         if (error) {
           console.error('Error fetching profile:', error)
+          console.log('Error details:', {
+            code: error.code,
+            message: error.message,
+            details: error.details
+          })
           if (error.code === 'PGRST301') {
             // JWTが期限切れの場合は一度だけリフレッシュを試みる
             try {
@@ -137,9 +174,12 @@ export default function MyPage() {
   const handleLogout = async () => {
     try {
       await logout()
-      router.push('/login')
+      // 強制的にログインページに遷移
+      window.location.href = '/login'
     } catch (error) {
       console.error('Logout error:', error)
+      // エラーが発生しても強制的にログインページに遷移
+      window.location.href = '/login'
     }
   }
 
@@ -158,7 +198,23 @@ export default function MyPage() {
   }
 
   if (!user || !profile) {
-    return null
+    return (
+      <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#E6F3EF] to-white">
+        <SiteHeader />
+        <main className="flex-grow container mx-auto px-4 py-12 mt-16 flex items-center justify-center">
+          <div className="text-center">
+            <p className="text-[#4C9A84] mb-4">ユーザー情報の読み込みに失敗しました</p>
+            <Button 
+              onClick={() => router.push('/login')}
+              className="bg-[#4C9A84] hover:bg-[#3A8B73] text-white"
+            >
+              ログインページへ
+            </Button>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    )
   }
 
   return (

@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { Menu, LogIn, History } from 'lucide-react'
-import { Button } from './ui/button'
+import { Button } from '@/components/ui/button'
 import { useRouter, usePathname } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 
@@ -11,8 +11,6 @@ export function SiteHeader() {
   const router = useRouter()
   const pathname = usePathname()
   const { user, loading } = useAuth()
-
-  console.log('SiteHeader state:', { user, loading, pathname }) // デバッグ用
 
   const handleMenuClick = () => {
     if (!user) {

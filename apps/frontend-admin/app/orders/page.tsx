@@ -98,7 +98,7 @@ export default function OrdersPage() {
       case 'processing':
         return <Badge variant="secondary">処理中</Badge>
       case 'shipped':
-        return <Badge variant="success">発送済み</Badge>
+        return <Badge variant="secondary">発送済み</Badge>
       case 'delivered':
         return <Badge>配達済み</Badge>
       case 'cancelled':
@@ -113,7 +113,7 @@ export default function OrdersPage() {
       case 'pending':
         return <Badge variant="default">未決済</Badge>
       case 'completed':
-        return <Badge variant="success">決済完了</Badge>
+        return <Badge variant="secondary">決済完了</Badge>
       case 'failed':
         return <Badge variant="destructive">決済失敗</Badge>
       default:

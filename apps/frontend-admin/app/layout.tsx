@@ -1,14 +1,13 @@
-import './globals.css'
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
-import { AuthLayout } from './AuthLayout'
-import { Header } from '@/components/layout/header'
+import { Header } from '@/components/header'
+import './globals.css'
 
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Healthle 管理システム',
-  description: 'Healthle管理者向けシステム',
+  title: 'Admin Dashboard',
+  description: 'Healthle Admin Dashboard',
 }
 
 export default function RootLayout({
@@ -19,28 +18,14 @@ export default function RootLayout({
   return (
     <html lang="ja">
       <body className={inter.className}>
-        <AuthLayout>
-          <HeaderWrapper>{children}</HeaderWrapper>
-        </AuthLayout>
+        <div className="min-h-screen flex flex-col">
+          <Header />
+          <main className="flex-1 bg-gray-50">
+            {children}
+          </main>
+        </div>
       </body>
     </html>
-  )
-}
-
-function HeaderWrapper({ children }: { children: React.ReactNode }) {
-  const isLoginPage = typeof window !== 'undefined' && window.location.pathname === '/login'
-
-  if (isLoginPage) {
-    return children
-  }
-
-  return (
-    <div className="min-h-screen flex flex-col">
-      <Header />
-      <main className="flex-1">
-        {children}
-      </main>
-    </div>
   )
 }
 
