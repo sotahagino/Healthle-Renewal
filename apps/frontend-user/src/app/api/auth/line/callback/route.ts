@@ -125,6 +125,14 @@ export async function GET(request: NextRequest) {
     })
     if (signInErr) throw signInErr
 
+    // returnToパラメータを取得
+    const returnTo = searchParams.get('returnTo')
+    // 許可されたリダイレクト先かチェック（セキュリティ対策）
+    const allowedPaths = ['/mypage', '/result', '/purchase-complete']
+    const redirectPath = returnTo && allowedPaths.some(path => returnTo.startsWith(path))
+      ? returnTo
+      : '/mypage'
+
     // vendor_ordersテーブルのuser_idを更新
     try {
       // ローカルストレージから購入情報を取得するためのスクリプトを追加
@@ -145,14 +153,6 @@ export async function GET(request: NextRequest) {
           localStorage.removeItem('purchaseFlow');
         }
       `;
-
-      // returnToパラメータを取得
-      const returnTo = searchParams.get('returnTo')
-      // 許可されたリダイレクト先かチェック（セキュリティ対策）
-      const allowedPaths = ['/mypage', '/result', '/purchase-complete']
-      const redirectPath = returnTo && allowedPaths.some(path => returnTo.startsWith(path))
-        ? returnTo
-        : '/mypage'
 
       const redirectUrl = new URL(redirectPath, request.url)
 
