@@ -9,13 +9,10 @@ export type Order = {
   status: string;
   total_amount: number;
   created_at: string;
-  shipping_info: {
-    name: string;
-    postal_code: string;
-    prefecture: string;
-    city: string;
-    address: string;
-  };
+  customer_email: string;
+  shipping_name: string;
+  shipping_address: string;
+  shipping_phone: string;
 };
 
 export const columns: ColumnDef<Order>[] = [
@@ -47,19 +44,19 @@ export const columns: ColumnDef<Order>[] = [
     },
   },
   {
-    accessorKey: 'shipping_info',
+    accessorKey: 'shipping_address',
     header: '配送先',
     cell: ({ row }) => {
-      const shipping = row.getValue('shipping_info') as Order['shipping_info'];
-      return shipping ? (
-        <div>
-          <div>{shipping.name}</div>
-          <div className="text-sm text-gray-500">
-            〒{shipping.postal_code} {shipping.prefecture}{shipping.city}{shipping.address}
-          </div>
+      return (
+        <div className="text-sm">
+          {row.getValue('shipping_address')}
         </div>
-      ) : null;
+      );
     },
+  },
+  {
+    accessorKey: 'customer_email',
+    header: 'メールアドレス',
   },
   {
     accessorKey: 'created_at',
