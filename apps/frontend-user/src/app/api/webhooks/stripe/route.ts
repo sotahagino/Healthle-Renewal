@@ -162,11 +162,6 @@ async function createOrderRecords(
   orderNumber: string
 ) {
   try {
-    // ユーザーが存在する場合のみユーザー情報を更新
-    if (session.client_reference_id) {
-      await updateUserShippingInfo(session.client_reference_id, session.shipping_details);
-    }
-
     // 配送情報の取得
     const shippingInfo = {
       name: session.shipping_details?.name || '',
@@ -177,48 +172,16 @@ async function createOrderRecords(
       phone: session.shipping_details?.phone || '',
     };
 
-    // 完全な住所を生成
-    const fullAddress = `〒${shippingInfo.postal_code} ${shippingInfo.prefecture}${shippingInfo.city}${shippingInfo.address}`;
-
-    // 基本的な注文情報
-    const orderData = {
-      order_number: orderNumber,
-      user_id: session.client_reference_id || null,
-      product_id: product.id,
-      vendor_id: product.vendor_id,
-      status: ORDER_STATUS.PAID,
-      total_amount: session.amount_total,
-      stripe_payment_link_id: session.payment_link,
-      stripe_session_id: session.id,
-      shipping_name: shippingInfo.name,
-      shipping_address: fullAddress,
-      shipping_phone: shippingInfo.phone,
-      customer_email: session.customer_details?.email || '',
-      payment_status: 'paid',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    };
-
-    // 注文履歴の保存
-    const { error: orderError } = await supabase
-      .from('orders')
-      .insert([orderData]);
-
-    if (orderError) {
-      console.error('Failed to create order:', orderError);
-      throw orderError;
-    }
-
     // 出展者向け注文情報の保存
     const vendorOrderData = {
       order_id: orderNumber,
       vendor_id: product.vendor_id,
       product_id: product.id,
-      status: ORDER_STATUS.PAID,
+      status: 'paid',
       total_amount: session.amount_total,
       commission_rate: product.commission_rate || 10,
       shipping_name: shippingInfo.name,
-      shipping_address: fullAddress,
+      shipping_address: `〒${shippingInfo.postal_code} ${shippingInfo.prefecture}${shippingInfo.city}${shippingInfo.address}`,
       shipping_phone: shippingInfo.phone,
       customer_email: session.customer_details?.email || '',
       created_at: new Date().toISOString(),
@@ -237,10 +200,10 @@ async function createOrderRecords(
     // 管理システム用の注文トラッキング情報の保存
     const orderTrackingData = {
       order_id: orderNumber,
-      current_status: ORDER_STATUS.PAID,
+      current_status: 'paid',
       payment_confirmed_at: new Date().toISOString(),
       status_history: [{
-        status: ORDER_STATUS.PAID,
+        status: 'paid',
         timestamp: new Date().toISOString(),
         note: '決済完了'
       }],
@@ -257,7 +220,7 @@ async function createOrderRecords(
       throw trackingError;
     }
 
-    return orderData;
+    return vendorOrderData;
   } catch (error) {
     console.error('注文情報の保存に失敗:', error);
     throw error;
