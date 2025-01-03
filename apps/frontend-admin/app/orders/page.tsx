@@ -12,7 +12,6 @@ import {
 } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Eye } from 'lucide-react'
 import {
   Select,
   SelectContent,
@@ -33,6 +32,10 @@ interface Order {
   payment_status: string
   created_at: string
   updated_at: string
+  shipping_name: string
+  shipping_address: string
+  shipping_phone: string
+  customer_email: string
   vendor_name: string
   user_name: string
 }
@@ -199,10 +202,11 @@ export default function OrdersPage() {
               <TableHead>注文日時</TableHead>
               <TableHead>出店者</TableHead>
               <TableHead>購入者</TableHead>
+              <TableHead>配送先</TableHead>
+              <TableHead>メールアドレス</TableHead>
               <TableHead>合計金額</TableHead>
               <TableHead>ステータス</TableHead>
               <TableHead>決済状況</TableHead>
-              <TableHead className="text-right">操作</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -212,18 +216,15 @@ export default function OrdersPage() {
                 <TableCell>{new Date(order.created_at).toLocaleString('ja-JP')}</TableCell>
                 <TableCell>{order.vendor_name}</TableCell>
                 <TableCell>{order.user_name}</TableCell>
+                <TableCell>
+                  <div className="text-sm">
+                    {order.shipping_address}
+                  </div>
+                </TableCell>
+                <TableCell>{order.customer_email}</TableCell>
                 <TableCell>{formatPrice(order.total_amount)}</TableCell>
                 <TableCell>{getStatusBadge(order.status)}</TableCell>
                 <TableCell>{getPaymentStatusBadge(order.payment_status)}</TableCell>
-                <TableCell className="text-right">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => router.push(`/orders/${order.id}`)}
-                  >
-                    <Eye className="h-4 w-4" />
-                  </Button>
-                </TableCell>
               </TableRow>
             ))}
           </TableBody>
