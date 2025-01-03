@@ -125,39 +125,67 @@ export async function GET(request: NextRequest) {
     })
     if (signInErr) throw signInErr
 
-    // returnToパラメータを取得
-    const returnTo = searchParams.get('returnTo')
-    // 許可されたリダイレクト先かチェック（セキュリティ対策）
-    const allowedPaths = ['/mypage', '/result', '/purchase-complete']
-    const redirectPath = returnTo && allowedPaths.some(path => returnTo.startsWith(path))
-      ? returnTo
-      : '/mypage'
+    // vendor_ordersテーブルのuser_idを更新
+    try {
+      // ローカルストレージから購入情報を取得するためのスクリプトを追加
+      const purchaseFlowScript = `
+        const purchaseFlow = localStorage.getItem('purchaseFlow');
+        if (purchaseFlow) {
+          const { consultation_id } = JSON.parse(purchaseFlow);
+          fetch('/api/orders/update-user', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              user_id: '${user.id}',
+              consultation_id
+            })
+          });
+          localStorage.removeItem('purchaseFlow');
+        }
+      `;
 
-    const redirectUrl = new URL(redirectPath, request.url)
+      // returnToパラメータを取得
+      const returnTo = searchParams.get('returnTo')
+      // 許可されたリダイレクト先かチェック（セキュリティ対策）
+      const allowedPaths = ['/mypage', '/result', '/purchase-complete']
+      const redirectPath = returnTo && allowedPaths.some(path => returnTo.startsWith(path))
+        ? returnTo
+        : '/mypage'
 
-    // セッショントークンをlocalStorageに保存するためのスクリプトを返す
-    const html = `
-      <!DOCTYPE html>
-      <html>
-        <script>
-          const session = ${JSON.stringify(signInData.session)};
-          const projectRef = '${process.env.NEXT_PUBLIC_SUPABASE_URL!.match(/(?:https:\/\/)?([^.]+)/)?.[1] ?? ''}';
-          localStorage.setItem(\`sb-\${projectRef}-auth-token\`, JSON.stringify({
-            access_token: session.access_token,
-            refresh_token: session.refresh_token,
-            expires_at: Math.floor(Date.now() / 1000) + ${60 * 60 * 24 * 7},
-            expires_in: ${60 * 60 * 24 * 7},
-            token_type: 'bearer',
-            user: session.user
-          }));
-          window.location.href = '${redirectUrl}';
-        </script>
-      </html>
-    `
+      const redirectUrl = new URL(redirectPath, request.url)
 
-    return new NextResponse(html, {
-      headers: { 'Content-Type': 'text/html' }
-    })
+      // セッショントークンをlocalStorageに保存し、vendor_ordersの更新を行うスクリプトを返す
+      const html = `
+        <!DOCTYPE html>
+        <html>
+          <script>
+            const session = ${JSON.stringify(signInData.session)};
+            const projectRef = '${process.env.NEXT_PUBLIC_SUPABASE_URL!.match(/(?:https:\/\/)?([^.]+)/)?.[1] ?? ''}';
+            localStorage.setItem(\`sb-\${projectRef}-auth-token\`, JSON.stringify({
+              access_token: session.access_token,
+              refresh_token: session.refresh_token,
+              expires_at: Math.floor(Date.now() / 1000) + ${60 * 60 * 24 * 7},
+              expires_in: ${60 * 60 * 24 * 7},
+              token_type: 'bearer',
+              user: session.user
+            }));
+            ${purchaseFlowScript}
+            window.location.href = '${redirectUrl}';
+          </script>
+        </html>
+      `
+
+      return new NextResponse(html, {
+        headers: { 'Content-Type': 'text/html' }
+      })
+
+    } catch (error) {
+      console.error('Error updating vendor_orders:', error)
+      // エラーが発生しても認証自体は成功しているので、リダイレクトは続行
+      return NextResponse.redirect(new URL(redirectPath, request.url))
+    }
 
   } catch (error) {
     console.error('Callback error:', error)
