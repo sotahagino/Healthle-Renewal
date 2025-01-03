@@ -8,6 +8,18 @@ CREATE TABLE webhook_logs (
   error_message TEXT
 );
 
+-- vendor_ordersテーブルにuser_idカラムを追加
+ALTER TABLE vendor_orders
+ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES users(id);
+
+-- vendor_ordersテーブルにconsultation_idカラムを追加
+ALTER TABLE vendor_orders
+ADD COLUMN IF NOT EXISTS consultation_id UUID REFERENCES consultations(id);
+
+-- webhook_logsテーブルにprocessed_dataカラムを追加
+ALTER TABLE webhook_logs
+ADD COLUMN IF NOT EXISTS processed_data JSONB;
+
 -- 注文テーブル
 CREATE TABLE orders (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,

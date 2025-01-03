@@ -184,6 +184,7 @@ async function createOrderRecords(
       shipping_address: `〒${shippingInfo.postal_code} ${shippingInfo.prefecture}${shippingInfo.city}${shippingInfo.address}`,
       shipping_phone: shippingInfo.phone,
       customer_email: session.customer_details?.email || '',
+      consultation_id: session.metadata?.consultation_id,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
