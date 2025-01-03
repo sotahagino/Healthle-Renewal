@@ -206,7 +206,7 @@ export default function QuestionnairePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#E6F3EF] to-white">
+    <div className="min-h-screen bg-[#FAFAFA]">
       <main className="container mx-auto px-4 py-8">
         <div className="max-w-4xl mx-auto">
           <div className="flex items-center mb-6">
