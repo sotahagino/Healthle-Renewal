@@ -25,7 +25,7 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
 interface Order {
   id: string
-  user_id: string
+  order_id: string
   vendor_id: string
   total_amount: number
   status: string
@@ -96,15 +96,13 @@ export default function OrdersPage() {
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'pending':
-        return <Badge variant="default">処理待ち</Badge>
-      case 'processing':
-        return <Badge variant="secondary">処理中</Badge>
-      case 'shipped':
+      case 'paid':
+        return <Badge variant="default">支払い済み</Badge>
+      case '準備中':
+        return <Badge variant="secondary">準備中</Badge>
+      case '発送済み':
         return <Badge variant="secondary">発送済み</Badge>
-      case 'delivered':
-        return <Badge>配達済み</Badge>
-      case 'cancelled':
+      case 'キャンセル':
         return <Badge variant="destructive">キャンセル</Badge>
       default:
         return <Badge variant="outline">{status}</Badge>
@@ -212,7 +210,7 @@ export default function OrdersPage() {
           <TableBody>
             {filteredOrders.map((order) => (
               <TableRow key={order.id}>
-                <TableCell className="font-medium">{order.id}</TableCell>
+                <TableCell className="font-medium">{order.order_id}</TableCell>
                 <TableCell>{new Date(order.created_at).toLocaleString('ja-JP')}</TableCell>
                 <TableCell>{order.vendor_name}</TableCell>
                 <TableCell>{order.user_name}</TableCell>

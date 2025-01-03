@@ -15,13 +15,10 @@ interface Order {
   status: string
   total_amount: number
   created_at: string
-  shipping_info: {
-    name: string
-    postal_code: string
-    prefecture: string
-    city: string
-    address: string
-  }
+  customer_email: string
+  shipping_name: string
+  shipping_address: string
+  shipping_phone: string
 }
 
 export default function OrdersPage() {
@@ -46,7 +43,10 @@ export default function OrdersPage() {
           status,
           total_amount,
           created_at,
-          shipping_info
+          customer_email,
+          shipping_name,
+          shipping_address,
+          shipping_phone
         `)
         .eq('vendor_id', vendorId)
         .order('created_at', { ascending: false })

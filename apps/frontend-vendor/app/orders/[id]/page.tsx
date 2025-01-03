@@ -24,24 +24,12 @@ interface OrderDetails {
   status: string
   total_amount: number
   commission_rate: number | null
-  shipping_info: {
-    name: string
-    postal_code: string
-    prefecture: string
-    city: string
-    address: string
-    phone: string
-  }
+  customer_email: string
+  shipping_name: string
+  shipping_address: string
+  shipping_phone: string
   created_at: string
   updated_at: string
-  order: {
-    shipping_name: string
-    shipping_postal_code: string
-    shipping_prefecture: string
-    shipping_city: string
-    shipping_address: string
-    shipping_phone: string
-  }
   product: {
     name: string
   }
@@ -88,7 +76,10 @@ export default function OrderDetailsPage({
             status,
             total_amount,
             commission_rate,
-            shipping_info,
+            customer_email,
+            shipping_name,
+            shipping_address,
+            shipping_phone,
             created_at,
             updated_at,
             product_id
@@ -119,14 +110,6 @@ export default function OrderDetailsPage({
 
         const formattedData: OrderDetails = {
           ...data,
-          order: {
-            shipping_name: data.shipping_info?.name,
-            shipping_postal_code: data.shipping_info?.postal_code,
-            shipping_prefecture: data.shipping_info?.prefecture,
-            shipping_city: data.shipping_info?.city,
-            shipping_address: data.shipping_info?.address,
-            shipping_phone: data.shipping_info?.phone
-          },
           product: productData || { name: '商品情報なし' }
         }
 
@@ -224,11 +207,11 @@ export default function OrderDetailsPage({
                   )}
                 </div>
                 <div>
-                  <h3 className="font-semibold mb-2">配送先情報</h3>
-                  <p>氏名: {order.order.shipping_name}</p>
-                  <p>電話番号: {order.order.shipping_phone}</p>
-                  <p>郵便番号: {order.order.shipping_postal_code}</p>
-                  <p>住所: {order.order.shipping_prefecture}{order.order.shipping_city}{order.order.shipping_address}</p>
+                  <h3 className="font-semibold mb-2">配送先・顧客情報</h3>
+                  <p>氏名: {order.shipping_name}</p>
+                  <p>メールアドレス: {order.customer_email}</p>
+                  {order.shipping_phone && <p>電話番号: {order.shipping_phone}</p>}
+                  <p>住所: {order.shipping_address}</p>
                 </div>
               </div>
 
