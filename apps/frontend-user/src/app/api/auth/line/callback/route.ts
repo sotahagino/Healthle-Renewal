@@ -139,18 +139,35 @@ export async function GET(request: NextRequest) {
       const purchaseFlowScript = `
         const purchaseFlow = localStorage.getItem('purchaseFlow');
         if (purchaseFlow) {
-          const { consultation_id } = JSON.parse(purchaseFlow);
-          fetch('/api/orders/update-user', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              user_id: '${user.id}',
-              consultation_id
+          try {
+            const { consultation_id } = JSON.parse(purchaseFlow);
+            console.log('Updating user_id for consultation:', consultation_id);
+            fetch('/api/orders/update-user', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                user_id: '${user.id}',
+                consultation_id
+              })
             })
-          });
+            .then(response => response.json())
+            .then(data => {
+              console.log('Update response:', data);
+              if (data.error) {
+                console.error('Update failed:', data.error);
+              }
+            })
+            .catch(error => {
+              console.error('Update request failed:', error);
+            });
+          } catch (error) {
+            console.error('Error processing purchaseFlow:', error);
+          }
           localStorage.removeItem('purchaseFlow');
+        } else {
+          console.log('No purchaseFlow found in localStorage');
         }
       `;
 

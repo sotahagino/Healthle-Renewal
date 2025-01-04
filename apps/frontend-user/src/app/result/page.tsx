@@ -602,6 +602,11 @@ export default function ResultPage() {
 
   const handlePurchaseClick = async (product: RecommendedProduct) => {
     try {
+      const consultation_id = searchParams.get('consultation_id')
+      if (!consultation_id) {
+        throw new Error('相談IDが見つかりません')
+      }
+
       // 商品のペイメントリンクURLを直接取得
       const { data: productData, error: productError } = await supabase
         .from('products')
@@ -616,7 +621,7 @@ export default function ResultPage() {
       // 購入フロー情報をlocalStorageに保存
       localStorage.setItem('purchaseFlow', JSON.stringify({
         product,
-        consultation_id: searchParams.get('consultation_id'),
+        consultation_id,
         timestamp: Date.now()
       }))
 
@@ -624,6 +629,8 @@ export default function ResultPage() {
       const successUrl = `${window.location.origin}/purchase-complete`
       const paymentUrl = new URL(productData.stripe_payment_link_url)
       paymentUrl.searchParams.set('redirect_to', successUrl)
+      // consultation_idをメタデータとして追加
+      paymentUrl.searchParams.set('metadata[consultation_id]', consultation_id)
 
       // ペイメントリンクに遷移
       window.location.href = paymentUrl.toString()

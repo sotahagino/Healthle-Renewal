@@ -11,32 +11,24 @@ export async function POST(request: NextRequest) {
     const { user_id, consultation_id } = await request.json()
 
     if (!user_id || !consultation_id) {
+      console.error('Missing required fields:', { user_id, consultation_id })
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
       )
     }
 
-    // consultation_idを使用して対応するvendor_ordersレコードを検索
-    const { data: vendorOrder, error: selectError } = await supabase
-      .from('vendor_orders')
-      .select('id')
-      .eq('consultation_id', consultation_id)
-      .single()
-
-    if (selectError) {
-      console.error('Error finding vendor order:', selectError)
-      return NextResponse.json(
-        { error: 'Failed to find vendor order' },
-        { status: 404 }
-      )
-    }
+    console.log('Updating vendor_orders with:', { user_id, consultation_id })
 
     // vendor_ordersテーブルのuser_idを更新
-    const { error: updateError } = await supabase
+    const { data: updateData, error: updateError } = await supabase
       .from('vendor_orders')
-      .update({ user_id })
+      .update({ 
+        user_id,
+        updated_at: new Date().toISOString()
+      })
       .eq('consultation_id', consultation_id)
+      .select()
 
     if (updateError) {
       console.error('Error updating vendor order:', updateError)
@@ -46,7 +38,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    return NextResponse.json({ success: true })
+    console.log('Update successful:', updateData)
+    return NextResponse.json({ success: true, data: updateData })
 
   } catch (error) {
     console.error('Error in update-user API:', error)
