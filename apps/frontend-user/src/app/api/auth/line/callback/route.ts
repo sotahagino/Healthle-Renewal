@@ -11,20 +11,10 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
     const code = searchParams.get('code')
-    const state = searchParams.get('state')
-    const order_id = searchParams.get('order_id')
-    const return_url = searchParams.get('return_url') || '/mypage'
-
-    console.log('Received parameters:', { code, state, order_id, return_url })
-
+    const returnTo = searchParams.get('returnTo')
+    
     if (!code) {
-      console.error('Authorization code not found')
-      return NextResponse.redirect(new URL('/login?error=no_code', request.url))
-    }
-
-    if (state !== 'line_login_state') {
-      console.error('Invalid state parameter')
-      return NextResponse.redirect(new URL('/login?error=invalid_state', request.url))
+      throw new Error('No code provided')
     }
 
     console.log('Getting LINE token with code:', code)
@@ -130,108 +120,97 @@ export async function GET(request: NextRequest) {
     }
 
     // セッション作成（新規・既存共通）
-    const { data: session, error: sessionError } = await supabase.auth.signInWithPassword({
+    const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
       email: user.email!,
       password: `line_${line_user_id}`
-    });
+    })
+    if (signInErr) throw signInErr
 
-    if (sessionError) {
-      console.error('Session creation error:', sessionError);
-      throw sessionError;
+    // URLパラメータからorder_idを取得
+    const order_id = searchParams.get('order_id');
+    console.log('Received order_id from URL:', order_id);
+
+    // 許可されたリダイレクト先かチェック（セキュリティ対策）
+    const allowedPaths = ['/mypage', '/result', '/purchase-complete']
+    const redirectPath = order_id ? '/purchase-complete' : '/mypage'
+
+    try {
+      // セッショントークンをlocalStorageに保存するHTML
+      const html = `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <script>
+              const session = ${JSON.stringify(signInData.session)};
+              const projectRef = '${process.env.NEXT_PUBLIC_SUPABASE_URL!.match(/(?:https:\/\/)?([^.]+)/)?.[1] ?? ''}';
+              const order_id = '${order_id || ''}';
+              
+              try {
+                // セッション情報を保存
+                localStorage.setItem(\`sb-\${projectRef}-auth-token\`, JSON.stringify({
+                  access_token: session.access_token,
+                  refresh_token: session.refresh_token,
+                  expires_at: Math.floor(Date.now() / 1000) + ${60 * 60 * 24 * 7},
+                  expires_in: ${60 * 60 * 24 * 7},
+                  token_type: 'bearer',
+                  user: session.user
+                }));
+
+                // order_idが存在する場合、ユーザーIDを更新
+                if (order_id) {
+                  console.log('Updating user_id for order:', order_id);
+                  fetch('/api/orders/update-user', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                      user_id: '${user.id}',
+                      order_id: order_id
+                    })
+                  })
+                  .then(response => response.json())
+                  .then(data => {
+                    console.log('Update response:', data);
+                    if (data.error) {
+                      console.error('Update failed:', data.error);
+                    }
+                    // 購入情報をクリア
+                    localStorage.removeItem('purchaseFlow');
+                  })
+                  .catch(error => {
+                    console.error('Update request failed:', error);
+                  });
+                }
+
+                // リダイレクト
+                window.location.href = '${redirectPath}';
+              } catch (error) {
+                console.error('Error in callback script:', error);
+                window.location.href = '/login?error=callback_error';
+              }
+            </script>
+          </head>
+          <body>
+            <p>ログイン処理中...</p>
+          </body>
+        </html>
+      `
+
+      return new NextResponse(html, {
+        headers: { 
+          'Content-Type': 'text/html',
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      })
+
+    } catch (error) {
+      console.error('Error in callback process:', error)
+      return NextResponse.redirect(new URL(redirectPath, request.url))
     }
 
-    console.log('Session created successfully:', session);
-
-    // ユーザーIDの更新処理
-    let redirectPath = return_url;
-    if (order_id && user) {
-      try {
-        // 注文の存在確認
-        const { data: existingOrder, error: checkError } = await supabase
-          .from('vendor_orders')
-          .select('*')
-          .eq('order_id', order_id)
-          .single();
-
-        if (checkError) {
-          console.error('Error checking order:', checkError);
-          redirectPath = '/purchase-error';
-          throw checkError;
-        }
-
-        if (!existingOrder) {
-          console.error('Order not found:', order_id);
-          redirectPath = '/purchase-error';
-          throw new Error('Order not found');
-        }
-
-        // vendor_ordersテーブルのuser_idを更新
-        const { data: updatedOrder, error: updateError } = await supabase
-          .from('vendor_orders')
-          .update({ 
-            user_id: user.id,
-            updated_at: new Date().toISOString()
-          })
-          .eq('order_id', order_id)
-          .select()
-          .single();
-
-        if (updateError) {
-          console.error('Failed to update user_id in vendor_orders:', {
-            error: updateError,
-            errorMessage: updateError?.message || 'Unknown error',
-            details: updateError?.details || null,
-            hint: updateError?.hint || null,
-            order_id,
-            user_id: user.id
-          });
-          redirectPath = '/purchase-error';
-          throw updateError;
-        }
-
-        console.log('Successfully updated user_id in vendor_orders:', updatedOrder);
-        redirectPath = '/purchase-complete';
-      } catch (error) {
-        console.error('Error in order update process:', error);
-      }
-    }
-
-    // セッショントークンをlocalStorageに保存するためのHTML
-    const html = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <script>
-            const session = ${JSON.stringify(session)};
-            const projectRef = '${process.env.NEXT_PUBLIC_SUPABASE_URL!.match(/(?:https:\/\/)?([^.]+)/)?.[1] ?? ''}';
-            
-            try {
-              // セッション情報を保存
-              localStorage.setItem(\`sb-\${projectRef}-auth-token\`, JSON.stringify({
-                access_token: session.session.access_token,
-                refresh_token: session.session.refresh_token,
-                expires_at: Math.floor(Date.now() / 1000) + ${60 * 60 * 24 * 7},
-                expires_in: ${60 * 60 * 24 * 7},
-                token_type: 'bearer',
-                user: session.user
-              }));
-
-              // リダイレクト先の決定
-              const redirectPath = '${redirectPath}';
-              console.log('Redirecting to:', redirectPath);
-              window.location.href = redirectPath;
-            } catch (error) {
-              console.error('Error in callback script:', error);
-              window.location.href = '/login?error=callback_error';
-            }
-          </script>
-        </head>
-      </html>
-    `;
-
-    return new NextResponse(html, {
-      headers: { 'Content-Type': 'text/html' }
-    });
   } catch (error) {
     console.error('Callback error:', error)
     return NextResponse.redirect(new URL('/login?error=auth_failed', request.url))

@@ -38,6 +38,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
         const purchaseFlowData = JSON.parse(purchaseFlow);
         order_id = purchaseFlowData.order_id;
         return_url = '/purchase-complete';
+        console.log('Retrieved order_id from purchaseFlow:', order_id);
       } catch (error) {
         console.error('Error parsing purchaseFlow:', error);
       }
@@ -45,7 +46,12 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
 
     const lineLoginUrl = new URL(`${process.env.NEXT_PUBLIC_SITE_URL}/api/auth/line`);
     lineLoginUrl.searchParams.append('state', 'line_login_state');
-    lineLoginUrl.searchParams.append('order_id', order_id);
+    
+    if (order_id) {
+      lineLoginUrl.searchParams.append('order_id', order_id);
+      console.log('Adding order_id to login URL:', order_id);
+    }
+    
     lineLoginUrl.searchParams.append('return_url', return_url);
 
     console.log('Redirecting to LINE login:', lineLoginUrl.toString());
