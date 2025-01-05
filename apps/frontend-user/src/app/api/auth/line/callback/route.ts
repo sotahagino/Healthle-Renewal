@@ -133,20 +133,62 @@ export async function GET(request: NextRequest) {
       // セッショントークンをlocalStorageに保存するHTML
       const html = `
         <!DOCTYPE html>
-        <html>
+        <html lang="ja">
           <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>認証処理中...</title>
+            <style>
+              body {
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                height: 100vh;
+                margin: 0;
+                background-color: #f5f5f5;
+              }
+              .loading {
+                text-align: center;
+                padding: 20px;
+              }
+              .loading p {
+                margin: 10px 0;
+                color: #333;
+              }
+              .error {
+                color: #dc3545;
+                margin-top: 10px;
+                display: none;
+              }
+            </style>
+          </head>
+          <body>
+            <div class="loading">
+              <p>認証処理中です...</p>
+              <p>しばらくお待ちください。</p>
+              <p id="error" class="error"></p>
+            </div>
             <script>
               const session = ${JSON.stringify(signInData.session)};
               const projectRef = '${process.env.NEXT_PUBLIC_SUPABASE_URL!.match(/(?:https:\/\/)?([^.]+)/)?.[1] ?? ''}';
               
+              function showError(message) {
+                const errorElement = document.getElementById('error');
+                errorElement.textContent = message;
+                errorElement.style.display = 'block';
+                setTimeout(() => {
+                  window.location.href = '/login?error=' + encodeURIComponent(message);
+                }, 3000);
+              }
+
               try {
                 // stateの検証
                 const savedState = localStorage.getItem('line_login_state');
                 const receivedState = '${request.nextUrl.searchParams.get('state')}';
                 
                 if (!savedState || savedState !== receivedState) {
-                  console.error('State verification failed');
-                  window.location.href = '/login?error=invalid_state';
+                  showError('認証エラー: セッションが無効です');
                   return;
                 }
                 
@@ -170,77 +212,65 @@ export async function GET(request: NextRequest) {
                     const purchaseFlowData = JSON.parse(purchaseFlow);
                     const { order_id, timestamp } = purchaseFlowData;
                     
-                    // タイムスタンプの検証（24時間以内）と最新データの確認
+                    // タイムスタンプの検証（24時間以内）
                     const isValid = timestamp && (Date.now() - timestamp) < 24 * 60 * 60 * 1000;
                     
-                    // 他のpurchaseFlowデータがないか確認
-                    let latestOrderId = order_id;
-                    let latestTimestamp = timestamp;
-                    
-                    // LocalStorageの全キーを走査
-                    for (let i = 0; i < localStorage.length; i++) {
-                      const key = localStorage.key(i);
-                      if (key && key.startsWith('purchaseFlow')) {
-                        try {
-                          const data = JSON.parse(localStorage.getItem(key) || '{}');
-                          if (data.timestamp && data.timestamp > latestTimestamp) {
-                            latestOrderId = data.order_id;
-                            latestTimestamp = data.timestamp;
-                          }
-                        } catch (e) {
-                          console.error('Error parsing purchaseFlow data:', e);
-                        }
-                      }
-                    }
-                    
-                    if (latestOrderId && isValid) {
-                      console.log('Found latest valid order_id:', latestOrderId);
-                      // ユーザーIDを更新
-                      fetch('/api/orders/update-user', {
-                        method: 'POST',
-                        headers: {
-                          'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                          user_id: '${user.id}',
-                          order_id: latestOrderId
-                        })
-                      })
-                      .then(response => response.json())
-                      .then(data => {
-                        console.log('Update response:', data);
-                        if (data.error) {
-                          console.error('Update failed:', data.error);
-                        }
-                      })
-                      .catch(error => {
-                        console.error('Update request failed:', error);
-                      })
-                      .finally(() => {
-                        // 処理完了後にpurchaseFlowを削除
-                        localStorage.removeItem('purchaseFlow');
-                        // 購入完了ページにリダイレクト
-                        window.location.href = '${redirectPath}';
-                      });
-                    } else {
+                    if (!isValid) {
+                      console.error('Purchase flow data has expired');
+                      localStorage.removeItem('purchaseFlow');
                       window.location.href = '/mypage';
+                      return;
                     }
+
+                    if (!order_id) {
+                      console.error('No order_id found in purchase flow');
+                      localStorage.removeItem('purchaseFlow');
+                      window.location.href = '/mypage';
+                      return;
+                    }
+
+                    console.log('Updating user_id for order:', order_id);
+                    
+                    // ユーザーIDを更新
+                    fetch('/api/orders/update-user', {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                      },
+                      body: JSON.stringify({
+                        user_id: '${user.id}',
+                        order_id: order_id
+                      })
+                    })
+                    .then(async response => {
+                      const data = await response.json();
+                      if (!response.ok) {
+                        throw new Error(data.error || 'Update request failed');
+                      }
+                      return data;
+                    })
+                    .then(data => {
+                      console.log('Update successful:', data);
+                      localStorage.removeItem('purchaseFlow');
+                      window.location.href = '${redirectPath}';
+                    })
+                    .catch(error => {
+                      console.error('Update failed:', error);
+                      showError('注文情報の更新に失敗しました');
+                    });
                   } catch (error) {
-                    console.error('Error processing purchaseFlow:', error);
+                    console.error('Error processing purchase flow:', error);
+                    localStorage.removeItem('purchaseFlow');
                     window.location.href = '/mypage';
                   }
                 } else {
-                  // 購入フローがない場合はマイページへ
                   window.location.href = '/mypage';
                 }
               } catch (error) {
                 console.error('Error in callback script:', error);
-                window.location.href = '/login?error=callback_error';
+                showError('認証処理中にエラーが発生しました');
               }
             </script>
-          </head>
-          <body>
-            <p>ログイン処理中...</p>
           </body>
         </html>
       `

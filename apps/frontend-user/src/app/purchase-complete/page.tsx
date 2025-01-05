@@ -64,9 +64,9 @@ export default function PurchaseCompletePage() {
         // purchaseFlowをlocalStorageから取得
         const purchaseFlow = localStorage.getItem('purchaseFlow')
         if (purchaseFlow) {
-          const { consultation_id } = JSON.parse(purchaseFlow)
-          // consultation_idが存在する場合は保持
-          localStorage.setItem('purchaseFlow', JSON.stringify({ consultation_id }))
+          const { product, timestamp } = JSON.parse(purchaseFlow)
+          // 製品情報とタイムスタンプを保持
+          localStorage.setItem('purchaseFlow', JSON.stringify({ product, timestamp }))
         }
 
         window.location.href = loginUrl.toString()

@@ -605,9 +605,7 @@ export default function ResultPage() {
       // 購入フロー情報をlocalStorageに保存
       const purchaseFlowData = {
         product,
-        timestamp: Date.now(),
-        // order_idは後でStripeのwebhookで生成される形式に合わせて保存
-        order_id: `ORD${Date.now()}${Math.random().toString(36).substring(2, 7)}`
+        timestamp: Date.now()
       }
       localStorage.setItem('purchaseFlow', JSON.stringify(purchaseFlowData))
       console.log('Saved purchaseFlow data:', purchaseFlowData)
