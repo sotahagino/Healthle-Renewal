@@ -210,7 +210,8 @@ export async function GET(request: NextRequest) {
 
     if (purchaseFlow) {
       try {
-        const { order_id } = JSON.parse(purchaseFlow);
+        const purchaseFlowData = JSON.parse(purchaseFlow) as { order_id: string };
+        const { order_id } = purchaseFlowData;
         console.log('Parsed order_id from purchaseFlow:', order_id);
 
         if (order_id) {
