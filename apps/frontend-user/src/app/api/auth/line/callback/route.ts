@@ -124,14 +124,21 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // セッション作成（新規・既存共通）
+    const { data: session, error: sessionError } = await supabase.auth.signInWithPassword({
+      email: user.email!,
+      password: `line_${line_user_id}`
+    });
+
+    if (sessionError) {
+      console.error('Session creation error:', sessionError);
+      throw sessionError;
+    }
+
+    console.log('Session created successfully:', session);
+
     // ユーザーIDの更新処理
     if (order_id && user) {
-      console.log('Attempting to update vendor_orders with:', {
-        order_id,
-        user_id: user.id,
-        timestamp: new Date().toISOString()
-      });
-
       try {
         // 注文の存在確認
         const { data: existingOrder, error: checkError } = await supabase
@@ -174,17 +181,41 @@ export async function GET(request: NextRequest) {
         }
 
         console.log('Successfully updated user_id in vendor_orders:', updatedOrder);
-        redirectPath = '/purchase-complete';
       } catch (error) {
         console.error('Error in order update process:', error);
-        // エラーが発生しても認証自体は成功しているので、エラーページにリダイレクト
-        redirectPath = '/purchase-error';
       }
-    } else {
-      console.log('Skipping order update:', { order_id, user: user?.id });
     }
 
-    return NextResponse.redirect(new URL(redirectPath, request.url));
+    // セッショントークンをlocalStorageに保存するためのHTML
+    const html = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <script>
+            const session = ${JSON.stringify(session)};
+            const projectRef = '${process.env.NEXT_PUBLIC_SUPABASE_URL!.match(/(?:https:\/\/)?([^.]+)/)?.[1] ?? ''}';
+            
+            // セッション情報を保存
+            localStorage.setItem(\`sb-\${projectRef}-auth-token\`, JSON.stringify({
+              access_token: session.session.access_token,
+              refresh_token: session.session.refresh_token,
+              expires_at: Math.floor(Date.now() / 1000) + ${60 * 60 * 24 * 7},
+              expires_in: ${60 * 60 * 24 * 7},
+              token_type: 'bearer',
+              user: session.user
+            }));
+
+            // リダイレクト先の決定
+            const returnPath = '${state || '/mypage'}';
+            window.location.href = returnPath;
+          </script>
+        </head>
+      </html>
+    `;
+
+    return new NextResponse(html, {
+      headers: { 'Content-Type': 'text/html' }
+    });
   } catch (error) {
     console.error('Callback error:', error)
     return NextResponse.redirect(new URL('/login?error=auth_failed', request.url))

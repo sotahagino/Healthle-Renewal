@@ -34,12 +34,15 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
     try {
       const purchaseFlow = localStorage.getItem('purchaseFlow');
       let order_id = '';
+      let returnUrl = window.location.pathname;
       
       if (purchaseFlow) {
         try {
           const purchaseFlowData = JSON.parse(purchaseFlow) as { order_id: string };
           order_id = purchaseFlowData.order_id;
           console.log('Retrieved order_id from purchaseFlow:', order_id);
+          // 購入完了後のリダイレクト先を設定
+          returnUrl = '/purchase-complete';
         } catch (error) {
           console.error('Error parsing purchaseFlow:', error);
         }
@@ -50,14 +53,17 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
       lineLoginUrl.searchParams.append('response_type', 'code');
       lineLoginUrl.searchParams.append('client_id', process.env.NEXT_PUBLIC_LINE_CLIENT_ID!);
       lineLoginUrl.searchParams.append('redirect_uri', process.env.NEXT_PUBLIC_LINE_REDIRECT_URI!);
-      lineLoginUrl.searchParams.append('state', '12345');
-      lineLoginUrl.searchParams.append('scope', 'profile openid');
-      lineLoginUrl.searchParams.append('nonce', '09876');
+      lineLoginUrl.searchParams.append('state', returnUrl); // stateパラメータにリダイレクト先を設定
+      lineLoginUrl.searchParams.append('scope', 'profile openid email');
+      lineLoginUrl.searchParams.append('nonce', Date.now().toString());
       
       if (order_id) {
         lineLoginUrl.searchParams.append('order_id', order_id);
         console.log('Added order_id to login URL:', order_id);
       }
+
+      // 現在のURLをreturn_toとして保存
+      localStorage.setItem('auth_return_to', returnUrl);
 
       console.log('Redirecting to LINE login:', lineLoginUrl.toString());
       window.location.href = lineLoginUrl.toString();
