@@ -227,14 +227,15 @@ export async function GET(request: NextRequest) {
         .single();
 
       if (updateError) {
-        console.error('Failed to update user_id in vendor_orders:', {
+        const errorDetails = {
           error: updateError,
-          errorMessage: updateError.message,
-          details: updateError.details,
-          hint: updateError.hint,
+          errorMessage: updateError?.message || 'Unknown error',
+          details: updateError?.details || null,
+          hint: updateError?.hint || null,
           order_id,
           user_id: user.id
-        });
+        };
+        console.error('Failed to update user_id in vendor_orders:', errorDetails);
       } else {
         console.log('Successfully updated user_id in vendor_orders:', updatedOrder);
       }
