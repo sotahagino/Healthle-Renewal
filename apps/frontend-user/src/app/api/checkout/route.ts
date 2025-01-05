@@ -48,7 +48,7 @@ export async function POST(req: Request) {
 
     // リクエストボディの解析
     const body = await req.json();
-    const { items } = body;
+    const { items, consultation_id } = body;
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json(
@@ -150,6 +150,7 @@ export async function POST(req: Request) {
       cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/checkout/cancel`,
       metadata: {
         order_id: order.id,
+        consultation_id: consultation_id || null,
       },
     });
 

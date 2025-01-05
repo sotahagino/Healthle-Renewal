@@ -607,6 +607,18 @@ export default function ResultPage() {
         throw new Error('相談IDが見つかりません')
       }
 
+      // consultation_idの存在を確認
+      console.log('Saving consultation_id to localStorage:', consultation_id)
+
+      // 購入フロー情報をlocalStorageに保存
+      const purchaseFlowData = {
+        product,
+        consultation_id,
+        timestamp: Date.now()
+      }
+      localStorage.setItem('purchaseFlow', JSON.stringify(purchaseFlowData))
+      console.log('Saved purchaseFlow data:', purchaseFlowData)
+
       // 商品のペイメントリンクURLを直接取得
       const { data: productData, error: productError } = await supabase
         .from('products')
@@ -617,13 +629,6 @@ export default function ResultPage() {
       if (productError || !productData?.stripe_payment_link_url) {
         throw new Error('決済リンクの取得に失敗しました')
       }
-
-      // 購入フロー情報をlocalStorageに保存
-      localStorage.setItem('purchaseFlow', JSON.stringify({
-        product,
-        consultation_id,
-        timestamp: Date.now()
-      }))
 
       // 成功時のリダイレクトURLを追加
       const successUrl = `${window.location.origin}/purchase-complete`

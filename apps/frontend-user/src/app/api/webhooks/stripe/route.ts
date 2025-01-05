@@ -162,6 +162,10 @@ async function createOrderRecords(
   orderNumber: string
 ) {
   try {
+    // consultation_idの取得と確認
+    const consultation_id = session.metadata?.consultation_id
+    console.log('Received consultation_id from session metadata:', consultation_id)
+
     // 配送情報の取得
     const shippingInfo = {
       name: session.shipping_details?.name || '',
@@ -174,6 +178,7 @@ async function createOrderRecords(
 
     // ユーザーIDの取得
     const user_id = session.client_reference_id;
+    console.log('Received user_id from session:', user_id)
 
     // 出展者向け注文情報の保存
     const vendorOrderData = {
@@ -188,10 +193,12 @@ async function createOrderRecords(
       shipping_address: `〒${shippingInfo.postal_code} ${shippingInfo.prefecture}${shippingInfo.city}${shippingInfo.address}`,
       shipping_phone: shippingInfo.phone,
       customer_email: session.customer_details?.email || '',
-      consultation_id: session.metadata?.consultation_id,
+      consultation_id: consultation_id,  // nullの場合もそのまま保存
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
+
+    console.log('Creating vendor order with data:', vendorOrderData);
 
     const { error: vendorOrderError } = await supabase
       .from('vendor_orders')
