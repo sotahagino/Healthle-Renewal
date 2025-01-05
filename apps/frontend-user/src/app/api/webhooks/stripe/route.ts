@@ -162,6 +162,15 @@ async function createOrderRecords(
   orderNumber: string
 ) {
   try {
+    // セッション情報のログ出力
+    console.log('Session details:', {
+      id: session.id,
+      metadata: session.metadata,
+      client_reference_id: session.client_reference_id,
+      customer_details: session.customer_details,
+      shipping_details: session.shipping_details
+    });
+
     // consultation_idの取得と確認
     const consultation_id = session.metadata?.consultation_id
     console.log('Received consultation_id from session metadata:', consultation_id)
@@ -175,6 +184,7 @@ async function createOrderRecords(
       address: `${session.shipping_details?.address?.line1 || ''}${session.shipping_details?.address?.line2 ? ' ' + session.shipping_details.address.line2 : ''}`,
       phone: session.shipping_details?.phone || '',
     };
+    console.log('Shipping info:', shippingInfo);
 
     // ユーザーIDの取得
     const user_id = session.client_reference_id;
@@ -185,7 +195,7 @@ async function createOrderRecords(
       order_id: orderNumber,
       vendor_id: product.vendor_id,
       product_id: product.id,
-      user_id: user_id,
+      user_id: null,  // 後から更新できるようにnullで保存
       status: 'paid',
       total_amount: session.amount_total,
       commission_rate: product.commission_rate || 10,
@@ -193,21 +203,37 @@ async function createOrderRecords(
       shipping_address: `〒${shippingInfo.postal_code} ${shippingInfo.prefecture}${shippingInfo.city}${shippingInfo.address}`,
       shipping_phone: shippingInfo.phone,
       customer_email: session.customer_details?.email || '',
-      consultation_id: consultation_id,  // nullの場合もそのまま保存
+      consultation_id: null,  // 後から更新できるようにnullで保存
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
 
     console.log('Creating vendor order with data:', vendorOrderData);
 
-    const { error: vendorOrderError } = await supabase
+    const { data: insertedOrder, error: vendorOrderError } = await supabase
       .from('vendor_orders')
-      .insert([vendorOrderData]);
+      .insert([vendorOrderData])
+      .select()
+      .single();
 
     if (vendorOrderError) {
-      console.error('Failed to create vendor order:', vendorOrderError);
+      console.error('Failed to create vendor order:', {
+        error: vendorOrderError,
+        errorMessage: vendorOrderError.message,
+        details: vendorOrderError.details,
+        hint: vendorOrderError.hint
+      });
       throw vendorOrderError;
     }
+
+    console.log('Successfully created vendor order:', insertedOrder);
+
+    // LocalStorageにorder_idを保存するためのデータを準備
+    const purchaseFlowData = {
+      order_id: orderNumber,
+      timestamp: Date.now()
+    };
+    console.log('Purchase flow data to be saved:', purchaseFlowData);
 
     // 管理システム用の注文トラッキング情報の保存
     const orderTrackingData = {
@@ -223,18 +249,33 @@ async function createOrderRecords(
       updated_at: new Date().toISOString()
     };
 
-    const { error: trackingError } = await supabase
+    console.log('Creating order tracking with data:', orderTrackingData);
+
+    const { data: insertedTracking, error: trackingError } = await supabase
       .from('order_tracking')
-      .insert([orderTrackingData]);
+      .insert([orderTrackingData])
+      .select()
+      .single();
 
     if (trackingError) {
-      console.error('Failed to create order tracking:', trackingError);
+      console.error('Failed to create order tracking:', {
+        error: trackingError,
+        errorMessage: trackingError.message,
+        details: trackingError.details,
+        hint: trackingError.hint
+      });
       throw trackingError;
     }
 
+    console.log('Successfully created order tracking:', insertedTracking);
+
     return vendorOrderData;
   } catch (error) {
-    console.error('注文情報の保存に失敗:', error);
+    console.error('注文情報の保存に失敗:', {
+      error,
+      errorMessage: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined
+    });
     throw error;
   }
 }

@@ -204,6 +204,60 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(new URL(redirectPath, request.url))
     }
 
+    // ユーザーIDを更新
+    const purchaseFlow = localStorage.getItem('purchaseFlow');
+    console.log('Retrieved purchaseFlow from localStorage:', purchaseFlow);
+
+    if (purchaseFlow) {
+      try {
+        const { order_id } = JSON.parse(purchaseFlow);
+        console.log('Parsed order_id from purchaseFlow:', order_id);
+
+        if (order_id) {
+          console.log('Attempting to update vendor_orders with:', {
+            order_id,
+            user_id: user.id,
+            timestamp: new Date().toISOString()
+          });
+
+          // vendor_ordersテーブルのuser_idを更新
+          const { data: updatedOrder, error: updateError } = await supabase
+            .from('vendor_orders')
+            .update({ 
+              user_id: user.id,
+              updated_at: new Date().toISOString()
+            })
+            .eq('order_id', order_id)
+            .select()
+            .single();
+
+          if (updateError) {
+            console.error('Failed to update user_id in vendor_orders:', {
+              error: updateError,
+              errorMessage: updateError.message,
+              details: updateError.details,
+              hint: updateError.hint,
+              order_id,
+              user_id: user.id
+            });
+          } else {
+            console.log('Successfully updated user_id in vendor_orders:', updatedOrder);
+          }
+        } else {
+          console.warn('No order_id found in purchaseFlow data');
+        }
+      } catch (error) {
+        console.error('Error updating user_id:', {
+          error,
+          errorMessage: error instanceof Error ? error.message : 'Unknown error',
+          stack: error instanceof Error ? error.stack : undefined,
+          purchaseFlow
+        });
+      }
+    } else {
+      console.log('No purchaseFlow data found in localStorage');
+    }
+
   } catch (error) {
     console.error('Callback error:', error)
     return NextResponse.redirect(new URL('/login?error=auth_failed', request.url))
