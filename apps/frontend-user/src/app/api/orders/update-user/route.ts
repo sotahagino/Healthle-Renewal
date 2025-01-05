@@ -1,45 +1,53 @@
-import { createClient } from '@supabase/supabase-js'
-import { NextRequest, NextResponse } from 'next/server'
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
+import { cookies } from 'next/headers'
+import { NextResponse } from 'next/server'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
-
-export async function POST(request: NextRequest) {
+export async function POST(req: Request) {
   try {
-    const { user_id, consultation_id } = await request.json()
+    const cookieStore = cookies()
+    const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
 
-    if (!user_id || !consultation_id) {
-      console.error('Missing required fields:', { user_id, consultation_id })
+    const { user_id, order_id } = await req.json()
+
+    if (!user_id || !order_id) {
       return NextResponse.json(
-        { error: 'Missing required fields' },
+        { error: 'user_id and order_id are required' },
         { status: 400 }
       )
     }
 
-    console.log('Updating vendor_orders with:', { user_id, consultation_id })
+    console.log('Updating user_id for order:', { user_id, order_id })
 
-    // vendor_ordersテーブルのuser_idを更新
     const { data: updateData, error: updateError } = await supabase
       .from('vendor_orders')
       .update({ 
         user_id,
         updated_at: new Date().toISOString()
       })
-      .eq('consultation_id', consultation_id)
+      .eq('order_id', order_id)
       .select()
 
     if (updateError) {
-      console.error('Error updating vendor order:', updateError)
+      console.error('Update error:', updateError)
       return NextResponse.json(
-        { error: 'Failed to update vendor order' },
+        { error: updateError.message },
         { status: 500 }
       )
     }
 
-    console.log('Update successful:', updateData)
-    return NextResponse.json({ success: true, data: updateData })
+    if (!updateData || updateData.length === 0) {
+      return NextResponse.json(
+        { error: 'Order not found' },
+        { status: 404 }
+      )
+    }
+
+    console.log('Successfully updated user_id:', updateData)
+
+    return NextResponse.json({
+      success: true,
+      data: updateData[0]
+    })
 
   } catch (error) {
     console.error('Error in update-user API:', error)

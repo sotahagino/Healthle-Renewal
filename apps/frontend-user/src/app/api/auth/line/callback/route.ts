@@ -135,13 +135,13 @@ export async function GET(request: NextRequest) {
 
     // vendor_ordersテーブルのuser_idを更新
     try {
-      // ローカルストレージから購入情報を取得するためのスクリプトを追加
+      // ローカルストレージから購入情報を取得するためのスクリプト
       const purchaseFlowScript = `
         const purchaseFlow = localStorage.getItem('purchaseFlow');
         if (purchaseFlow) {
           try {
-            const { consultation_id } = JSON.parse(purchaseFlow);
-            console.log('Updating user_id for consultation:', consultation_id);
+            const { order_id } = JSON.parse(purchaseFlow);
+            console.log('Updating user_id for order:', order_id);
             fetch('/api/orders/update-user', {
               method: 'POST',
               headers: {
@@ -149,7 +149,7 @@ export async function GET(request: NextRequest) {
               },
               body: JSON.stringify({
                 user_id: '${user.id}',
-                consultation_id
+                order_id
               })
             })
             .then(response => response.json())

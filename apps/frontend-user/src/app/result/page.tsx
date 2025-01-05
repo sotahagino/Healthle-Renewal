@@ -602,19 +602,12 @@ export default function ResultPage() {
 
   const handlePurchaseClick = async (product: RecommendedProduct) => {
     try {
-      const consultation_id = searchParams.get('consultation_id')
-      if (!consultation_id) {
-        throw new Error('相談IDが見つかりません')
-      }
-
-      // consultation_idの存在を確認
-      console.log('Saving consultation_id to localStorage:', consultation_id)
-
       // 購入フロー情報をlocalStorageに保存
       const purchaseFlowData = {
         product,
-        consultation_id,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        // order_idは後でStripeのwebhookで生成される形式に合わせて保存
+        order_id: `ORD${Date.now()}${Math.random().toString(36).substring(2, 7)}`
       }
       localStorage.setItem('purchaseFlow', JSON.stringify(purchaseFlowData))
       console.log('Saved purchaseFlow data:', purchaseFlowData)
@@ -634,8 +627,6 @@ export default function ResultPage() {
       const successUrl = `${window.location.origin}/purchase-complete`
       const paymentUrl = new URL(productData.stripe_payment_link_url)
       paymentUrl.searchParams.set('redirect_to', successUrl)
-      // consultation_idをメタデータとして追加
-      paymentUrl.searchParams.set('metadata[consultation_id]', consultation_id)
 
       // ペイメントリンクに遷移
       window.location.href = paymentUrl.toString()
