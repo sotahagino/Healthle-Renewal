@@ -13,12 +13,18 @@ export async function GET(request: NextRequest) {
     const code = searchParams.get('code')
     const state = searchParams.get('state')
     const order_id = searchParams.get('order_id')
+    const return_url = searchParams.get('return_url') || '/mypage'
 
-    console.log('Received parameters:', { code, state, order_id });
+    console.log('Received parameters:', { code, state, order_id, return_url })
 
     if (!code) {
       console.error('Authorization code not found')
       return NextResponse.redirect(new URL('/login?error=no_code', request.url))
+    }
+
+    if (state !== 'line_login_state') {
+      console.error('Invalid state parameter')
+      return NextResponse.redirect(new URL('/login?error=invalid_state', request.url))
     }
 
     console.log('Getting LINE token with code:', code)
@@ -63,7 +69,6 @@ export async function GET(request: NextRequest) {
       .single()
 
     let user = null
-    let redirectPath = '/mypage'
     
     if (existingUser) {
       // 既存ユーザーの場合は直接サインイン
@@ -138,6 +143,7 @@ export async function GET(request: NextRequest) {
     console.log('Session created successfully:', session);
 
     // ユーザーIDの更新処理
+    let redirectPath = return_url;
     if (order_id && user) {
       try {
         // 注文の存在確認
@@ -149,11 +155,13 @@ export async function GET(request: NextRequest) {
 
         if (checkError) {
           console.error('Error checking order:', checkError);
+          redirectPath = '/purchase-error';
           throw checkError;
         }
 
         if (!existingOrder) {
           console.error('Order not found:', order_id);
+          redirectPath = '/purchase-error';
           throw new Error('Order not found');
         }
 
@@ -177,10 +185,12 @@ export async function GET(request: NextRequest) {
             order_id,
             user_id: user.id
           });
+          redirectPath = '/purchase-error';
           throw updateError;
         }
 
         console.log('Successfully updated user_id in vendor_orders:', updatedOrder);
+        redirectPath = '/purchase-complete';
       } catch (error) {
         console.error('Error in order update process:', error);
       }
@@ -195,19 +205,25 @@ export async function GET(request: NextRequest) {
             const session = ${JSON.stringify(session)};
             const projectRef = '${process.env.NEXT_PUBLIC_SUPABASE_URL!.match(/(?:https:\/\/)?([^.]+)/)?.[1] ?? ''}';
             
-            // セッション情報を保存
-            localStorage.setItem(\`sb-\${projectRef}-auth-token\`, JSON.stringify({
-              access_token: session.session.access_token,
-              refresh_token: session.session.refresh_token,
-              expires_at: Math.floor(Date.now() / 1000) + ${60 * 60 * 24 * 7},
-              expires_in: ${60 * 60 * 24 * 7},
-              token_type: 'bearer',
-              user: session.user
-            }));
+            try {
+              // セッション情報を保存
+              localStorage.setItem(\`sb-\${projectRef}-auth-token\`, JSON.stringify({
+                access_token: session.session.access_token,
+                refresh_token: session.session.refresh_token,
+                expires_at: Math.floor(Date.now() / 1000) + ${60 * 60 * 24 * 7},
+                expires_in: ${60 * 60 * 24 * 7},
+                token_type: 'bearer',
+                user: session.user
+              }));
 
-            // リダイレクト先の決定
-            const returnPath = '${state || '/mypage'}';
-            window.location.href = returnPath;
+              // リダイレクト先の決定
+              const redirectPath = '${redirectPath}';
+              console.log('Redirecting to:', redirectPath);
+              window.location.href = redirectPath;
+            } catch (error) {
+              console.error('Error in callback script:', error);
+              window.location.href = '/login?error=callback_error';
+            }
           </script>
         </head>
       </html>

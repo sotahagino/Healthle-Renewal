@@ -17,9 +17,7 @@ interface LoginModalProps {
   onClose: () => void;
 }
 
-const lineLoginUrl = process.env.NEXT_PUBLIC_LINE_LOGIN_URL
-
-export function LoginModal({ isOpen, onClose }: LoginModalProps) {
+export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
   const [showGuestForm, setShowGuestForm] = useState(false)
   const { user, loading } = useAuth()
   const router = useRouter()
@@ -30,46 +28,28 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
     }
   }, [user, onClose])
 
-  const handleLogin = () => {
-    try {
-      const purchaseFlow = localStorage.getItem('purchaseFlow');
-      let order_id = '';
-      let returnUrl = window.location.pathname;
-      
-      if (purchaseFlow) {
-        try {
-          const purchaseFlowData = JSON.parse(purchaseFlow) as { order_id: string };
-          order_id = purchaseFlowData.order_id;
-          console.log('Retrieved order_id from purchaseFlow:', order_id);
-          // 購入完了後のリダイレクト先を設定
-          returnUrl = '/purchase-complete';
-        } catch (error) {
-          console.error('Error parsing purchaseFlow:', error);
-        }
+  const handleLineLogin = () => {
+    const purchaseFlow = localStorage.getItem('purchaseFlow');
+    let order_id = '';
+    let return_url = '/mypage';
+
+    if (purchaseFlow) {
+      try {
+        const purchaseFlowData = JSON.parse(purchaseFlow);
+        order_id = purchaseFlowData.order_id;
+        return_url = '/purchase-complete';
+      } catch (error) {
+        console.error('Error parsing purchaseFlow:', error);
       }
-
-      // LINE認証URLの構築
-      const lineLoginUrl = new URL('https://access.line.me/oauth2/v2.1/authorize');
-      lineLoginUrl.searchParams.append('response_type', 'code');
-      lineLoginUrl.searchParams.append('client_id', process.env.NEXT_PUBLIC_LINE_CLIENT_ID!);
-      lineLoginUrl.searchParams.append('redirect_uri', process.env.NEXT_PUBLIC_LINE_REDIRECT_URI!);
-      lineLoginUrl.searchParams.append('state', returnUrl); // stateパラメータにリダイレクト先を設定
-      lineLoginUrl.searchParams.append('scope', 'profile openid email');
-      lineLoginUrl.searchParams.append('nonce', Date.now().toString());
-      
-      if (order_id) {
-        lineLoginUrl.searchParams.append('order_id', order_id);
-        console.log('Added order_id to login URL:', order_id);
-      }
-
-      // 現在のURLをreturn_toとして保存
-      localStorage.setItem('auth_return_to', returnUrl);
-
-      console.log('Redirecting to LINE login:', lineLoginUrl.toString());
-      window.location.href = lineLoginUrl.toString();
-    } catch (error) {
-      console.error('Error in handleLogin:', error);
     }
+
+    const lineLoginUrl = new URL(`${process.env.NEXT_PUBLIC_SITE_URL}/api/auth/line`);
+    lineLoginUrl.searchParams.append('state', 'line_login_state');
+    lineLoginUrl.searchParams.append('order_id', order_id);
+    lineLoginUrl.searchParams.append('return_url', return_url);
+
+    console.log('Redirecting to LINE login:', lineLoginUrl.toString());
+    window.location.href = lineLoginUrl.toString();
   };
 
   if (loading) {
@@ -83,7 +63,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
           <DialogTitle>アカウント選択</DialogTitle>
         </DialogHeader>
         
-        <LoginContent onLogin={handleLogin} />
+        <LoginContent onLogin={handleLineLogin} />
         
         <div className="text-center my-4">または</div>
         
