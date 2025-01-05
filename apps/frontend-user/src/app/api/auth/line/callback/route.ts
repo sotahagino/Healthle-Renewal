@@ -11,9 +11,12 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
     const code = searchParams.get('code')
-    
+    const state = searchParams.get('state')
+    const order_id = searchParams.get('order_id')
+
     if (!code) {
-      throw new Error('No code provided')
+      console.error('Authorization code not found')
+      return NextResponse.redirect(new URL('/login?error=no_code', request.url))
     }
 
     console.log('Getting LINE token with code:', code)
@@ -205,58 +208,38 @@ export async function GET(request: NextRequest) {
     }
 
     // ユーザーIDを更新
-    const purchaseFlow = localStorage.getItem('purchaseFlow');
-    console.log('Retrieved purchaseFlow from localStorage:', purchaseFlow);
+    if (order_id) {
+      console.log('Attempting to update vendor_orders with:', {
+        order_id,
+        user_id: user.id,
+        timestamp: new Date().toISOString()
+      });
 
-    if (purchaseFlow) {
-      try {
-        const purchaseFlowData = JSON.parse(purchaseFlow) as { order_id: string };
-        const { order_id } = purchaseFlowData;
-        console.log('Parsed order_id from purchaseFlow:', order_id);
+      // vendor_ordersテーブルのuser_idを更新
+      const { data: updatedOrder, error: updateError } = await supabase
+        .from('vendor_orders')
+        .update({ 
+          user_id: user.id,
+          updated_at: new Date().toISOString()
+        })
+        .eq('order_id', order_id)
+        .select()
+        .single();
 
-        if (order_id) {
-          console.log('Attempting to update vendor_orders with:', {
-            order_id,
-            user_id: user.id,
-            timestamp: new Date().toISOString()
-          });
-
-          // vendor_ordersテーブルのuser_idを更新
-          const { data: updatedOrder, error: updateError } = await supabase
-            .from('vendor_orders')
-            .update({ 
-              user_id: user.id,
-              updated_at: new Date().toISOString()
-            })
-            .eq('order_id', order_id)
-            .select()
-            .single();
-
-          if (updateError) {
-            console.error('Failed to update user_id in vendor_orders:', {
-              error: updateError,
-              errorMessage: updateError.message,
-              details: updateError.details,
-              hint: updateError.hint,
-              order_id,
-              user_id: user.id
-            });
-          } else {
-            console.log('Successfully updated user_id in vendor_orders:', updatedOrder);
-          }
-        } else {
-          console.warn('No order_id found in purchaseFlow data');
-        }
-      } catch (error) {
-        console.error('Error updating user_id:', {
-          error,
-          errorMessage: error instanceof Error ? error.message : 'Unknown error',
-          stack: error instanceof Error ? error.stack : undefined,
-          purchaseFlow
+      if (updateError) {
+        console.error('Failed to update user_id in vendor_orders:', {
+          error: updateError,
+          errorMessage: updateError.message,
+          details: updateError.details,
+          hint: updateError.hint,
+          order_id,
+          user_id: user.id
         });
+      } else {
+        console.log('Successfully updated user_id in vendor_orders:', updatedOrder);
       }
     } else {
-      console.log('No purchaseFlow data found in localStorage');
+      console.log('No order_id found in URL parameters');
     }
 
   } catch (error) {

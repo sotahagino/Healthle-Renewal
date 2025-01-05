@@ -31,23 +31,20 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
   }, [user, onClose])
 
   const handleLogin = () => {
-    try {
-      if (lineLoginUrl) {
-        const purchaseFlow = localStorage.getItem('purchaseFlow');
-        if (purchaseFlow) {
-          const { consultation_id } = JSON.parse(purchaseFlow);
-          const loginUrlObj = new URL(lineLoginUrl);
-          loginUrlObj.searchParams.set('return_to', window.location.pathname);
-          window.location.href = loginUrlObj.toString();
-        } else {
-          window.location.href = lineLoginUrl;
-        }
-      } else {
-        throw new Error('LINE login URL is not configured');
+    const purchaseFlow = localStorage.getItem('purchaseFlow');
+    let order_id = '';
+    
+    if (purchaseFlow) {
+      try {
+        const purchaseFlowData = JSON.parse(purchaseFlow) as { order_id: string };
+        order_id = purchaseFlowData.order_id;
+      } catch (error) {
+        console.error('Error parsing purchaseFlow:', error);
       }
-    } catch (error) {
-      console.error('Login error:', error);
     }
+
+    const lineLoginUrl = `https://access.line.me/oauth2/v2.1/authorize?response_type=code&client_id=${process.env.NEXT_PUBLIC_LINE_CLIENT_ID}&redirect_uri=${process.env.NEXT_PUBLIC_LINE_REDIRECT_URI}&state=12345&scope=profile%20openid&nonce=09876${order_id ? `&order_id=${order_id}` : ''}`;
+    window.location.href = lineLoginUrl;
   };
 
   if (loading) {
