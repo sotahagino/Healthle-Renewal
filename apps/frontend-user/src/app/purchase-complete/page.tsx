@@ -36,6 +36,15 @@ export default function PurchaseCompletePage() {
       if (lineLoginUrl) {
         const loginUrl = new URL(lineLoginUrl)
         loginUrl.searchParams.set('return_to', '/purchase-complete')
+
+        // purchaseFlowをlocalStorageから取得
+        const purchaseFlow = localStorage.getItem('purchaseFlow')
+        if (purchaseFlow) {
+          const { consultation_id } = JSON.parse(purchaseFlow)
+          // consultation_idが存在する場合は保持
+          localStorage.setItem('purchaseFlow', JSON.stringify({ consultation_id }))
+        }
+
         window.location.href = loginUrl.toString()
       } else {
         throw new Error('LINE login URL is not configured')

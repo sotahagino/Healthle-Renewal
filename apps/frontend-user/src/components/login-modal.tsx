@@ -33,14 +33,22 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
   const handleLogin = () => {
     try {
       if (lineLoginUrl) {
-        window.location.href = lineLoginUrl
+        const purchaseFlow = localStorage.getItem('purchaseFlow');
+        if (purchaseFlow) {
+          const { consultation_id } = JSON.parse(purchaseFlow);
+          const loginUrlObj = new URL(lineLoginUrl);
+          loginUrlObj.searchParams.set('return_to', window.location.pathname);
+          window.location.href = loginUrlObj.toString();
+        } else {
+          window.location.href = lineLoginUrl;
+        }
       } else {
-        throw new Error('LINE login URL is not configured')
+        throw new Error('LINE login URL is not configured');
       }
     } catch (error) {
-      console.error('Login error:', error)
+      console.error('Login error:', error);
     }
-  }
+  };
 
   if (loading) {
     return null

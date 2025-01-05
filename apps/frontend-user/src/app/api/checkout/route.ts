@@ -129,6 +129,7 @@ export async function POST(req: Request) {
     // Stripeチェックアウトセッションの作成
     const checkoutSession = await stripe.checkout.sessions.create({
       customer: stripeCustomerId,
+      client_reference_id: authSession.user.id,
       payment_method_types: ['card'],
       line_items: items.map(item => {
         const product = products.find(p => p.id === item.product_id);

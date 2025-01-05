@@ -172,11 +172,15 @@ async function createOrderRecords(
       phone: session.shipping_details?.phone || '',
     };
 
+    // ユーザーIDの取得
+    const user_id = session.client_reference_id;
+
     // 出展者向け注文情報の保存
     const vendorOrderData = {
       order_id: orderNumber,
       vendor_id: product.vendor_id,
       product_id: product.id,
+      user_id: user_id,
       status: 'paid',
       total_amount: session.amount_total,
       commission_rate: product.commission_rate || 10,
