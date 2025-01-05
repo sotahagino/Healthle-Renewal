@@ -31,20 +31,39 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
   }, [user, onClose])
 
   const handleLogin = () => {
-    const purchaseFlow = localStorage.getItem('purchaseFlow');
-    let order_id = '';
-    
-    if (purchaseFlow) {
-      try {
-        const purchaseFlowData = JSON.parse(purchaseFlow) as { order_id: string };
-        order_id = purchaseFlowData.order_id;
-      } catch (error) {
-        console.error('Error parsing purchaseFlow:', error);
+    try {
+      const purchaseFlow = localStorage.getItem('purchaseFlow');
+      let order_id = '';
+      
+      if (purchaseFlow) {
+        try {
+          const purchaseFlowData = JSON.parse(purchaseFlow) as { order_id: string };
+          order_id = purchaseFlowData.order_id;
+          console.log('Retrieved order_id from purchaseFlow:', order_id);
+        } catch (error) {
+          console.error('Error parsing purchaseFlow:', error);
+        }
       }
-    }
 
-    const lineLoginUrl = `https://access.line.me/oauth2/v2.1/authorize?response_type=code&client_id=${process.env.NEXT_PUBLIC_LINE_CLIENT_ID}&redirect_uri=${process.env.NEXT_PUBLIC_LINE_REDIRECT_URI}&state=12345&scope=profile%20openid&nonce=09876${order_id ? `&order_id=${order_id}` : ''}`;
-    window.location.href = lineLoginUrl;
+      // LINE認証URLの構築
+      const lineLoginUrl = new URL('https://access.line.me/oauth2/v2.1/authorize');
+      lineLoginUrl.searchParams.append('response_type', 'code');
+      lineLoginUrl.searchParams.append('client_id', process.env.NEXT_PUBLIC_LINE_CLIENT_ID!);
+      lineLoginUrl.searchParams.append('redirect_uri', process.env.NEXT_PUBLIC_LINE_REDIRECT_URI!);
+      lineLoginUrl.searchParams.append('state', '12345');
+      lineLoginUrl.searchParams.append('scope', 'profile openid');
+      lineLoginUrl.searchParams.append('nonce', '09876');
+      
+      if (order_id) {
+        lineLoginUrl.searchParams.append('order_id', order_id);
+        console.log('Added order_id to login URL:', order_id);
+      }
+
+      console.log('Redirecting to LINE login:', lineLoginUrl.toString());
+      window.location.href = lineLoginUrl.toString();
+    } catch (error) {
+      console.error('Error in handleLogin:', error);
+    }
   };
 
   if (loading) {

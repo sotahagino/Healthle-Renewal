@@ -14,6 +14,8 @@ export async function GET(request: NextRequest) {
     const state = searchParams.get('state')
     const order_id = searchParams.get('order_id')
 
+    console.log('Received parameters:', { code, state, order_id });
+
     if (!code) {
       console.error('Authorization code not found')
       return NextResponse.redirect(new URL('/login?error=no_code', request.url))
@@ -61,6 +63,7 @@ export async function GET(request: NextRequest) {
       .single()
 
     let user = null
+    let redirectPath = '/mypage'
     
     if (existingUser) {
       // 既存ユーザーの場合は直接サインイン
@@ -121,128 +124,67 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // セッション作成（新規・既存共通）
-    const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
-      email: user.email!,
-      password: `line_${line_user_id}`
-    })
-    if (signInErr) throw signInErr
-
-    // returnToパラメータを取得
-    const returnTo = searchParams.get('returnTo')
-    // 許可されたリダイレクト先かチェック（セキュリティ対策）
-    const allowedPaths = ['/mypage', '/result', '/purchase-complete']
-    const redirectPath = returnTo && allowedPaths.some(path => returnTo.startsWith(path))
-      ? returnTo
-      : '/mypage'
-
-    // vendor_ordersテーブルのuser_idを更新
-    try {
-      // ローカルストレージから購入情報を取得するためのスクリプト
-      const purchaseFlowScript = `
-        const purchaseFlow = localStorage.getItem('purchaseFlow');
-        if (purchaseFlow) {
-          try {
-            const { order_id } = JSON.parse(purchaseFlow);
-            console.log('Updating user_id for order:', order_id);
-            fetch('/api/orders/update-user', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                user_id: '${user.id}',
-                order_id
-              })
-            })
-            .then(response => response.json())
-            .then(data => {
-              console.log('Update response:', data);
-              if (data.error) {
-                console.error('Update failed:', data.error);
-              }
-            })
-            .catch(error => {
-              console.error('Update request failed:', error);
-            });
-          } catch (error) {
-            console.error('Error processing purchaseFlow:', error);
-          }
-          localStorage.removeItem('purchaseFlow');
-        } else {
-          console.log('No purchaseFlow found in localStorage');
-        }
-      `;
-
-      const redirectUrl = new URL(redirectPath, request.url)
-
-      // セッショントークンをlocalStorageに保存し、vendor_ordersの更新を行うスクリプトを返す
-      const html = `
-        <!DOCTYPE html>
-        <html>
-          <script>
-            const session = ${JSON.stringify(signInData.session)};
-            const projectRef = '${process.env.NEXT_PUBLIC_SUPABASE_URL!.match(/(?:https:\/\/)?([^.]+)/)?.[1] ?? ''}';
-            localStorage.setItem(\`sb-\${projectRef}-auth-token\`, JSON.stringify({
-              access_token: session.access_token,
-              refresh_token: session.refresh_token,
-              expires_at: Math.floor(Date.now() / 1000) + ${60 * 60 * 24 * 7},
-              expires_in: ${60 * 60 * 24 * 7},
-              token_type: 'bearer',
-              user: session.user
-            }));
-            ${purchaseFlowScript}
-            window.location.href = '${redirectUrl}';
-          </script>
-        </html>
-      `
-
-      return new NextResponse(html, {
-        headers: { 'Content-Type': 'text/html' }
-      })
-
-    } catch (error) {
-      console.error('Error updating vendor_orders:', error)
-      // エラーが発生しても認証自体は成功しているので、リダイレクトは続行
-      return NextResponse.redirect(new URL(redirectPath, request.url))
-    }
-
-    // ユーザーIDを更新
-    if (order_id) {
+    // ユーザーIDの更新処理
+    if (order_id && user) {
       console.log('Attempting to update vendor_orders with:', {
         order_id,
         user_id: user.id,
         timestamp: new Date().toISOString()
       });
 
-      // vendor_ordersテーブルのuser_idを更新
-      const { data: updatedOrder, error: updateError } = await supabase
-        .from('vendor_orders')
-        .update({ 
-          user_id: user.id,
-          updated_at: new Date().toISOString()
-        })
-        .eq('order_id', order_id)
-        .select()
-        .single();
+      try {
+        // 注文の存在確認
+        const { data: existingOrder, error: checkError } = await supabase
+          .from('vendor_orders')
+          .select('*')
+          .eq('order_id', order_id)
+          .single();
 
-      if (updateError) {
-        const errorDetails = {
-          error: updateError,
-          errorMessage: updateError?.message || 'Unknown error',
-          details: updateError?.details || null,
-          hint: updateError?.hint || null,
-          order_id,
-          user_id: user.id
-        };
-        console.error('Failed to update user_id in vendor_orders:', errorDetails);
-      } else {
+        if (checkError) {
+          console.error('Error checking order:', checkError);
+          throw checkError;
+        }
+
+        if (!existingOrder) {
+          console.error('Order not found:', order_id);
+          throw new Error('Order not found');
+        }
+
+        // vendor_ordersテーブルのuser_idを更新
+        const { data: updatedOrder, error: updateError } = await supabase
+          .from('vendor_orders')
+          .update({ 
+            user_id: user.id,
+            updated_at: new Date().toISOString()
+          })
+          .eq('order_id', order_id)
+          .select()
+          .single();
+
+        if (updateError) {
+          console.error('Failed to update user_id in vendor_orders:', {
+            error: updateError,
+            errorMessage: updateError?.message || 'Unknown error',
+            details: updateError?.details || null,
+            hint: updateError?.hint || null,
+            order_id,
+            user_id: user.id
+          });
+          throw updateError;
+        }
+
         console.log('Successfully updated user_id in vendor_orders:', updatedOrder);
+        redirectPath = '/purchase-complete';
+      } catch (error) {
+        console.error('Error in order update process:', error);
+        // エラーが発生しても認証自体は成功しているので、エラーページにリダイレクト
+        redirectPath = '/purchase-error';
       }
     } else {
-      console.log('No order_id found in URL parameters');
+      console.log('Skipping order update:', { order_id, user: user?.id });
     }
 
+    return NextResponse.redirect(new URL(redirectPath, request.url));
   } catch (error) {
     console.error('Callback error:', error)
     return NextResponse.redirect(new URL('/login?error=auth_failed', request.url))
