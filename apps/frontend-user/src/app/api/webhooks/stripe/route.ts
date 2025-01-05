@@ -228,13 +228,6 @@ async function createOrderRecords(
 
     console.log('Successfully created vendor order:', insertedOrder);
 
-    // LocalStorageにorder_idを保存するためのデータを準備
-    const purchaseFlowData = {
-      order_id: orderNumber,
-      timestamp: Date.now()
-    };
-    console.log('Purchase flow data to be saved:', purchaseFlowData);
-
     // 管理システム用の注文トラッキング情報の保存
     const orderTrackingData = {
       order_id: orderNumber,
@@ -318,7 +311,8 @@ async function processOrder(
           product_id: product.id,
           vendor_id: product.vendor_id,
           payment_link: session.payment_link,
-          stripe_price_id: product.stripe_price_id
+          stripe_price_id: product.stripe_price_id,
+          timestamp: Date.now()
         }
       })
       .eq('stripe_event_id', event.id);

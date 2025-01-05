@@ -126,13 +126,8 @@ export async function GET(request: NextRequest) {
     })
     if (signInErr) throw signInErr
 
-    // URLパラメータからorder_idを取得
-    const order_id = searchParams.get('order_id');
-    console.log('Received order_id from URL:', order_id);
-
-    // 許可されたリダイレクト先かチェック（セキュリティ対策）
-    const allowedPaths = ['/mypage', '/result', '/purchase-complete']
-    const redirectPath = order_id ? '/purchase-complete' : '/mypage'
+    // リダイレクト先の決定
+    const redirectPath = '/purchase-complete'
 
     try {
       // セッショントークンをlocalStorageに保存するHTML
@@ -143,9 +138,21 @@ export async function GET(request: NextRequest) {
             <script>
               const session = ${JSON.stringify(signInData.session)};
               const projectRef = '${process.env.NEXT_PUBLIC_SUPABASE_URL!.match(/(?:https:\/\/)?([^.]+)/)?.[1] ?? ''}';
-              const order_id = '${order_id || ''}';
               
               try {
+                // stateの検証
+                const savedState = localStorage.getItem('line_login_state');
+                const receivedState = '${request.nextUrl.searchParams.get('state')}';
+                
+                if (!savedState || savedState !== receivedState) {
+                  console.error('State verification failed');
+                  window.location.href = '/login?error=invalid_state';
+                  return;
+                }
+                
+                // 検証成功後、stateを削除
+                localStorage.removeItem('line_login_state');
+
                 // セッション情報を保存
                 localStorage.setItem(\`sb-\${projectRef}-auth-token\`, JSON.stringify({
                   access_token: session.access_token,
@@ -156,35 +163,76 @@ export async function GET(request: NextRequest) {
                   user: session.user
                 }));
 
-                // order_idが存在する場合、ユーザーIDを更新
-                if (order_id) {
-                  console.log('Updating user_id for order:', order_id);
-                  fetch('/api/orders/update-user', {
-                    method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                      user_id: '${user.id}',
-                      order_id: order_id
-                    })
-                  })
-                  .then(response => response.json())
-                  .then(data => {
-                    console.log('Update response:', data);
-                    if (data.error) {
-                      console.error('Update failed:', data.error);
+                // purchaseFlowから注文情報を取得
+                const purchaseFlow = localStorage.getItem('purchaseFlow');
+                if (purchaseFlow) {
+                  try {
+                    const purchaseFlowData = JSON.parse(purchaseFlow);
+                    const { order_id, timestamp } = purchaseFlowData;
+                    
+                    // タイムスタンプの検証（24時間以内）と最新データの確認
+                    const isValid = timestamp && (Date.now() - timestamp) < 24 * 60 * 60 * 1000;
+                    
+                    // 他のpurchaseFlowデータがないか確認
+                    let latestOrderId = order_id;
+                    let latestTimestamp = timestamp;
+                    
+                    // LocalStorageの全キーを走査
+                    for (let i = 0; i < localStorage.length; i++) {
+                      const key = localStorage.key(i);
+                      if (key && key.startsWith('purchaseFlow')) {
+                        try {
+                          const data = JSON.parse(localStorage.getItem(key) || '{}');
+                          if (data.timestamp && data.timestamp > latestTimestamp) {
+                            latestOrderId = data.order_id;
+                            latestTimestamp = data.timestamp;
+                          }
+                        } catch (e) {
+                          console.error('Error parsing purchaseFlow data:', e);
+                        }
+                      }
                     }
-                    // 購入情報をクリア
-                    localStorage.removeItem('purchaseFlow');
-                  })
-                  .catch(error => {
-                    console.error('Update request failed:', error);
-                  });
+                    
+                    if (latestOrderId && isValid) {
+                      console.log('Found latest valid order_id:', latestOrderId);
+                      // ユーザーIDを更新
+                      fetch('/api/orders/update-user', {
+                        method: 'POST',
+                        headers: {
+                          'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                          user_id: '${user.id}',
+                          order_id: latestOrderId
+                        })
+                      })
+                      .then(response => response.json())
+                      .then(data => {
+                        console.log('Update response:', data);
+                        if (data.error) {
+                          console.error('Update failed:', data.error);
+                        }
+                      })
+                      .catch(error => {
+                        console.error('Update request failed:', error);
+                      })
+                      .finally(() => {
+                        // 処理完了後にpurchaseFlowを削除
+                        localStorage.removeItem('purchaseFlow');
+                        // 購入完了ページにリダイレクト
+                        window.location.href = '${redirectPath}';
+                      });
+                    } else {
+                      window.location.href = '/mypage';
+                    }
+                  } catch (error) {
+                    console.error('Error processing purchaseFlow:', error);
+                    window.location.href = '/mypage';
+                  }
+                } else {
+                  // 購入フローがない場合はマイページへ
+                  window.location.href = '/mypage';
                 }
-
-                // リダイレクト
-                window.location.href = '${redirectPath}';
               } catch (error) {
                 console.error('Error in callback script:', error);
                 window.location.href = '/login?error=callback_error';

@@ -32,7 +32,6 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
     const purchaseFlow = localStorage.getItem('purchaseFlow');
     let order_id = '';
     let return_url = '/mypage';
-
     if (purchaseFlow) {
       try {
         const purchaseFlowData = JSON.parse(purchaseFlow);
@@ -44,14 +43,16 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
       }
     }
 
+    // ランダムなstateを生成
+    const state = Array.from(crypto.getRandomValues(new Uint8Array(32)))
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+    
+    // stateをLocalStorageに保存
+    localStorage.setItem('line_login_state', state);
+
     const lineLoginUrl = new URL(`${process.env.NEXT_PUBLIC_SITE_URL}/api/auth/line`);
-    lineLoginUrl.searchParams.append('state', 'line_login_state');
-    
-    if (order_id) {
-      lineLoginUrl.searchParams.append('order_id', order_id);
-      console.log('Adding order_id to login URL:', order_id);
-    }
-    
+    lineLoginUrl.searchParams.append('state', state);
     lineLoginUrl.searchParams.append('return_url', return_url);
 
     console.log('Redirecting to LINE login:', lineLoginUrl.toString());

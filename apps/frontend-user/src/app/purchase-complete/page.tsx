@@ -20,6 +20,30 @@ export default function PurchaseCompletePage() {
   useEffect(() => {
     // クライアントサイドでのみwindow.locationを使用
     setReturnTo(typeof window !== 'undefined' ? '/purchase-complete' : '')
+
+    // 最新の注文情報を取得
+    const fetchLatestOrder = async () => {
+      try {
+        const response = await fetch('/api/orders/latest');
+        const data = await response.json();
+        
+        if (data.order_id) {
+          // LocalStorageを更新
+          const purchaseFlowData = {
+            order_id: data.order_id,
+            timestamp: data.timestamp
+          };
+          localStorage.setItem('purchaseFlow', JSON.stringify(purchaseFlowData));
+          console.log('Updated purchaseFlow with latest order:', purchaseFlowData);
+        } else {
+          console.warn('No order_id found in latest order');
+        }
+      } catch (error) {
+        console.error('Error fetching latest order:', error);
+      }
+    };
+
+    fetchLatestOrder();
   }, [])
 
   useEffect(() => {
