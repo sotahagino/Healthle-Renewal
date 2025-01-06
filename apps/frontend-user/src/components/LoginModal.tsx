@@ -1,5 +1,6 @@
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { LoginContent } from '@/components/login-content';
+import { useAuth } from '@/hooks/useAuth';
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -7,6 +8,8 @@ interface LoginModalProps {
 }
 
 export function LoginModal({ isOpen, onClose }: LoginModalProps) {
+  const { migrateGuestToRegular } = useAuth();
+
   const handleLineLogin = () => {
     try {
       const lineLoginUrl = process.env.NEXT_PUBLIC_LINE_LOGIN_URL;
@@ -27,6 +30,9 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
           }));
           console.log('Preserved purchaseFlow data with order_id');
         }
+
+        // LINE認証後のコールバックでゲストアカウントを変換するためのフラグを設定
+        localStorage.setItem('convertGuestAccount', 'true');
 
         window.location.href = loginUrl.toString();
       } else {

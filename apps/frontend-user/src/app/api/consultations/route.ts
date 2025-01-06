@@ -10,14 +10,19 @@ export async function POST(req: Request) {
     const body = await req.json()
     console.log('Request body:', body)
 
+    if (!body.symptom_text) {
+      return Response.json({ 
+        error: '相談内容を入力してください' 
+      }, { status: 400 })
+    }
+
     // consultationsテーブルに保存
     const { data, error } = await supabase
       .from('consultations')
       .insert([
         {
-          user_id: body.user_id || null,
-          symptom_text: body.symptom_text,
-          session_id: body.session_id
+          user_id: body.user_id,
+          symptom_text: body.symptom_text
         }
       ])
       .select()

@@ -17,7 +17,7 @@ export default function Home() {
   const [symptomText, setSymptomText] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const { user } = useAuth()
+  const { user, loginAsGuest } = useAuth()
   const supabase = createClientComponentClient()
 
   const handleStartConsultation = async () => {
@@ -31,9 +31,12 @@ export default function Home() {
     }
 
     try {
-      // セッションIDの生成（未ログインユーザー用）
-      const sessionId = localStorage.getItem('session_id') || uuidv4()
-      localStorage.setItem('session_id', sessionId)
+      let currentUser = user
+
+      // ユーザーが未ログインの場合、ゲストログインを実行
+      if (!currentUser) {
+        currentUser = await loginAsGuest()
+      }
 
       // 相談内容をDBに保存
       const consultationRes = await fetch("/api/consultations", {
@@ -44,8 +47,7 @@ export default function Home() {
         credentials: 'include',
         body: JSON.stringify({ 
           symptom_text: symptomText,
-          session_id: sessionId,
-          user_id: user?.id || null // ユーザーIDがない場合はnull
+          user_id: currentUser.id
         })
       })
 
@@ -71,8 +73,7 @@ export default function Home() {
         body: JSON.stringify({ 
           symptom_text: symptomText,
           consultation_id,
-          session_id: sessionId,
-          user_id: user?.id || null // ユーザーIDがない場合はnull
+          user_id: currentUser.id
         })
       })
 
@@ -92,9 +93,9 @@ export default function Home() {
       const queryString = encodeURIComponent(JSON.stringify(questions))
       router.push(`/questionnaire?data=${queryString}&consultation_id=${consultation_id}`)
 
-    } catch (err: any) {
-      console.error("エラー:", err)
-      setError(err.message || "予期せぬエラーが発生しました")
+    } catch (error) {
+      console.error('Error in handleStartConsultation:', error)
+      setError(error instanceof Error ? error.message : "予期せぬエラーが発生しました")
     } finally {
       setLoading(false)
     }

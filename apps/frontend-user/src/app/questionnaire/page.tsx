@@ -8,6 +8,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
 import { ArrowLeft } from 'lucide-react'
 import { Textarea } from "@/components/ui/textarea"
+import { useAuth } from '@/hooks/useAuth'
 
 // APIから返される質問の型定義
 interface Option {
@@ -30,6 +31,8 @@ export default function QuestionnairePage() {
   const [answers, setAnswers] = useState<{ [key: string]: string | string[] }>({})
   const [error, setError] = useState<string | null>(null)
   const errorRef = useRef<HTMLDivElement>(null)
+  const { user, isGuestUser, loginAsGuest } = useAuth()
+  const [isLoading, setIsLoading] = useState(false)
 
   useEffect(() => {
     const consultation_id = searchParams.get('consultation_id')
@@ -79,6 +82,25 @@ export default function QuestionnairePage() {
       errorRef.current?.scrollIntoView({ behavior: 'smooth' })
     }
   }, [error])
+
+  useEffect(() => {
+    const initializeUser = async () => {
+      try {
+        setIsLoading(true)
+        // ユーザーがログインしていない場合、ゲストアカウントを作成
+        if (!user && !isGuestUser) {
+          await loginAsGuest()
+        }
+      } catch (error) {
+        console.error('Error initializing user:', error)
+        alert('エラーが発生しました。もう一度お試しください。')
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    initializeUser()
+  }, [user, isGuestUser])
 
   const handleAnswerChange = (questionId: string, value: string) => {
     setAnswers(prev => {

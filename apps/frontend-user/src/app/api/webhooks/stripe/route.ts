@@ -204,6 +204,7 @@ async function createOrderRecords(
       shipping_phone: shippingInfo.phone,
       customer_email: session.customer_details?.email || '',
       consultation_id: null,  // 後から更新できるようにnullで保存
+      stripe_session_id: session.id,  // Stripeセッションのidを保存
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
