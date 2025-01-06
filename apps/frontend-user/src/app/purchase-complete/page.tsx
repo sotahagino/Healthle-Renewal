@@ -160,8 +160,7 @@ export default function PurchaseCompletePage() {
         const purchaseFlowData = {
           ...(existingPurchaseFlow ? JSON.parse(existingPurchaseFlow) : {}),
           order_id: data.order_id,
-          timestamp: Date.now(),
-          session_id: sessionId
+          timestamp: data.timestamp || Date.now()
         };
 
         localStorage.setItem('purchaseFlow', JSON.stringify(purchaseFlowData));

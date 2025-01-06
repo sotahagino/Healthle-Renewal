@@ -39,32 +39,46 @@ export async function POST(request: Request) {
       );
     }
 
-    // 最新の注文を取得
-    const { data: latestOrder, error: orderError } = await supabase
-      .from('vendor_orders')
-      .select('order_id')
-      .eq('status', 'paid')
-      .order('created_at', { ascending: false })
+    // webhook_logsテーブルから注文情報を取得
+    const { data: webhookLog, error: webhookError } = await supabase
+      .from('webhook_logs')
+      .select('processed_data')
+      .eq('event_type', 'checkout.session.completed')
+      .order('processed_at', { ascending: false })
       .limit(1)
       .single();
 
-    console.log('Latest order query result:', {
-      order: latestOrder,
-      error: orderError
+    console.log('Webhook log query result:', {
+      log: webhookLog,
+      error: webhookError
     });
 
-    if (orderError || !latestOrder) {
-      console.warn('No paid orders found');
+    if (webhookError || !webhookLog || !webhookLog.processed_data) {
+      console.warn('No webhook log found');
       return NextResponse.json(
-        { error: 'No paid orders found' },
+        { error: 'Order information not found' },
         { status: 404 }
       );
     }
 
-    console.log('Found latest order:', latestOrder);
+    const orderInfo = webhookLog.processed_data as {
+      order_id: string;
+      timestamp: number;
+    };
+
+    console.log('Found order info from webhook log:', orderInfo);
+
+    if (!orderInfo.order_id) {
+      console.warn('No order_id in webhook log');
+      return NextResponse.json(
+        { error: 'Order ID not found' },
+        { status: 404 }
+      );
+    }
 
     return NextResponse.json({
-      order_id: latestOrder.order_id
+      order_id: orderInfo.order_id,
+      timestamp: orderInfo.timestamp
     });
 
   } catch (error) {
