@@ -39,47 +39,55 @@ export async function POST(request: Request) {
       );
     }
 
-    // webhook_logsテーブルから注文情報を取得
-    const { data: webhookLog, error: webhookError } = await supabase
-      .from('webhook_logs')
-      .select('processed_data')
-      .eq('event_type', 'checkout.session.completed')
-      .order('processed_at', { ascending: false })
+    // vendor_ordersテーブルから注文情報を取得
+    const { data: order, error: orderError } = await supabase
+      .from('vendor_orders')
+      .select('order_id, created_at, total_amount, product_id')
+      .eq('customer_email', session.customer_details?.email)
+      .order('created_at', { ascending: false })
       .limit(1)
       .single();
 
-    console.log('Webhook log query result:', {
-      log: webhookLog,
-      error: webhookError
+    console.log('Order query result:', {
+      order,
+      error: orderError,
+      email: session.customer_details?.email
     });
 
-    if (webhookError || !webhookLog || !webhookLog.processed_data) {
-      console.warn('No webhook log found');
+    if (orderError || !order) {
+      console.warn('No order found for session');
       return NextResponse.json(
-        { error: 'Order information not found' },
+        { error: 'Order not found' },
         { status: 404 }
       );
     }
 
-    const orderInfo = webhookLog.processed_data as {
-      order_id: string;
-      timestamp: number;
+    // 商品情報を取得
+    const { data: product, error: productError } = await supabase
+      .from('products')
+      .select('name')
+      .eq('id', order.product_id)
+      .single();
+
+    console.log('Product query result:', {
+      product,
+      error: productError
+    });
+
+    // purchaseFlowデータを作成
+    const purchaseFlowData = {
+      order_id: order.order_id,
+      timestamp: Date.now(),
+      product: {
+        id: order.product_id,
+        name: product?.name || '',
+        price: order.total_amount
+      }
     };
 
-    console.log('Found order info from webhook log:', orderInfo);
+    console.log('Created purchaseFlow data:', purchaseFlowData);
 
-    if (!orderInfo.order_id) {
-      console.warn('No order_id in webhook log');
-      return NextResponse.json(
-        { error: 'Order ID not found' },
-        { status: 404 }
-      );
-    }
-
-    return NextResponse.json({
-      order_id: orderInfo.order_id,
-      timestamp: orderInfo.timestamp
-    });
+    return NextResponse.json(purchaseFlowData);
 
   } catch (error) {
     console.error('Error checking session:', error);
