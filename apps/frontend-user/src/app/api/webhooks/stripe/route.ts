@@ -321,7 +321,7 @@ async function processOrder(
       try {
         const successUrl = new URL(session.success_url);
         successUrl.searchParams.append('order_id', orderNumber);
-        await stripe.checkout.sessions.update(session.id, {
+        await stripe.checkout.sessions.modify(session.id, {
           success_url: successUrl.toString()
         });
         console.log('Updated success_url with order_id:', successUrl.toString());
