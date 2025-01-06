@@ -123,22 +123,40 @@ export default function PurchaseCompletePage() {
           body: JSON.stringify({ session_id: sessionId }),
         });
 
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.error('Session check failed:', errorData);
+          // エラーの場合は一定時間後に再試行
+          setTimeout(updatePurchaseFlow, 5000);
+          return;
+        }
+
         const data = await response.json();
         console.log('Session check response:', data);
 
-        if (!response.ok) {
-          throw new Error(data.error || 'Failed to check session');
+        if (!data.order_id) {
+          console.error('No order_id in response');
+          // order_idがない場合も一定時間後に再試行
+          setTimeout(updatePurchaseFlow, 5000);
+          return;
         }
 
-        // order_idを追加して保存
-        const purchaseFlowData = existingPurchaseFlow ? JSON.parse(existingPurchaseFlow) : {};
+        // purchaseFlowデータを更新
+        const purchaseFlowData = existingPurchaseFlow 
+          ? JSON.parse(existingPurchaseFlow)
+          : {};
+
         purchaseFlowData.order_id = data.order_id;
         purchaseFlowData.timestamp = Date.now();
+        purchaseFlowData.session_id = sessionId;
+
         localStorage.setItem('purchaseFlow', JSON.stringify(purchaseFlowData));
         console.log('Updated purchaseFlow data:', purchaseFlowData);
 
       } catch (error) {
         console.error('Error updating purchaseFlow:', error);
+        // エラーの場合は一定時間後に再試行
+        setTimeout(updatePurchaseFlow, 5000);
       }
     };
 

@@ -39,24 +39,29 @@ export async function POST(request: Request) {
       );
     }
 
-    // vendor_ordersテーブルから最新の注文情報を取得
+    // セッションIDに紐づく注文を取得
     const { data: order, error: orderError } = await supabase
       .from('vendor_orders')
       .select('order_id')
+      .eq('stripe_session_id', session_id)
       .eq('status', 'paid')
-      .order('created_at', { ascending: false })
-      .limit(1)
       .single();
 
     if (orderError || !order) {
-      console.warn('Order not found in vendor_orders:', orderError);
+      console.warn('Order not found for session:', {
+        session_id,
+        error: orderError
+      });
       return NextResponse.json(
-        { error: 'Order not found' },
+        { error: 'Order not found for this session' },
         { status: 404 }
       );
     }
 
-    console.log('Found order_id:', order.order_id);
+    console.log('Found order for session:', {
+      session_id,
+      order_id: order.order_id
+    });
 
     return NextResponse.json({
       order_id: order.order_id
