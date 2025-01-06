@@ -14,6 +14,7 @@ const supabase = createClient(
 export async function POST(request: Request) {
   try {
     const { session_id } = await request.json();
+    console.log('Checking session with ID:', session_id);
 
     if (!session_id) {
       return NextResponse.json(
@@ -24,8 +25,14 @@ export async function POST(request: Request) {
 
     // Stripeセッションを取得
     const session = await stripe.checkout.sessions.retrieve(session_id);
+    console.log('Retrieved session:', {
+      id: session.id,
+      payment_status: session.payment_status,
+      metadata: session.metadata
+    });
     
     if (session.payment_status !== 'paid') {
+      console.log('Payment not completed:', session.payment_status);
       return NextResponse.json(
         { error: 'Payment not completed' },
         { status: 400 }
@@ -34,7 +41,10 @@ export async function POST(request: Request) {
 
     // セッションのメタデータからorder_idを取得
     const order_id = session.metadata?.order_id;
+    console.log('Found order_id in metadata:', order_id);
+
     if (!order_id) {
+      console.warn('Order ID not found in session metadata');
       return NextResponse.json(
         { error: 'Order ID not found in session' },
         { status: 404 }

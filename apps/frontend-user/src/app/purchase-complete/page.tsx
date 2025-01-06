@@ -102,22 +102,19 @@ export default function PurchaseCompletePage() {
         // URLからsession_idを取得
         const urlParams = new URLSearchParams(window.location.search);
         const sessionId = urlParams.get('session_id');
+        console.log('Got session_id from URL:', sessionId);
 
         if (!sessionId) {
           console.error('No session_id found in URL');
           return;
         }
 
-        // 既存のpurchaseFlowデータを取得
+        // 既存のpurchaseFlowデータを確認
         const existingPurchaseFlow = localStorage.getItem('purchaseFlow');
-        if (!existingPurchaseFlow) {
-          console.error('No purchaseFlow data found');
-          return;
-        }
-
-        const purchaseFlowData = JSON.parse(existingPurchaseFlow);
+        console.log('Current purchaseFlow data:', existingPurchaseFlow);
 
         // Stripeセッションの状態を確認
+        console.log('Checking session status...');
         const response = await fetch('/api/orders/check-session', {
           method: 'POST',
           headers: {
@@ -127,16 +124,19 @@ export default function PurchaseCompletePage() {
         });
 
         const data = await response.json();
+        console.log('Session check response:', data);
+
         if (!response.ok) {
           throw new Error(data.error || 'Failed to check session');
         }
 
         // order_idを追加して保存
+        const purchaseFlowData = existingPurchaseFlow ? JSON.parse(existingPurchaseFlow) : {};
         purchaseFlowData.order_id = data.order_id;
         purchaseFlowData.timestamp = Date.now();
         localStorage.setItem('purchaseFlow', JSON.stringify(purchaseFlowData));
+        console.log('Updated purchaseFlow data:', purchaseFlowData);
 
-        console.log('Updated purchaseFlow with order_id:', data.order_id);
       } catch (error) {
         console.error('Error updating purchaseFlow:', error);
       }
