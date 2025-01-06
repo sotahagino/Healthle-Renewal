@@ -602,9 +602,8 @@ export default function ResultPage() {
 
   const handlePurchaseClick = async (product: RecommendedProduct) => {
     try {
-      // 購入フロー情報をlocalStorageに保存
+      // 購入フロー情報をlocalStorageに保存（order_idは後で追加される）
       const purchaseFlowData = {
-        product,
         timestamp: Date.now()
       }
       localStorage.setItem('purchaseFlow', JSON.stringify(purchaseFlowData))
