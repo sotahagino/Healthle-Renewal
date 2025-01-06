@@ -51,38 +51,40 @@ export async function POST(req: Request) {
     if (productError) throw productError;
 
     // 注文の作成
-    const { data: order, error: orderError } = await supabase
-      .from('orders')
-      .insert([
-        {
-          user_id: userId,
-          status: 'pending',
-          amount: items.reduce((total, item) => {
-            const product = products.find(p => p.id === item.product_id);
-            return total + (product?.price || 0) * item.quantity;
-          }, 0),
-          consultation_id: consultation_id || null,
-          is_guest_order: !userId
-        }
-      ])
-      .select()
-      .single();
+    const orderData = {
+      user_id: userId,
+      status: 'pending',
+      amount: items.reduce((total, item) => {
+        const product = products.find(p => p.id === item.product_id);
+        return total + (product?.price || 0) * item.quantity;
+      }, 0),
+      consultation_id: consultation_id || null,
+      is_guest_order: !userId
+    };
 
-    if (orderError) throw orderError;
+    // vendor_ordersにも事前に注文情報を作成
+    for (const item of items) {
+      const product = products.find(p => p.id === item.product_id);
+      if (!product) continue;
 
-    // 注文アイテムの作成
-    const orderItems = items.map(item => ({
-      order_id: order.id,
-      product_id: item.product_id,
-      quantity: item.quantity,
-      price: products.find(p => p.id === item.product_id)?.price || 0
-    }));
+      const vendorOrderData = {
+        user_id: userId,
+        vendor_id: product.vendor_id,
+        product_id: product.id,
+        status: 'pending',
+        total_amount: product.price,
+        commission_rate: product.commission_rate || 10,
+        consultation_id: consultation_id || null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
 
-    const { error: orderItemError } = await supabase
-      .from('order_items')
-      .insert(orderItems);
+      const { error: vendorOrderError } = await supabase
+        .from('vendor_orders')
+        .insert([vendorOrderData]);
 
-    if (orderItemError) throw orderItemError;
+      if (vendorOrderError) throw vendorOrderError;
+    }
 
     // Stripeセッションの作成
     const checkoutSession = await stripe.checkout.sessions.create({
@@ -105,21 +107,18 @@ export async function POST(req: Request) {
       success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/purchase-complete?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/checkout/cancel`,
       metadata: {
-        order_id: order.id,
-        consultation_id: consultation_id || null,
+        user_id: userId || '',
+        consultation_id: consultation_id || '',
         is_guest_order: !userId ? 'true' : 'false'
       },
+      client_reference_id: userId || undefined,
     });
 
-    return NextResponse.json({ 
-      sessionId: checkoutSession.id,
-      orderId: order.id
-    });
-
+    return NextResponse.json({ sessionId: checkoutSession.id });
   } catch (error) {
     console.error('Checkout error:', error);
     return NextResponse.json(
-      { error: 'チェックアウトに失敗しました' },
+      { error: 'チェックアウトの作成に失敗しました' },
       { status: 500 }
     );
   }

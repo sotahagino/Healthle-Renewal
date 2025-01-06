@@ -40,4 +40,11 @@ CREATE TABLE orders (
 );
 
 ALTER TABLE products
-ADD COLUMN IF NOT EXISTS stock_quantity INTEGER DEFAULT 0; 
+ADD COLUMN IF NOT EXISTS stock_quantity INTEGER DEFAULT 0;
+
+-- vendor_ordersテーブルにstripe_session_idカラムを追加
+ALTER TABLE vendor_orders
+ADD COLUMN IF NOT EXISTS stripe_session_id VARCHAR(255);
+
+-- stripe_session_idにインデックスを追加（検索パフォーマンス向上のため）
+CREATE INDEX IF NOT EXISTS idx_vendor_orders_stripe_session_id ON vendor_orders(stripe_session_id); 

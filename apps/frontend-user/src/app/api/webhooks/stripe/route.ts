@@ -190,44 +190,46 @@ async function createOrderRecords(
     const user_id = session.client_reference_id;
     console.log('Received user_id from session:', user_id)
 
-    // 出展者向け注文情報の保存
+    // 出展者向け注文情報の更新
+    const { data: existingOrder, error: fetchError } = await supabase
+      .from('vendor_orders')
+      .select('*')
+      .eq('product_id', product.id)
+      .eq('status', 'pending')
+      .single();
+
+    if (fetchError) {
+      console.error('Failed to fetch existing order:', fetchError);
+      throw fetchError;
+    }
+
+    if (!existingOrder) {
+      console.error('No pending order found for product:', product.id);
+      throw new Error('No pending order found');
+    }
+
     const vendorOrderData = {
       order_id: orderNumber,
-      vendor_id: product.vendor_id,
-      product_id: product.id,
-      user_id: user_id,  // user_idを直接保存するように変更
       status: 'paid',
-      total_amount: session.amount_total,
-      commission_rate: product.commission_rate || 10,
       shipping_name: shippingInfo.name,
       shipping_address: `〒${shippingInfo.postal_code} ${shippingInfo.prefecture}${shippingInfo.city}${shippingInfo.address}`,
       shipping_phone: shippingInfo.phone,
       customer_email: session.customer_details?.email || '',
-      consultation_id: null,  // 後から更新できるようにnullで保存
-      stripe_session_id: session.id,  // Stripeセッションのidを保存
-      created_at: new Date().toISOString(),
+      stripe_session_id: session.id,
       updated_at: new Date().toISOString()
     };
 
-    console.log('Creating vendor order with data:', vendorOrderData);
-
-    const { data: insertedOrder, error: vendorOrderError } = await supabase
+    const { error: updateError } = await supabase
       .from('vendor_orders')
-      .insert([vendorOrderData])
-      .select()
-      .single();
+      .update(vendorOrderData)
+      .eq('id', existingOrder.id);
 
-    if (vendorOrderError) {
-      console.error('Failed to create vendor order:', {
-        error: vendorOrderError,
-        errorMessage: vendorOrderError.message,
-        details: vendorOrderError.details,
-        hint: vendorOrderError.hint
-      });
-      throw vendorOrderError;
+    if (updateError) {
+      console.error('Failed to update vendor order:', updateError);
+      throw updateError;
     }
 
-    console.log('Successfully created vendor order:', insertedOrder);
+    console.log('Successfully created vendor order:', vendorOrderData);
 
     // purchaseFlowデータを作成してlocalStorageに保存
     const purchaseFlowData = {
