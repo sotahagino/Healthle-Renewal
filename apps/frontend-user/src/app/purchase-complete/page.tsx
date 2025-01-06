@@ -97,6 +97,9 @@ export default function PurchaseCompletePage() {
   }
 
   useEffect(() => {
+    let retryCount = 0;
+    const MAX_RETRIES = 10; // 最大50秒間試行
+
     const updatePurchaseFlow = async () => {
       try {
         // URLからsession_idを取得
@@ -114,7 +117,7 @@ export default function PurchaseCompletePage() {
         console.log('Current purchaseFlow data:', existingPurchaseFlow);
 
         // Stripeセッションの状態を確認
-        console.log('Checking session status...');
+        console.log('Checking session status... (attempt ' + (retryCount + 1) + ')');
         const response = await fetch('/api/orders/check-session', {
           method: 'POST',
           headers: {
@@ -126,8 +129,14 @@ export default function PurchaseCompletePage() {
         if (!response.ok) {
           const errorData = await response.json();
           console.error('Session check failed:', errorData);
-          // エラーの場合は一定時間後に再試行
-          setTimeout(updatePurchaseFlow, 5000);
+          
+          if (retryCount < MAX_RETRIES) {
+            retryCount++;
+            console.log(`Retrying in 5 seconds... (${retryCount}/${MAX_RETRIES})`);
+            setTimeout(updatePurchaseFlow, 5000);
+          } else {
+            console.error('Max retries reached. Please try refreshing the page.');
+          }
           return;
         }
 
@@ -136,27 +145,38 @@ export default function PurchaseCompletePage() {
 
         if (!data.order_id) {
           console.error('No order_id in response');
-          // order_idがない場合も一定時間後に再試行
-          setTimeout(updatePurchaseFlow, 5000);
+          
+          if (retryCount < MAX_RETRIES) {
+            retryCount++;
+            console.log(`Retrying in 5 seconds... (${retryCount}/${MAX_RETRIES})`);
+            setTimeout(updatePurchaseFlow, 5000);
+          } else {
+            console.error('Max retries reached. Please try refreshing the page.');
+          }
           return;
         }
 
         // purchaseFlowデータを更新
-        const purchaseFlowData = existingPurchaseFlow 
-          ? JSON.parse(existingPurchaseFlow)
-          : {};
-
-        purchaseFlowData.order_id = data.order_id;
-        purchaseFlowData.timestamp = Date.now();
-        purchaseFlowData.session_id = sessionId;
+        const purchaseFlowData = {
+          ...(existingPurchaseFlow ? JSON.parse(existingPurchaseFlow) : {}),
+          order_id: data.order_id,
+          timestamp: Date.now(),
+          session_id: sessionId
+        };
 
         localStorage.setItem('purchaseFlow', JSON.stringify(purchaseFlowData));
-        console.log('Updated purchaseFlow data:', purchaseFlowData);
+        console.log('Successfully updated purchaseFlow data:', purchaseFlowData);
 
       } catch (error) {
         console.error('Error updating purchaseFlow:', error);
-        // エラーの場合は一定時間後に再試行
-        setTimeout(updatePurchaseFlow, 5000);
+        
+        if (retryCount < MAX_RETRIES) {
+          retryCount++;
+          console.log(`Retrying in 5 seconds... (${retryCount}/${MAX_RETRIES})`);
+          setTimeout(updatePurchaseFlow, 5000);
+        } else {
+          console.error('Max retries reached. Please try refreshing the page.');
+        }
       }
     };
 

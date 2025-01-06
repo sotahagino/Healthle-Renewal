@@ -291,14 +291,13 @@ async function processOrder(
     const orderNumber = `ORD${Date.now()}${Math.random().toString(36).substring(2, 7)}`;
     console.log('Generated order number:', orderNumber);
 
-    // セッションのメタデータを更新
-    // await stripe.checkout.sessions.update(session.id, {
-    //   metadata: {
-    //     ...session.metadata,
-    //     order_id: orderNumber
-    //   }
-    // });
-    // console.log('Updated session metadata with order_id:', orderNumber);
+    // purchaseFlowにorder_idを保存
+    const purchaseFlow = {
+      order_id: orderNumber,
+      timestamp: Date.now(),
+      session_id: session.id
+    };
+    console.log('Setting purchaseFlow data:', purchaseFlow);
 
     // 注文関連情報の保存
     console.log('Saving order records...');
@@ -322,7 +321,8 @@ async function processOrder(
           vendor_id: product.vendor_id,
           payment_link: session.payment_link,
           stripe_price_id: product.stripe_price_id,
-          timestamp: Date.now()
+          timestamp: Date.now(),
+          purchase_flow: purchaseFlow  // webhookログにもpurchaseFlowデータを保存
         }
       })
       .eq('stripe_event_id', event.id);
@@ -347,7 +347,8 @@ async function processOrder(
     return NextResponse.json({ 
       received: true,
       order_number: orderNumber,
-      order_id: orderNumber
+      order_id: orderNumber,
+      purchase_flow: purchaseFlow  // レスポンスにpurchaseFlowデータを含める
     });
   } catch (error) {
     console.error('Error in processOrder:', error);
