@@ -291,13 +291,13 @@ async function processOrder(
     console.log('Generated order number:', orderNumber);
 
     // セッションのメタデータを更新
-    await stripe.checkout.sessions.update(session.id, {
-      metadata: {
-        ...session.metadata,
-        order_id: orderNumber
-      }
-    });
-    console.log('Updated session metadata with order_id:', orderNumber);
+    // await stripe.checkout.sessions.update(session.id, {
+    //   metadata: {
+    //     ...session.metadata,
+    //     order_id: orderNumber
+    //   }
+    // });
+    // console.log('Updated session metadata with order_id:', orderNumber);
 
     // 注文関連情報の保存
     console.log('Saving order records...');

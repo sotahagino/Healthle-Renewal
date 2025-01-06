@@ -39,20 +39,27 @@ export async function POST(request: Request) {
       );
     }
 
-    // セッションのメタデータからorder_idを取得
-    const order_id = session.metadata?.order_id;
-    console.log('Found order_id in metadata:', order_id);
+    // vendor_ordersテーブルから最新の注文情報を取得
+    const { data: order, error: orderError } = await supabase
+      .from('vendor_orders')
+      .select('order_id')
+      .eq('status', 'paid')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
 
-    if (!order_id) {
-      console.warn('Order ID not found in session metadata');
+    if (orderError || !order) {
+      console.warn('Order not found in vendor_orders:', orderError);
       return NextResponse.json(
-        { error: 'Order ID not found in session' },
+        { error: 'Order not found' },
         { status: 404 }
       );
     }
 
+    console.log('Found order_id:', order.order_id);
+
     return NextResponse.json({
-      order_id: order_id
+      order_id: order.order_id
     });
 
   } catch (error) {
