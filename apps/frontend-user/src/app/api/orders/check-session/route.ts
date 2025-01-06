@@ -32,25 +32,17 @@ export async function POST(request: Request) {
       );
     }
 
-    // vendor_ordersから注文情報を取得
-    const { data: order, error } = await supabase
-      .from('vendor_orders')
-      .select('order_id')
-      .eq('payment_status', 'paid')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single();
-
-    if (error || !order) {
-      console.error('Error fetching order:', error);
+    // セッションのメタデータからorder_idを取得
+    const order_id = session.metadata?.order_id;
+    if (!order_id) {
       return NextResponse.json(
-        { error: 'Order not found' },
+        { error: 'Order ID not found in session' },
         { status: 404 }
       );
     }
 
     return NextResponse.json({
-      order_id: order.order_id
+      order_id: order_id
     });
 
   } catch (error) {
