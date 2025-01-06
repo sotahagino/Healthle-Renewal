@@ -171,7 +171,7 @@ export async function GET(request: NextRequest) {
             </div>
             <script>
               const session = ${JSON.stringify(signInData.session)};
-              const projectRef = '${process.env.NEXT_PUBLIC_SUPABASE_URL!.match(/(?:https:\/\/)?([^.]+)/)?.[1] ?? ''}';
+              const projectRef = '${process.env.NEXT_PUBLIC_SUPABASE_URL!.split('//')[1].split('.')[0]}';
               
               function showError(message) {
                 const errorElement = document.getElementById('error');
@@ -223,11 +223,11 @@ export async function GET(request: NextRequest) {
                       if (!isValid) {
                         console.error('Purchase flow data has expired');
                         localStorage.removeItem('purchaseFlow');
-                        window.location.href = '/mypage';
+                        window.location.replace('/mypage');
                       } else if (!order_id) {
                         console.error('No order_id found in purchase flow');
                         localStorage.removeItem('purchaseFlow');
-                        window.location.href = '/mypage';
+                        window.location.replace('/mypage');
                       } else {
                         console.log('Updating user_id for order:', order_id);
                         
@@ -238,7 +238,7 @@ export async function GET(request: NextRequest) {
                             'Content-Type': 'application/json',
                           },
                           body: JSON.stringify({
-                            user_id: '${user.id}',
+                            user_id: session.user.id,
                             order_id: order_id
                           })
                         })
@@ -252,21 +252,21 @@ export async function GET(request: NextRequest) {
                         .then(data => {
                           console.log('Update successful:', data);
                           localStorage.removeItem('purchaseFlow');
-                          window.location.href = '${redirectPath}';
+                          window.location.replace('/purchase-complete');
                         })
                         .catch(error => {
                           console.error('Update failed:', error);
                           showError('注文情報の更新に失敗しました');
-                          window.location.href = '/mypage';
+                          window.location.replace('/mypage');
                         });
                       }
                     } catch (error) {
                       console.error('Error processing purchase flow:', error);
                       localStorage.removeItem('purchaseFlow');
-                      window.location.href = '/mypage';
+                      window.location.replace('/mypage');
                     }
                   } else {
-                    window.location.href = '/mypage';
+                    window.location.replace('/mypage');
                   }
                 }
               } catch (error) {
