@@ -37,7 +37,7 @@ export default function PurchaseCompletePage() {
           purchaseFlowData.timestamp = Date.now();
           
           localStorage.setItem('purchaseFlow', JSON.stringify(purchaseFlowData));
-          console.log('Updated purchaseFlow with latest order:', purchaseFlowData);
+          console.log('Updated purchaseFlow with order_id:', data.order_id);
         } else {
           console.warn('No order_id found in latest order');
         }
@@ -67,9 +67,16 @@ export default function PurchaseCompletePage() {
         // purchaseFlowをlocalStorageから取得
         const purchaseFlow = localStorage.getItem('purchaseFlow')
         if (purchaseFlow) {
-          const { product, timestamp } = JSON.parse(purchaseFlow)
-          // 製品情報とタイムスタンプを保持
-          localStorage.setItem('purchaseFlow', JSON.stringify({ product, timestamp }))
+          const purchaseFlowData = JSON.parse(purchaseFlow)
+          console.log('Current purchaseFlow data:', purchaseFlowData)
+          
+          // order_idを含めて保持
+          localStorage.setItem('purchaseFlow', JSON.stringify({
+            product: purchaseFlowData.product,
+            timestamp: purchaseFlowData.timestamp,
+            order_id: purchaseFlowData.order_id
+          }))
+          console.log('Preserved purchaseFlow data with order_id')
         }
 
         window.location.href = loginUrl.toString()
