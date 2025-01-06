@@ -28,11 +28,14 @@ export default function PurchaseCompletePage() {
         const data = await response.json();
         
         if (data.order_id) {
-          // LocalStorageを更新
-          const purchaseFlowData = {
-            order_id: data.order_id,
-            timestamp: data.timestamp
-          };
+          // 既存のpurchaseFlowデータを取得
+          const existingPurchaseFlow = localStorage.getItem('purchaseFlow');
+          const purchaseFlowData = existingPurchaseFlow ? JSON.parse(existingPurchaseFlow) : {};
+          
+          // 注文IDを更新
+          purchaseFlowData.order_id = data.order_id;
+          purchaseFlowData.timestamp = Date.now();
+          
           localStorage.setItem('purchaseFlow', JSON.stringify(purchaseFlowData));
           console.log('Updated purchaseFlow with latest order:', purchaseFlowData);
         } else {
