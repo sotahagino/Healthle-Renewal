@@ -204,7 +204,6 @@ async function createOrderRecords(
       shipping_phone: shippingInfo.phone,
       customer_email: session.customer_details?.email || '',
       consultation_id: null,  // 後から更新できるようにnullで保存
-      stripe_session_id: session.id,  // セッションIDを保存
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
@@ -291,13 +290,11 @@ async function processOrder(
     const orderNumber = `ORD${Date.now()}${Math.random().toString(36).substring(2, 7)}`;
     console.log('Generated order number:', orderNumber);
 
-    // purchaseFlowにorder_idを保存
+    // purchaseFlowデータを作成
     const purchaseFlow = {
       order_id: orderNumber,
-      timestamp: Date.now(),
-      session_id: session.id
+      timestamp: Date.now()
     };
-    console.log('Setting purchaseFlow data:', purchaseFlow);
 
     // 注文関連情報の保存
     console.log('Saving order records...');
@@ -321,8 +318,7 @@ async function processOrder(
           vendor_id: product.vendor_id,
           payment_link: session.payment_link,
           stripe_price_id: product.stripe_price_id,
-          timestamp: Date.now(),
-          purchase_flow: purchaseFlow  // webhookログにもpurchaseFlowデータを保存
+          timestamp: Date.now()
         }
       })
       .eq('stripe_event_id', event.id);
@@ -348,7 +344,7 @@ async function processOrder(
       received: true,
       order_number: orderNumber,
       order_id: orderNumber,
-      purchase_flow: purchaseFlow  // レスポンスにpurchaseFlowデータを含める
+      purchase_flow: purchaseFlow
     });
   } catch (error) {
     console.error('Error in processOrder:', error);
