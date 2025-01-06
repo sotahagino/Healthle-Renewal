@@ -228,6 +228,27 @@ async function createOrderRecords(
 
     console.log('Successfully created vendor order:', insertedOrder);
 
+    // purchaseFlowデータを作成してlocalStorageに保存
+    const purchaseFlowData = {
+      order_id: orderNumber,
+      timestamp: Date.now(),
+      product: {
+        id: product.id,
+        name: product.name,
+        price: session.amount_total
+      }
+    };
+
+    // localStorageに保存するためのスクリプトをクライアントに送信
+    const script = `
+      try {
+        localStorage.setItem('purchaseFlow', '${JSON.stringify(purchaseFlowData)}');
+        console.log('Successfully saved purchaseFlow:', ${JSON.stringify(purchaseFlowData)});
+      } catch (error) {
+        console.error('Failed to save purchaseFlow:', error);
+      }
+    `;
+
     // 管理システム用の注文トラッキング情報の保存
     const orderTrackingData = {
       order_id: orderNumber,
@@ -262,7 +283,12 @@ async function createOrderRecords(
 
     console.log('Successfully created order tracking:', insertedTracking);
 
-    return vendorOrderData;
+    return {
+      vendorOrderData,
+      orderTrackingData,
+      purchaseFlowData,
+      script
+    };
   } catch (error) {
     console.error('注文情報の保存に失敗:', {
       error,
@@ -290,12 +316,6 @@ async function processOrder(
     const orderNumber = `ORD${Date.now()}${Math.random().toString(36).substring(2, 7)}`;
     console.log('Generated order number:', orderNumber);
 
-    // purchaseFlowデータを作成
-    const purchaseFlow = {
-      order_id: orderNumber,
-      timestamp: Date.now()
-    };
-
     // 注文関連情報の保存
     console.log('Saving order records...');
     const orderData = await createOrderRecords(session, product, orderNumber);
@@ -318,7 +338,8 @@ async function processOrder(
           vendor_id: product.vendor_id,
           payment_link: session.payment_link,
           stripe_price_id: product.stripe_price_id,
-          timestamp: Date.now()
+          timestamp: Date.now(),
+          purchase_flow: orderData.purchaseFlowData
         }
       })
       .eq('stripe_event_id', event.id);
@@ -344,7 +365,8 @@ async function processOrder(
       received: true,
       order_number: orderNumber,
       order_id: orderNumber,
-      purchase_flow: purchaseFlow
+      purchase_flow: orderData.purchaseFlowData,
+      script: orderData.script
     });
   } catch (error) {
     console.error('Error in processOrder:', error);

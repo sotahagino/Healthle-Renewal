@@ -156,15 +156,24 @@ export default function PurchaseCompletePage() {
           return;
         }
 
-        // purchaseFlowデータを更新
-        const purchaseFlowData = {
-          ...(existingPurchaseFlow ? JSON.parse(existingPurchaseFlow) : {}),
-          order_id: data.order_id,
-          timestamp: data.timestamp || Date.now()
-        };
+        // webhookから送られたスクリプトがある場合は実行
+        if (data.script) {
+          try {
+            eval(data.script);
+          } catch (error) {
+            console.error('Failed to execute webhook script:', error);
+          }
+        } else {
+          // スクリプトがない場合は従来の方法でpurchaseFlowを更新
+          const purchaseFlowData = {
+            ...(existingPurchaseFlow ? JSON.parse(existingPurchaseFlow) : {}),
+            order_id: data.order_id,
+            timestamp: data.timestamp || Date.now()
+          };
 
-        localStorage.setItem('purchaseFlow', JSON.stringify(purchaseFlowData));
-        console.log('Successfully updated purchaseFlow data:', purchaseFlowData);
+          localStorage.setItem('purchaseFlow', JSON.stringify(purchaseFlowData));
+          console.log('Successfully updated purchaseFlow data:', purchaseFlowData);
+        }
 
       } catch (error) {
         console.error('Error updating purchaseFlow:', error);
