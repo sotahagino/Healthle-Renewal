@@ -8,10 +8,12 @@ const supabase = createClient(
 
 export async function GET(request: Request) {
   try {
-    // 最新の注文情報を取得
+    // 最新の注文情報を取得（決済完了済みのものに限定）
     const { data: latestOrder, error } = await supabase
       .from('vendor_orders')
       .select('order_id, created_at')
+      .eq('payment_status', 'paid')  // 決済完了済みのみ
+      .is('order_id', 'not.null')    // order_idが存在するもののみ
       .order('created_at', { ascending: false })
       .limit(1)
       .single();
