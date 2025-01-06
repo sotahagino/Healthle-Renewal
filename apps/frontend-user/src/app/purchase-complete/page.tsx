@@ -30,14 +30,21 @@ export default function PurchaseCompletePage() {
         if (data.order_id) {
           // 既存のpurchaseFlowデータを取得
           const existingPurchaseFlow = localStorage.getItem('purchaseFlow');
-          const purchaseFlowData = existingPurchaseFlow ? JSON.parse(existingPurchaseFlow) : {};
-          
-          // 注文IDを更新
-          purchaseFlowData.order_id = data.order_id;
-          purchaseFlowData.timestamp = Date.now();
-          
-          localStorage.setItem('purchaseFlow', JSON.stringify(purchaseFlowData));
-          console.log('Updated purchaseFlow with order_id:', data.order_id);
+          if (existingPurchaseFlow) {
+            const purchaseFlowData = JSON.parse(existingPurchaseFlow);
+            
+            // 既存のデータを保持しながら、order_idとtimestampを更新
+            const updatedPurchaseFlow = {
+              ...purchaseFlowData,
+              order_id: data.order_id,  // vendor_ordersテーブルのorder_id
+              timestamp: Date.now()
+            };
+            
+            localStorage.setItem('purchaseFlow', JSON.stringify(updatedPurchaseFlow));
+            console.log('Updated purchaseFlow with vendor_orders order_id:', data.order_id);
+          } else {
+            console.warn('No purchaseFlow data found in localStorage');
+          }
         } else {
           console.warn('No order_id found in latest order');
         }

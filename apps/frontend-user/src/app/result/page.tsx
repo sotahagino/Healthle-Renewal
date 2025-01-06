@@ -605,8 +605,7 @@ export default function ResultPage() {
       // 購入フロー情報をlocalStorageに保存
       const purchaseFlowData = {
         product,
-        timestamp: Date.now(),
-        order_id: product.id // 商品IDを注文IDとして使用
+        timestamp: Date.now()
       }
       localStorage.setItem('purchaseFlow', JSON.stringify(purchaseFlowData))
       console.log('Saved purchaseFlow data:', purchaseFlowData)

@@ -11,7 +11,12 @@ export async function GET(request: Request) {
     // 最新の注文情報を取得（決済完了済みのものに限定）
     const { data: latestOrder, error } = await supabase
       .from('vendor_orders')
-      .select('order_id, created_at')
+      .select(`
+        id,
+        order_id,
+        created_at,
+        payment_status
+      `)
       .eq('payment_status', 'paid')  // 決済完了済みのみ
       .is('order_id', 'not.null')    // order_idが存在するもののみ
       .order('created_at', { ascending: false })
@@ -19,15 +24,19 @@ export async function GET(request: Request) {
       .single();
 
     if (error) {
+      console.error('Database query error:', error);
       throw error;
     }
 
     if (!latestOrder) {
+      console.warn('No completed order found');
       return NextResponse.json({ error: 'No order found' }, { status: 404 });
     }
 
+    console.log('Found latest order:', latestOrder);
+
     return NextResponse.json({
-      order_id: latestOrder.order_id,
+      order_id: latestOrder.id,  // vendor_ordersテーブルのidを使用
       timestamp: new Date(latestOrder.created_at).getTime()
     });
   } catch (error) {
