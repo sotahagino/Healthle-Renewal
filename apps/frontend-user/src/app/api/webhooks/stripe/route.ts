@@ -316,23 +316,6 @@ async function processOrder(
     const orderNumber = `ORD${Date.now()}${Math.random().toString(36).substring(2, 7)}`;
     console.log('Generated order number:', orderNumber);
 
-    // success_urlにorder_idを追加
-    if (session.success_url) {
-      try {
-        const successUrl = new URL(session.success_url);
-        successUrl.searchParams.append('order_id', orderNumber);
-        await stripe.checkout.sessions.modify(session.id, {
-          success_url: successUrl.toString()
-        });
-        console.log('Updated success_url with order_id:', successUrl.toString());
-      } catch (error) {
-        console.error('Failed to update success_url:', error);
-        // success_urlの更新に失敗しても処理は続行
-      }
-    } else {
-      console.warn('No success_url found in session');
-    }
-
     // 注文関連情報の保存
     console.log('Saving order records...');
     const orderData = await createOrderRecords(session, product, orderNumber);
