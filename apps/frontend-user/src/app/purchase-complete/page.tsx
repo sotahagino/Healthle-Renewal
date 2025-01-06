@@ -2,196 +2,40 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Dialog, DialogContent } from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
+import { useAuth } from '@/hooks/useAuth'
+import { LoginModal } from '@/components/LoginModal'
 import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { CheckCircle } from 'lucide-react'
 import { SiteHeader } from '@/components/site-header'
 import { Footer } from '@/components/footer'
-import { useAuth } from '@/hooks/useAuth'
-import { CheckCircle } from 'lucide-react'
-import { LoginContent } from '@/components/login-content'
 
 export default function PurchaseCompletePage() {
   const router = useRouter()
   const { user, loading } = useAuth()
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [returnTo, setReturnTo] = useState('')
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
 
   useEffect(() => {
-    // クライアントサイドでのみwindow.locationを使用
-    setReturnTo(typeof window !== 'undefined' ? '/purchase-complete' : '')
-
-    // 最新の注文情報を取得
-    const fetchLatestOrder = async () => {
+    const checkSession = async () => {
       try {
-        const response = await fetch('/api/orders/latest');
-        const data = await response.json();
+        const response = await fetch('/api/orders/check-session')
+        const data = await response.json()
         
-        if (data.order_id) {
-          // 既存のpurchaseFlowデータを取得
-          const existingPurchaseFlow = localStorage.getItem('purchaseFlow');
-          if (existingPurchaseFlow) {
-            const purchaseFlowData = JSON.parse(existingPurchaseFlow);
-            
-            // 既存のデータを保持しながら、order_idとtimestampを更新
-            const updatedPurchaseFlow = {
-              ...purchaseFlowData,
-              order_id: data.order_id,  // vendor_ordersテーブルのorder_id
-              timestamp: Date.now()
-            };
-            
-            localStorage.setItem('purchaseFlow', JSON.stringify(updatedPurchaseFlow));
-            console.log('Updated purchaseFlow with vendor_orders order_id:', data.order_id);
-          } else {
-            console.warn('No purchaseFlow data found in localStorage');
-          }
-        } else {
-          console.warn('No order_id found in latest order');
+        if (data.purchase_flow) {
+          localStorage.setItem('purchaseFlow', JSON.stringify(data.purchase_flow))
+          console.log('Successfully saved purchaseFlow:', data.purchase_flow)
+        }
+
+        if (!loading && !user) {
+          setIsLoginModalOpen(true)
         }
       } catch (error) {
-        console.error('Error fetching latest order:', error);
+        console.error('Error checking session:', error)
       }
-    };
-
-    fetchLatestOrder();
-  }, [])
-
-  useEffect(() => {
-    // ログインしていない場合、モーダルを表示
-    if (!loading && !user) {
-      setIsModalOpen(true)
     }
+
+    checkSession()
   }, [user, loading])
-
-  // URLからorder_idを取得して保存
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const orderId = urlParams.get('order_id');
-    
-    if (orderId) {
-      console.log('Got order_id from URL:', orderId);
-      const purchaseFlowData = {
-        order_id: orderId,
-        timestamp: Date.now()
-      };
-      localStorage.setItem('purchaseFlow', JSON.stringify(purchaseFlowData));
-      console.log('Saved purchaseFlow data:', purchaseFlowData);
-    } else {
-      console.warn('No order_id found in URL parameters');
-    }
-  }, []);
-
-  // LINEログイン処理
-  const handleLineLogin = () => {
-    try {
-      const lineLoginUrl = process.env.NEXT_PUBLIC_LINE_LOGIN_URL
-      if (lineLoginUrl) {
-        const loginUrl = new URL(lineLoginUrl)
-        loginUrl.searchParams.set('return_to', '/purchase-complete')
-
-        // purchaseFlowをlocalStorageから取得
-        const purchaseFlow = localStorage.getItem('purchaseFlow')
-        if (purchaseFlow) {
-          const purchaseFlowData = JSON.parse(purchaseFlow)
-          console.log('Current purchaseFlow data:', purchaseFlowData)
-          
-          // order_idを含めて保持
-          localStorage.setItem('purchaseFlow', JSON.stringify({
-            timestamp: purchaseFlowData.timestamp,
-            order_id: purchaseFlowData.order_id
-          }))
-          console.log('Preserved purchaseFlow data with order_id')
-        }
-
-        window.location.href = loginUrl.toString()
-      } else {
-        throw new Error('LINE login URL is not configured')
-      }
-    } catch (error) {
-      console.error('LINE login error:', error)
-      alert('ログインに失敗しました。もう一度お試しください。')
-    }
-  }
-
-  useEffect(() => {
-    let retryCount = 0;
-    const MAX_RETRIES = 10; // 最大50秒間試行
-
-    const updatePurchaseFlow = async () => {
-      try {
-        // URLからsession_idを取得
-        const urlParams = new URLSearchParams(window.location.search);
-        const sessionId = urlParams.get('session_id');
-        console.log('Got session_id from URL:', sessionId);
-
-        if (!sessionId) {
-          console.error('No session_id found in URL');
-          return;
-        }
-
-        // 既存のpurchaseFlowデータを確認
-        const existingPurchaseFlow = localStorage.getItem('purchaseFlow');
-        console.log('Current purchaseFlow data:', existingPurchaseFlow);
-
-        // Stripeセッションの状態を確認
-        console.log('Checking session status... (attempt ' + (retryCount + 1) + ')');
-        const response = await fetch('/api/orders/check-session', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ session_id: sessionId }),
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          console.error('Session check failed:', errorData);
-          
-          if (retryCount < MAX_RETRIES) {
-            retryCount++;
-            console.log(`Retrying in 5 seconds... (${retryCount}/${MAX_RETRIES})`);
-            setTimeout(updatePurchaseFlow, 5000);
-          } else {
-            console.error('Max retries reached. Please try refreshing the page.');
-          }
-          return;
-        }
-
-        const data = await response.json();
-        console.log('Session check response:', data);
-
-        if (!data.order_id) {
-          console.error('No order_id in response');
-          
-          if (retryCount < MAX_RETRIES) {
-            retryCount++;
-            console.log(`Retrying in 5 seconds... (${retryCount}/${MAX_RETRIES})`);
-            setTimeout(updatePurchaseFlow, 5000);
-          } else {
-            console.error('Max retries reached. Please try refreshing the page.');
-          }
-          return;
-        }
-
-        // purchaseFlowデータを更新
-        localStorage.setItem('purchaseFlow', JSON.stringify(data));
-        console.log('Successfully updated purchaseFlow data:', data);
-
-      } catch (error) {
-        console.error('Error updating purchaseFlow:', error);
-        
-        if (retryCount < MAX_RETRIES) {
-          retryCount++;
-          console.log(`Retrying in 5 seconds... (${retryCount}/${MAX_RETRIES})`);
-          setTimeout(updatePurchaseFlow, 5000);
-        } else {
-          console.error('Max retries reached. Please try refreshing the page.');
-        }
-      }
-    };
-
-    updatePurchaseFlow();
-  }, []);
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#E6F3EF] to-white">
@@ -242,23 +86,10 @@ export default function PurchaseCompletePage() {
       </main>
       <Footer />
 
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent>
-          <LoginContent
-            onLogin={handleLineLogin}
-            returnTo={returnTo}
-            title="商品の発送状況を受け取る"
-            message="ご購入ありがとうございます。商品の発送状況や配送状況をLINEでお知らせするために、LINEアカウントと連携してください。"
-            additionalMessage={
-              <ul className="text-[#666666] space-y-2 mt-4">
-                <li>• 商品の発送状況</li>
-                <li>• 配送状況の追跡情報</li>
-                <li>• お届け完了のお知らせ</li>
-              </ul>
-            }
-          />
-        </DialogContent>
-      </Dialog>
+      <LoginModal
+        isOpen={isLoginModalOpen}
+        onClose={() => setIsLoginModalOpen(false)}
+      />
     </div>
   )
 } 
