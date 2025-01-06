@@ -336,7 +336,8 @@ async function processOrder(
     console.log('Order processing completed successfully');
     return NextResponse.json({ 
       received: true,
-      order_number: orderNumber
+      order_number: orderNumber,
+      order_id: orderNumber
     });
   } catch (error) {
     console.error('Error in processOrder:', error);

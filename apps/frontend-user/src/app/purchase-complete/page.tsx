@@ -96,6 +96,55 @@ export default function PurchaseCompletePage() {
     }
   }
 
+  useEffect(() => {
+    const updatePurchaseFlow = async () => {
+      try {
+        // URLからsession_idを取得
+        const urlParams = new URLSearchParams(window.location.search);
+        const sessionId = urlParams.get('session_id');
+
+        if (!sessionId) {
+          console.error('No session_id found in URL');
+          return;
+        }
+
+        // 既存のpurchaseFlowデータを取得
+        const existingPurchaseFlow = localStorage.getItem('purchaseFlow');
+        if (!existingPurchaseFlow) {
+          console.error('No purchaseFlow data found');
+          return;
+        }
+
+        const purchaseFlowData = JSON.parse(existingPurchaseFlow);
+
+        // Stripeセッションの状態を確認
+        const response = await fetch('/api/orders/check-session', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ session_id: sessionId }),
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to check session');
+        }
+
+        // order_idを追加して保存
+        purchaseFlowData.order_id = data.order_id;
+        purchaseFlowData.timestamp = Date.now();
+        localStorage.setItem('purchaseFlow', JSON.stringify(purchaseFlowData));
+
+        console.log('Updated purchaseFlow with order_id:', data.order_id);
+      } catch (error) {
+        console.error('Error updating purchaseFlow:', error);
+      }
+    };
+
+    updatePurchaseFlow();
+  }, []);
+
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#E6F3EF] to-white">
       <SiteHeader />
