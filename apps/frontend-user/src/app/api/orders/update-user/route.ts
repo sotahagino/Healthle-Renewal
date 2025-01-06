@@ -24,7 +24,7 @@ export async function POST(req: Request) {
         user_id,
         updated_at: new Date().toISOString()
       })
-      .eq('id', order_id)
+      .eq('order_id', order_id)
       .select()
 
     if (updateError) {

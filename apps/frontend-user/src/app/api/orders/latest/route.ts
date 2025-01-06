@@ -36,7 +36,7 @@ export async function GET(request: Request) {
     console.log('Found latest order:', latestOrder);
 
     return NextResponse.json({
-      order_id: latestOrder.id,  // vendor_ordersテーブルのidを使用
+      order_id: latestOrder.order_id,  // order_idを返す
       timestamp: new Date(latestOrder.created_at).getTime()
     });
   } catch (error) {
