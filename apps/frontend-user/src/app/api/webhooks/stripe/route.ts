@@ -194,18 +194,22 @@ async function createOrderRecords(
     const { data: existingOrder, error: fetchError } = await supabase
       .from('vendor_orders')
       .select('*')
-      .eq('product_id', product.id)
-      .eq('status', 'pending')
+      .eq('stripe_session_id', session.id)
       .single();
 
     if (fetchError) {
-      console.error('Failed to fetch existing order:', fetchError);
+      console.error('Failed to fetch existing order:', {
+        error: fetchError,
+        session_id: session.id
+      });
       throw fetchError;
     }
 
     if (!existingOrder) {
-      console.error('No pending order found for product:', product.id);
-      throw new Error('No pending order found');
+      console.error('No order found for session:', {
+        session_id: session.id
+      });
+      throw new Error('No order found');
     }
 
     const vendorOrderData = {
@@ -215,9 +219,14 @@ async function createOrderRecords(
       shipping_address: `〒${shippingInfo.postal_code} ${shippingInfo.prefecture}${shippingInfo.city}${shippingInfo.address}`,
       shipping_phone: shippingInfo.phone,
       customer_email: session.customer_details?.email || '',
-      stripe_session_id: session.id,
       updated_at: new Date().toISOString()
     };
+
+    console.log('Updating vendor order:', {
+      order_id: existingOrder.id,
+      session_id: session.id,
+      data: vendorOrderData
+    });
 
     const { error: updateError } = await supabase
       .from('vendor_orders')

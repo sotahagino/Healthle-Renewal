@@ -15,21 +15,9 @@ export async function POST(req: Request) {
     const { data: { session: authSession }, error: sessionError } = await supabase.auth.getSession();
     if (sessionError) throw sessionError;
 
-    // ユーザーが未ログインの場合はエラーを返さない
-    let userId = authSession?.user?.id;
-    let userData = null;
-
-    if (userId) {
-      // ログイン済みユーザーの情報を取得
-      const { data: userDataResult, error: userError } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', userId)
-        .single();
-
-      if (userError) throw userError;
-      userData = userDataResult;
-    }
+    // 現在のユーザーIDを取得（ゲストユーザーの場合でも）
+    const currentUserId = authSession?.user?.id;
+    console.log('Current user ID:', currentUserId);
 
     // リクエストボディの解析
     const body = await req.json();
@@ -49,42 +37,6 @@ export async function POST(req: Request) {
       .in('id', items.map(item => item.product_id));
 
     if (productError) throw productError;
-
-    // 注文の作成
-    const orderData = {
-      user_id: userId,
-      status: 'pending',
-      amount: items.reduce((total, item) => {
-        const product = products.find(p => p.id === item.product_id);
-        return total + (product?.price || 0) * item.quantity;
-      }, 0),
-      consultation_id: consultation_id || null,
-      is_guest_order: !userId
-    };
-
-    // vendor_ordersにも事前に注文情報を作成
-    for (const item of items) {
-      const product = products.find(p => p.id === item.product_id);
-      if (!product) continue;
-
-      const vendorOrderData = {
-        user_id: userId,
-        vendor_id: product.vendor_id,
-        product_id: product.id,
-        status: 'pending',
-        total_amount: product.price,
-        commission_rate: product.commission_rate || 10,
-        consultation_id: consultation_id || null,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
-
-      const { error: vendorOrderError } = await supabase
-        .from('vendor_orders')
-        .insert([vendorOrderData]);
-
-      if (vendorOrderError) throw vendorOrderError;
-    }
 
     // Stripeセッションの作成
     const checkoutSession = await stripe.checkout.sessions.create({
@@ -107,12 +59,52 @@ export async function POST(req: Request) {
       success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/purchase-complete?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/checkout/cancel`,
       metadata: {
-        user_id: userId || '',
+        user_id: currentUserId || '',  // 現在のユーザーIDを設定
         consultation_id: consultation_id || '',
-        is_guest_order: !userId ? 'true' : 'false'
+        is_guest_order: !currentUserId ? 'true' : 'false'
       },
-      client_reference_id: userId || undefined,
+      client_reference_id: currentUserId || undefined,  // 現在のユーザーIDを設定
     });
+
+    // vendor_ordersにも事前に注文情報を作成
+    for (const item of items) {
+      const product = products.find(p => p.id === item.product_id);
+      if (!product) continue;
+
+      const vendorOrderData = {
+        user_id: currentUserId,  // 現在のユーザーIDを設定（nullではなく）
+        vendor_id: product.vendor_id,
+        product_id: product.id,
+        status: 'pending',
+        total_amount: product.price,
+        commission_rate: product.commission_rate || 10,
+        consultation_id: consultation_id || null,
+        stripe_session_id: checkoutSession.id,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      console.log('Creating vendor order:', {
+        session_id: checkoutSession.id,
+        product_id: product.id,
+        user_id: currentUserId,  // ログ出力も修正
+        data: vendorOrderData
+      });
+
+      const { error: vendorOrderError } = await supabase
+        .from('vendor_orders')
+        .insert([vendorOrderData]);
+
+      if (vendorOrderError) {
+        console.error('Failed to create vendor order:', {
+          error: vendorOrderError,
+          session_id: checkoutSession.id,
+          product_id: product.id,
+          user_id: currentUserId  // エラーログも修正
+        });
+        throw vendorOrderError;
+      }
+    }
 
     return NextResponse.json({ sessionId: checkoutSession.id });
   } catch (error) {
