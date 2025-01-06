@@ -63,6 +63,24 @@ export default function PurchaseCompletePage() {
     }
   }, [user, loading])
 
+  // URLからorder_idを取得して保存
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const orderId = urlParams.get('order_id');
+    
+    if (orderId) {
+      console.log('Got order_id from URL:', orderId);
+      const purchaseFlowData = {
+        order_id: orderId,
+        timestamp: Date.now()
+      };
+      localStorage.setItem('purchaseFlow', JSON.stringify(purchaseFlowData));
+      console.log('Saved purchaseFlow data:', purchaseFlowData);
+    } else {
+      console.warn('No order_id found in URL parameters');
+    }
+  }, []);
+
   // LINEログイン処理
   const handleLineLogin = () => {
     try {
@@ -79,7 +97,6 @@ export default function PurchaseCompletePage() {
           
           // order_idを含めて保持
           localStorage.setItem('purchaseFlow', JSON.stringify({
-            product: purchaseFlowData.product,
             timestamp: purchaseFlowData.timestamp,
             order_id: purchaseFlowData.order_id
           }))
