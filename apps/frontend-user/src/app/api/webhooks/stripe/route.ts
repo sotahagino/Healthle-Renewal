@@ -195,7 +195,7 @@ async function createOrderRecords(
       order_id: orderNumber,
       vendor_id: product.vendor_id,
       product_id: product.id,
-      user_id: null,  // 後から更新できるようにnullで保存
+      user_id: user_id,  // user_idを直接保存するように変更
       status: 'paid',
       total_amount: session.amount_total,
       commission_rate: product.commission_rate || 10,

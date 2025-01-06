@@ -19,6 +19,12 @@ export default function PurchaseCompletePage() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    if (isGuestUser()) {
+      setShowLoginModal(true)
+    }
+  }, [isGuestUser])
+
+  useEffect(() => {
     const fetchOrderDetails = async () => {
       try {
         const sessionId = searchParams.get('session_id')
@@ -29,6 +35,7 @@ export default function PurchaseCompletePage() {
 
         const response = await fetch(`/api/orders/check-session?session_id=${sessionId}`)
         if (!response.ok) {
+          console.error('Session check failed:', await response.text())
           throw new Error('Failed to check session')
         }
 
@@ -44,17 +51,19 @@ export default function PurchaseCompletePage() {
           .eq('stripe_session_id', sessionId)
           .single()
 
-        if (orderError) throw orderError
+        if (orderError) {
+          console.error('Order fetch error:', orderError)
+          throw orderError
+        }
+        
         if (!orderData) {
+          console.error('No order data found for session:', sessionId)
           setError('注文情報が見つかりません')
           return
         }
 
+        console.log('Order data:', orderData)
         setOrder(orderData)
-
-        if (isGuestUser()) {
-          setShowLoginModal(true)
-        }
       } catch (error) {
         console.error('Error fetching order:', error)
         setError('注文情報の取得に失敗しました')
@@ -64,7 +73,7 @@ export default function PurchaseCompletePage() {
     }
 
     fetchOrderDetails()
-  }, [searchParams, isGuestUser])
+  }, [searchParams])
 
   const handleLoginModalClose = () => {
     if (!isGuestUser()) {
