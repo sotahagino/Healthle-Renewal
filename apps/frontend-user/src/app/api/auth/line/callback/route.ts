@@ -127,7 +127,9 @@ export async function GET(request: NextRequest) {
     if (signInErr) throw signInErr
 
     // リダイレクト先の決定
-    const redirectPath = '/purchase-complete'
+    const searchParams = request.nextUrl.searchParams
+    const returnUrl = searchParams.get('return_url')
+    const redirectPath = returnUrl || '/mypage'
 
     try {
       // セッショントークンをlocalStorageに保存するHTML
@@ -166,11 +168,11 @@ export async function GET(request: NextRequest) {
                   if (!isValid) {
                     console.error('Purchase flow data has expired');
                     localStorage.removeItem('purchaseFlow');
-                    window.location.replace('/mypage');
+                    window.location.replace('${redirectPath}');
                   } else if (!order_id) {
                     console.error('No order_id found in purchase flow');
                     localStorage.removeItem('purchaseFlow');
-                    window.location.replace('/mypage');
+                    window.location.replace('${redirectPath}');
                   } else {
                     console.log('Updating user_id for order:', order_id);
                     
@@ -195,15 +197,15 @@ export async function GET(request: NextRequest) {
                     .then(data => {
                       console.log('Update successful:', data);
                       localStorage.removeItem('purchaseFlow');
-                      window.location.replace('/purchase-complete');
+                      window.location.replace('${redirectPath}');
                     })
                     .catch(error => {
                       console.error('Update failed:', error);
-                      window.location.replace('/mypage');
+                      window.location.replace('${redirectPath}');
                     });
                   }
                 } else {
-                  window.location.replace('/mypage');
+                  window.location.replace('${redirectPath}');
                 }
               } catch (error) {
                 console.error('Error in callback script:', error);

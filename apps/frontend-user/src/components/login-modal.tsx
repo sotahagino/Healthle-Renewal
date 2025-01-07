@@ -112,7 +112,7 @@ export default function LoginModal({
             ) : (
               <>
                 <Image
-                  src="/line-icon.png"
+                  src="https://wojtqrjpxivotuzjtgsc.supabase.co/storage/v1/object/public/Healthle/LINE_logo.svg.webp"
                   alt="LINE"
                   width={24}
                   height={24}

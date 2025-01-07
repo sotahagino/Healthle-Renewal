@@ -50,14 +50,6 @@ export function SiteHeader() {
                         <span>ログイン</span>
                       </Button>
                     </Link>
-                    <Button 
-                      variant="ghost" 
-                      onClick={handleLogout}
-                      className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100/80"
-                    >
-                      <LogOut className="h-4 w-4" />
-                      <span className="hidden sm:inline">ログアウト</span>
-                    </Button>
                   </div>
                 ) : (
                   <div className="flex items-center space-x-3">
