@@ -22,38 +22,57 @@ export function useAuth() {
       try {
         const { data: { session }, error } = await supabase.auth.getSession()
         
-        if (error) {
-          console.error('Error getting session:', error)
+        if (error || !session?.user) {
+          console.log('No active session or error, checking local storage:', error)
           if (mounted) {
             // セッションエラー時にローカルストレージからゲストユーザー情報を確認
             const guestInfo = getGuestUserInfo()
             if (guestInfo && typeof guestInfo.email === 'string' && typeof guestInfo.password === 'string') {
+              console.log('Found guest info in local storage, attempting to sign in')
               // 自動再ログイン試行
               try {
-                const { data: reAuthData, error: reAuthError } = await supabase.auth.signInWithPassword({
+                const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
                   email: guestInfo.email,
                   password: guestInfo.password
                 })
                 
-                if (!reAuthError && reAuthData.user) {
-                  const { data: userData } = await supabase
-                    .from('users')
-                    .select('*')
-                    .eq('id', reAuthData.user.id)
-                    .single()
+                if (signInError) {
+                  console.error('Sign in failed:', signInError)
+                  throw signInError
+                }
 
-                  if (userData) {
-                    setUser({
-                      ...reAuthData.user,
-                      is_guest: userData.is_guest,
-                      guest_created_at: userData.guest_created_at
-                    })
-                    setLoading(false)
-                    return
-                  }
+                if (!signInData.user) {
+                  console.error('No user data after sign in')
+                  throw new Error('No user data after sign in')
+                }
+
+                console.log('Successfully signed in as guest:', signInData.user)
+
+                // ユーザー情報をデータベースから取得
+                const { data: userData, error: userError } = await supabase
+                  .from('users')
+                  .select('*')
+                  .eq('id', signInData.user.id)
+                  .single()
+
+                if (userError) {
+                  console.error('Failed to fetch user data:', userError)
+                  throw userError
+                }
+
+                if (userData) {
+                  console.log('Successfully fetched user data:', userData)
+                  setUser({
+                    ...signInData.user,
+                    is_guest: userData.is_guest,
+                    guest_created_at: userData.guest_created_at
+                  })
+                  setLoading(false)
+                  return
                 }
               } catch (reAuthError) {
                 console.error('Re-authentication failed:', reAuthError)
+                clearGuestUserInfo() // 無効なゲスト情報をクリア
               }
             }
             setUser(null)
@@ -72,6 +91,7 @@ export function useAuth() {
               .single()
 
             if (!userError && userData) {
+              console.log('Setting user data:', userData)
               // セッションのユーザー情報にデータベースの情報を統合
               setUser({
                 ...session.user,
@@ -79,6 +99,7 @@ export function useAuth() {
                 guest_created_at: userData.guest_created_at
               })
             } else {
+              console.log('Setting session user:', session.user)
               setUser(session.user)
             }
           } else {
@@ -110,6 +131,7 @@ export function useAuth() {
             .single()
 
           if (!userError && userData) {
+            console.log('Auth state change: setting user data:', userData)
             // セッションのユーザー情報にデータベースの情報を統合
             setUser({
               ...session.user,
@@ -117,15 +139,11 @@ export function useAuth() {
               guest_created_at: userData.guest_created_at
             })
           } else {
+            console.log('Auth state change: setting session user:', session.user)
             setUser(session.user)
           }
         } else {
           setUser(null)
-          const protectedPaths = ['/mypage', '/consultations', '/result']
-          const currentPath = window.location.pathname
-          if (protectedPaths.some(path => currentPath.startsWith(path))) {
-            router.push('/login')
-          }
         }
         setLoading(false)
       }
@@ -139,65 +157,12 @@ export function useAuth() {
     }
   }, [router])
 
-  // ゲストユーザーとしてログイン
-  const loginAsGuest = async () => {
-    try {
-      const email = generateGuestEmail()
-      const password = generateGuestPassword()
-
-      // まずSupabase認証でユーザーを作成
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            is_guest: true,
-            guest_created_at: new Date().toISOString()
-          }
-        }
-      })
-
-      if (signUpError) throw signUpError
-      if (!signUpData.user) throw new Error('ユーザー作成に失敗しました')
-
-      // 次にusersテーブルにゲストユーザー情報を追加
-      const { error: userError } = await supabase
-        .from('users')
-        .insert([{
-          id: signUpData.user.id,
-          email: email,
-          is_guest: true,
-          guest_created_at: new Date().toISOString()
-        }])
-
-      if (userError) {
-        // usersテーブルへの挿入に失敗した場合、認証ユーザーを削除
-        await supabase.auth.admin.deleteUser(signUpData.user.id)
-        throw userError
-      }
-
-      // ゲストユーザー情報をローカルストレージに保存
-      saveGuestUserInfo(signUpData.user.id, email, password)
-      
-      // ユーザー情報を設定
-      const userWithMetadata = {
-        ...signUpData.user,
-        is_guest: true,
-        guest_created_at: new Date().toISOString()
-      }
-      setUser(userWithMetadata)
-      return userWithMetadata
-
-    } catch (error) {
-      console.error('Guest login error:', error)
-      throw error
-    }
-  }
-
   // ゲストユーザーかどうかを確認
   const isGuestUser = () => {
-    // データベースの情報を優先
-    return user?.is_guest === true
+    return Boolean(
+      user?.is_guest === true || 
+      (user?.email && user.email.includes('@guest.healthle.com'))
+    )
   }
 
   // ゲストアカウントを正規アカウントに移行
@@ -228,33 +193,36 @@ export function useAuth() {
 
         const guestUserId = userData.id;
 
-        // ストアドプロシージャを使用してデータ移行を実行
-        const { error: migrationError } = await supabase
-          .rpc('migrate_guest_user_data', {
-            old_user_id: guestUserId,
-            new_user_id: newUserId
-          });
+        // vendor_ordersテーブルのユーザーIDを更新
+        const { error: orderUpdateError } = await supabase
+          .from('vendor_orders')
+          .update({ user_id: newUserId })
+          .eq('user_id', guestUserId);
 
-        if (migrationError) {
-          console.error('Migration failed:', migrationError);
-          throw migrationError;
+        if (orderUpdateError) {
+          console.error('Failed to update vendor_orders:', orderUpdateError);
+          throw orderUpdateError;
         }
 
-        // 移行成功を確認
-        const { data: verifyData, error: verifyError } = await supabase
+        // ユーザーの移行状態を更新
+        const { error: userUpdateError } = await supabase
           .from('users')
-          .select('migrated_to, migrated_at')
-          .eq('id', guestUserId)
-          .single();
+          .update({
+            migrated_to: newUserId,
+            migrated_at: new Date().toISOString(),
+            migration_status: 'completed'
+          })
+          .eq('id', guestUserId);
 
-        if (verifyError || !verifyData.migrated_to) {
-          throw new Error('Migration verification failed');
+        if (userUpdateError) {
+          console.error('Failed to update user migration status:', userUpdateError);
+          throw userUpdateError;
         }
 
         console.log('Migration completed successfully:', {
           guestUserId,
           newUserId,
-          migratedAt: verifyData.migrated_at
+          migratedAt: new Date().toISOString()
         });
 
         // ゲストユーザー情報をクリア
@@ -286,51 +254,10 @@ export function useAuth() {
     throw new Error(`Migration failed after ${MAX_RETRIES} attempts`);
   };
 
-  const logout = async () => {
-    try {
-      const { error } = await supabase.auth.signOut()
-      if (error) throw error
-      
-      // ブラウザのストレージをクリア
-      window.sessionStorage.clear()
-      window.localStorage.clear()
-
-      // セッションクッキーを削除
-      document.cookie.split(';').forEach(cookie => {
-        const [name] = cookie.split('=')
-        const cookieName = name.trim()
-        document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`
-        document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/api;`
-      })
-
-      setUser(null)
-      router.push('/login')
-    } catch (error) {
-      console.error('Logout error:', error)
-      throw error
-    }
-  }
-
   return {
     user,
     loading,
-    setUser,
-    loginAsGuest,
     isGuestUser,
-    migrateGuestToRegular,
-    login: async (email: string, password: string) => {
-      try {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        })
-        if (error) throw error
-        setUser(data.user)
-      } catch (error) {
-        console.error('Login error:', error)
-        throw error
-      }
-    },
-    logout
+    migrateGuestToRegular
   }
 } 
