@@ -438,11 +438,10 @@ export async function POST(req: Request) {
       console.log('Processing checkout.session.completed event:', {
         event_id: event.id,
         session_id: session.id,
-        payment_status: session.payment_status,
-        client_reference_id: session.client_reference_id
+        payment_status: session.payment_status
       });
 
-      // vendor_ordersテーブルのステータスを更新
+      // vendor_ordersテーブルのステータスを直接更新
       const { error: updateOrderError } = await supabase
         .from('vendor_orders')
         .update({ 
@@ -455,6 +454,8 @@ export async function POST(req: Request) {
         console.error('Error updating order status:', updateOrderError);
         throw updateOrderError;
       }
+
+      console.log('Successfully updated order status for session:', session.id);
 
       return NextResponse.json({ received: true });
     }
