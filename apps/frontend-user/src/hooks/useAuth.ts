@@ -228,6 +228,13 @@ export function useAuth() {
     const MAX_RETRIES = 3;
     let retryCount = 0;
 
+    interface UserData {
+      id: string;
+      is_guest: boolean;
+      email: string;
+      guest_created_at?: string;
+    }
+
     const migrate = async (): Promise<boolean> => {
       try {
         console.log('Starting guest user migration:', {
@@ -253,7 +260,7 @@ export function useAuth() {
           throw new Error('Guest user not found in database');
         }
 
-        const guestUserId: string = userData.id;
+        const guestUserId = (userData as UserData).id;
 
         // vendor_ordersテーブルのユーザーIDを更新
         const { error: orderUpdateError } = await supabase
