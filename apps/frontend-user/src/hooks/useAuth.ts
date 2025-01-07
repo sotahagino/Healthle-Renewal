@@ -454,6 +454,11 @@ export function useAuth() {
   const loginAsGuest = async () => {
     try {
       console.log('Starting guest login process...');
+      
+      // 既存のセッションをクリア
+      await supabase.auth.signOut();
+      clearGuestUserInfo();
+      
       const email = generateGuestEmail()
       const password = generateGuestPassword()
 
@@ -471,12 +476,12 @@ export function useAuth() {
 
       if (signUpError) {
         console.error('Failed to sign up guest user:', signUpError);
-        setAuthError(signUpError);
+        setAuthError(new Error('ゲストユーザーの作成に失敗しました。もう一度お試しください。'));
         throw signUpError;
       }
 
       if (!signUpData.user) {
-        const error = new Error('ゲストユーザーの作成に失敗しました');
+        const error = new Error('ゲストユーザーの作成に失敗しました。もう一度お試しください。');
         setAuthError(error);
         throw error;
       }
@@ -497,7 +502,7 @@ export function useAuth() {
         console.error('Failed to create guest user in database:', userError);
         // Rollback: 認証ユーザーを削除
         await supabase.auth.admin.deleteUser(signUpData.user.id);
-        setAuthError(userError);
+        setAuthError(new Error('ゲストユーザーの作成に失敗しました。もう一度お試しください。'));
         throw userError;
       }
 
@@ -515,7 +520,7 @@ export function useAuth() {
 
       if (signInError || !signInData.user) {
         console.error('Failed to sign in guest user:', signInError);
-        setAuthError(signInError || new Error('ゲストユーザーのログインに失敗しました'));
+        setAuthError(new Error('ゲストユーザーのログインに失敗しました。もう一度お試しください。'));
         throw signInError || new Error('Failed to sign in guest user');
       }
 
@@ -531,11 +536,13 @@ export function useAuth() {
       setAuthError(null);
       setUser(userWithMetadata);
       setIsGuestUser(true);
+      setLoading(false);
       return userWithMetadata;
 
     } catch (error) {
       console.error('Guest login error:', error);
       setAuthError(error as Error);
+      setLoading(false);
       throw error;
     }
   }
