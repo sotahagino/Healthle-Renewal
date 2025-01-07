@@ -17,14 +17,6 @@ export default function PurchaseCompletePage() {
   const [order, setOrder] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [retryCount, setRetryCount] = useState(0)
-  const MAX_RETRIES = 10 // 最大10回まで試行（合計50秒）
-
-  useEffect(() => {
-    if (isGuestUser()) {
-      setShowLoginModal(true)
-    }
-  }, [isGuestUser])
 
   useEffect(() => {
     const fetchOrderDetails = async () => {
@@ -37,36 +29,16 @@ export default function PurchaseCompletePage() {
 
         const response = await fetch(`/api/orders/check-session?session_id=${sessionId}`)
         if (!response.ok) {
-          if (response.status === 202) {
-            // 処理中の場合は5秒後に再試行
-            const data = await response.json()
-            console.log('Order processing:', data)
-            
-            if (retryCount < MAX_RETRIES) {
-              setTimeout(() => {
-                setRetryCount(prev => prev + 1)
-              }, 5000)
-              return
-            } else {
-              throw new Error('注文処理のタイムアウト')
-            }
-          }
-          console.error('Session check failed:', await response.text())
+          console.error('Session check failed:', await response.json())
           throw new Error('Failed to check session')
         }
 
         const purchaseFlowData = await response.json()
         console.log('Purchase flow data:', purchaseFlowData)
 
-        if (purchaseFlowData.status !== 'completed') {
-          if (retryCount < MAX_RETRIES) {
-            setTimeout(() => {
-              setRetryCount(prev => prev + 1)
-            }, 5000)
-            return
-          } else {
-            throw new Error('注文処理のタイムアウト')
-          }
+        // ゲストユーザーの場合はモーダルを表示
+        if (purchaseFlowData.is_guest) {
+          setShowLoginModal(true)
         }
 
         const { data: orderData, error: orderError } = await supabase
@@ -99,10 +71,8 @@ export default function PurchaseCompletePage() {
       }
     }
 
-    if (loading) {
-      fetchOrderDetails()
-    }
-  }, [searchParams, retryCount, loading])
+    fetchOrderDetails()
+  }, [searchParams])
 
   const handleLoginModalClose = () => {
     if (!isGuestUser()) {
@@ -116,12 +86,7 @@ export default function PurchaseCompletePage() {
         <SiteHeader />
         <main className="flex-grow container mx-auto px-4 py-8 mt-16">
           <div className="text-center">
-            <p>注文処理中です...</p>
-            {retryCount > 0 && (
-              <p className="text-sm text-gray-600 mt-2">
-                処理の完了まで今しばらくお待ちください ({retryCount}/{MAX_RETRIES})
-              </p>
-            )}
+            <p>注文情報を取得中...</p>
           </div>
         </main>
         <Footer />

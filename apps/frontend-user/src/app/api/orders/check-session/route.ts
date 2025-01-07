@@ -48,7 +48,7 @@ export async function GET(request: Request) {
         updated_at: new Date().toISOString()
       })
       .eq('stripe_session_id', session.id)
-      .select('order_id, created_at, total_amount, product_id, status')
+      .select('order_id, created_at, total_amount, product_id, status, user_id')
       .single();
 
     if (updateError) {
@@ -64,6 +64,21 @@ export async function GET(request: Request) {
       return NextResponse.json(
         { error: 'Order not found' },
         { status: 404 }
+      );
+    }
+
+    // ユーザー情報を取得してゲストかどうかを確認
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('is_guest')
+      .eq('id', updatedOrder.user_id)
+      .single();
+
+    if (userError) {
+      console.error('Error fetching user data:', userError);
+      return NextResponse.json(
+        { error: 'Failed to fetch user data' },
+        { status: 500 }
       );
     }
 
@@ -88,7 +103,8 @@ export async function GET(request: Request) {
         name: product?.name || '',
         price: updatedOrder.total_amount
       },
-      status: updatedOrder.status
+      status: updatedOrder.status,
+      is_guest: userData?.is_guest || false
     };
 
     console.log('Created purchaseFlow data:', purchaseFlowData);
