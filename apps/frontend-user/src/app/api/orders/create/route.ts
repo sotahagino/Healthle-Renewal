@@ -49,8 +49,6 @@ export async function POST(req: Request) {
           user_id: user_id,
           product_id: product_id,
           vendor_id: product.vendor_id,
-          quantity: 1,
-          unit_price: product.price,
           total_amount: product.price,
           status: 'pending',
           created_at: new Date().toISOString(),
