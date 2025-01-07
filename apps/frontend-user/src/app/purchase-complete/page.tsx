@@ -16,15 +16,19 @@ export default function PurchaseCompletePage() {
   const sessionId = searchParams.get('session_id')
 
   useEffect(() => {
-    // ローディングが完了し、ユーザー情報が取得できた後にゲストユーザーチェックを行う
-    if (!loading && user && isGuestUser()) {
-      console.log('Guest user detected:', { user })
+    // ロバッグ用のログ出力
+    console.log('Purchase complete page state:', { loading, user, isGuestUser })
+    
+    // ローディングが完了し、ユーザーが存在する場合にゲストチェックを行う
+    if (!loading && user && isGuestUser) {
+      console.log('Showing login modal for guest user')
       setShowLoginModal(true)
     }
   }, [loading, user, isGuestUser])
 
+  // ゲストユーザーの場合、モーダルを閉じられないようにする
   const handleLoginModalClose = () => {
-    if (!isGuestUser()) {
+    if (!isGuestUser) {
       setShowLoginModal(false)
     }
   }
@@ -76,7 +80,7 @@ export default function PurchaseCompletePage() {
             </div>
           </div>
           
-          {user && isGuestUser() && (
+          {isGuestUser && (
             <div className="mt-8 p-6 bg-[#E6F3EF] rounded-lg">
               <h2 className="text-xl font-bold text-[#4C9A84] mb-4 text-center">
                 LINEで最新情報をお届け
@@ -114,7 +118,7 @@ export default function PurchaseCompletePage() {
       <LoginModal
         isOpen={showLoginModal}
         onClose={handleLoginModalClose}
-        isGuestUser={isGuestUser()}
+        isGuestUser={isGuestUser}
       />
     </div>
   )
