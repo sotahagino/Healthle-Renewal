@@ -2,85 +2,26 @@
 
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { useAuth } from '@/hooks/useAuth'
 import { SiteHeader } from '@/components/site-header'
 import { Footer } from '@/components/footer'
 import LoginModal from '@/components/login-modal'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 
 export default function PurchaseCompletePage() {
-  const searchParams = useSearchParams()
   const [showLoginModal, setShowLoginModal] = useState(false)
-  const { user, isGuestUser } = useAuth()
-  const supabase = createClientComponentClient()
-  const [order, setOrder] = useState<any>(null)
-  const [error, setError] = useState<string | null>(null)
+  const { isGuestUser } = useAuth()
 
   useEffect(() => {
     // ゲストユーザーの場合は即座にモーダルを表示
     if (isGuestUser()) {
       setShowLoginModal(true)
     }
-
-    const fetchOrderDetails = async () => {
-      try {
-        const sessionId = searchParams.get('session_id')
-        if (!sessionId) {
-          setError('注文情報が見つかりません')
-          return
-        }
-
-        const { data: orderData, error: orderError } = await supabase
-          .from('vendor_orders')
-          .select(`
-            *,
-            product:product_id (*)
-          `)
-          .eq('stripe_session_id', sessionId)
-          .single()
-
-        if (orderError) {
-          console.error('Order fetch error:', orderError)
-          throw orderError
-        }
-        
-        if (!orderData) {
-          console.error('No order data found for session:', sessionId)
-          setError('注文情報が見つかりません')
-          return
-        }
-
-        console.log('Order data:', orderData)
-        setOrder(orderData)
-      } catch (error) {
-        console.error('Error fetching order:', error)
-        setError(error instanceof Error ? error.message : '注文情報の取得に失敗しました')
-      }
-    }
-
-    fetchOrderDetails()
-  }, [searchParams, isGuestUser])
+  }, [isGuestUser])
 
   const handleLoginModalClose = () => {
     if (!isGuestUser()) {
       setShowLoginModal(false)
     }
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#E6F3EF] to-white">
-        <SiteHeader />
-        <main className="flex-grow container mx-auto px-4 py-8 mt-16">
-          <Alert variant="destructive">
-            <AlertTitle>エラー</AlertTitle>
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        </main>
-        <Footer />
-      </div>
-    )
   }
 
   return (
@@ -92,42 +33,11 @@ export default function PurchaseCompletePage() {
             ご購入ありがとうございます
           </h1>
           
-          {order ? (
-            <div className="space-y-6">
-              <div className="border-t border-b py-4">
-                <h2 className="text-lg font-semibold mb-2">注文番号</h2>
-                <p className="text-gray-600">{order.order_id}</p>
-              </div>
-              
-              <div>
-                <h2 className="text-lg font-semibold mb-2">購入商品</h2>
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <p className="font-medium">{order.product.name}</p>
-                      <p className="text-sm text-gray-600">数量: 1</p>
-                    </div>
-                    <p className="font-medium">
-                      ¥{order.total_amount.toLocaleString()}
-                    </p>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="border-t pt-4">
-                <div className="flex justify-between items-center">
-                  <p className="text-lg font-semibold">合計金額</p>
-                  <p className="text-lg font-bold text-[#4C9A84]">
-                    ¥{order.total_amount.toLocaleString()}
-                  </p>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="text-center py-4">
-              <p>注文情報を取得中...</p>
-            </div>
-          )}
+          <div className="text-center mb-6">
+            <p className="text-gray-600">
+              ご注文の確認メールをお送りしましたので、ご確認ください。
+            </p>
+          </div>
           
           {isGuestUser() && (
             <div className="mt-8 p-4 bg-[#E6F3EF] rounded-lg">
