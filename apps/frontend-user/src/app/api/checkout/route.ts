@@ -25,28 +25,14 @@ export async function POST(req: Request) {
       );
     }
 
-    // ユーザー情報を取得してゲストかどうかを確認
-    const { data: userData, error: userError } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', currentUserId)
-      .single();
-
-    if (userError) {
-      console.error('Failed to fetch user data:', userError);
-      throw userError;
-    }
-
-    const isGuestUser = userData?.is_guest || false;
-    console.log('User info:', {
-      id: currentUserId,
-      is_guest: isGuestUser,
-      email: userData?.email
+    console.log('Current user session:', {
+      user_id: currentUserId,
+      email: authSession?.user?.email
     });
 
     // リクエストボディの解析
     const body = await req.json();
-    const { items, consultation_id, guestInfo } = body;
+    const { items, consultation_id } = body;
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json(
@@ -86,7 +72,6 @@ export async function POST(req: Request) {
       metadata: {
         user_id: currentUserId,
         consultation_id: consultation_id || '',
-        is_guest_order: isGuestUser ? 'true' : 'false'
       },
       client_reference_id: currentUserId,
     });
@@ -101,7 +86,7 @@ export async function POST(req: Request) {
         vendor_id: product.vendor_id,
         product_id: product.id,
         status: 'pending',
-        total_amount: product.price,
+        total_amount: product.price * item.quantity,
         commission_rate: product.commission_rate || 10,
         consultation_id: consultation_id || null,
         stripe_session_id: checkoutSession.id,
@@ -113,13 +98,15 @@ export async function POST(req: Request) {
         session_id: checkoutSession.id,
         product_id: product.id,
         user_id: currentUserId,
-        is_guest: isGuestUser,
         data: vendorOrderData
       });
 
-      const { error: vendorOrderError } = await supabase
+      // vendor_ordersテーブルにデータを挿入
+      const { data: insertedOrder, error: vendorOrderError } = await supabase
         .from('vendor_orders')
-        .insert([vendorOrderData]);
+        .insert([vendorOrderData])
+        .select()
+        .single();
 
       if (vendorOrderError) {
         console.error('Failed to create vendor order:', {
@@ -127,10 +114,12 @@ export async function POST(req: Request) {
           session_id: checkoutSession.id,
           product_id: product.id,
           user_id: currentUserId,
-          is_guest: isGuestUser
+          data: vendorOrderData
         });
         throw vendorOrderError;
       }
+
+      console.log('Successfully created vendor order:', insertedOrder);
     }
 
     return NextResponse.json({ sessionId: checkoutSession.id });

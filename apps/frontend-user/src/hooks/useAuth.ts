@@ -202,40 +202,89 @@ export function useAuth() {
 
   // ゲストアカウントを正規アカウントに移行
   const migrateGuestToRegular = async (newUserId: string) => {
-    try {
-      // データベースからゲストユーザー情報を取得
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('id')
-        .eq('is_guest', true)
-        .eq('id', user?.id)
-        .single()
+    const MAX_RETRIES = 3;
+    let retryCount = 0;
 
-      if (userError) throw new Error('Guest user not found in database')
-      const guestUserId = userData.id
+    const migrate = async (): Promise<boolean> => {
+      try {
+        console.log('Starting guest user migration:', {
+          guestUserId: user?.id,
+          newUserId: newUserId,
+          attempt: retryCount + 1
+        });
 
-      // 各テーブルのユーザーIDを更新
-      const tables = ['consultations', 'orders', 'vendor_orders']
-      for (const table of tables) {
-        const { error } = await supabase
-          .from(table)
-          .update({ user_id: newUserId })
-          .eq('user_id', guestUserId)
+        // データベースからゲストユーザー情報を取得
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('id')
+          .eq('is_guest', true)
+          .eq('id', user?.id)
+          .single();
 
-        if (error) {
-          console.error(`Failed to update ${table}:`, error)
-          throw error
+        if (userError) {
+          console.error('Failed to find guest user:', userError);
+          throw new Error('Guest user not found in database');
         }
+
+        const guestUserId = userData.id;
+
+        // ストアドプロシージャを使用してデータ移行を実行
+        const { error: migrationError } = await supabase
+          .rpc('migrate_guest_user_data', {
+            old_user_id: guestUserId,
+            new_user_id: newUserId
+          });
+
+        if (migrationError) {
+          console.error('Migration failed:', migrationError);
+          throw migrationError;
+        }
+
+        // 移行成功を確認
+        const { data: verifyData, error: verifyError } = await supabase
+          .from('users')
+          .select('migrated_to, migrated_at')
+          .eq('id', guestUserId)
+          .single();
+
+        if (verifyError || !verifyData.migrated_to) {
+          throw new Error('Migration verification failed');
+        }
+
+        console.log('Migration completed successfully:', {
+          guestUserId,
+          newUserId,
+          migratedAt: verifyData.migrated_at
+        });
+
+        // ゲストユーザー情報をクリア
+        clearGuestUserInfo();
+
+        return true;
+      } catch (error) {
+        console.error('Migration attempt failed:', {
+          attempt: retryCount + 1,
+          error
+        });
+        return false;
       }
+    };
 
-      // ゲストユーザー情報をクリア
-      clearGuestUserInfo()
+    while (retryCount < MAX_RETRIES) {
+      const success = await migrate();
+      if (success) return;
 
-    } catch (error) {
-      console.error('Migration error:', error)
-      throw error
+      retryCount++;
+      if (retryCount < MAX_RETRIES) {
+        // 指数バックオフでリトライ
+        const delay = Math.min(1000 * Math.pow(2, retryCount), 8000);
+        console.log(`Retrying migration in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
     }
-  }
+
+    throw new Error(`Migration failed after ${MAX_RETRIES} attempts`);
+  };
 
   const logout = async () => {
     try {

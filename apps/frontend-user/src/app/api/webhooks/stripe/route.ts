@@ -171,24 +171,13 @@ async function createOrderRecords(
       shipping_details: session.shipping_details
     });
 
-    // consultation_idの取得と確認
-    const consultation_id = session.metadata?.consultation_id
-    console.log('Received consultation_id from session metadata:', consultation_id)
-
-    // 配送情報の取得
-    const shippingInfo = {
-      name: session.shipping_details?.name || '',
-      postal_code: session.shipping_details?.address?.postal_code || '',
-      prefecture: session.shipping_details?.address?.state || '',
-      city: session.shipping_details?.address?.city || '',
-      address: `${session.shipping_details?.address?.line1 || ''}${session.shipping_details?.address?.line2 ? ' ' + session.shipping_details.address.line2 : ''}`,
-      phone: session.shipping_details?.phone || '',
-    };
-    console.log('Shipping info:', shippingInfo);
-
     // ユーザーIDの取得
     const user_id = session.client_reference_id;
-    console.log('Received user_id from session:', user_id)
+    if (!user_id) {
+      console.error('No user_id found in session');
+      throw new Error('User ID is required');
+    }
+    console.log('Processing order for user:', user_id);
 
     // 出展者向け注文情報の更新
     const { data: existingOrder, error: fetchError } = await supabase
@@ -200,24 +189,27 @@ async function createOrderRecords(
     if (fetchError) {
       console.error('Failed to fetch existing order:', {
         error: fetchError,
-        session_id: session.id
+        session_id: session.id,
+        user_id: user_id
       });
       throw fetchError;
     }
 
     if (!existingOrder) {
       console.error('No order found for session:', {
-        session_id: session.id
+        session_id: session.id,
+        user_id: user_id
       });
       throw new Error('No order found');
     }
 
     const vendorOrderData = {
       order_id: orderNumber,
+      user_id: user_id,  // ユーザーIDを明示的に設定
       status: 'paid',
-      shipping_name: shippingInfo.name,
-      shipping_address: `〒${shippingInfo.postal_code} ${shippingInfo.prefecture}${shippingInfo.city}${shippingInfo.address}`,
-      shipping_phone: shippingInfo.phone,
+      shipping_name: session.shipping_details?.name || '',
+      shipping_address: `〒${session.shipping_details?.address?.postal_code || ''} ${session.shipping_details?.address?.state || ''}${session.shipping_details?.address?.city || ''}${session.shipping_details?.address?.line1 || ''}${session.shipping_details?.address?.line2 ? ' ' + session.shipping_details.address.line2 : ''}`,
+      shipping_phone: session.shipping_details?.phone || '',
       customer_email: session.customer_details?.email || '',
       updated_at: new Date().toISOString()
     };
@@ -225,6 +217,7 @@ async function createOrderRecords(
     console.log('Updating vendor order:', {
       order_id: existingOrder.id,
       session_id: session.id,
+      user_id: user_id,
       data: vendorOrderData
     });
 
@@ -234,11 +227,18 @@ async function createOrderRecords(
       .eq('id', existingOrder.id);
 
     if (updateError) {
-      console.error('Failed to update vendor order:', updateError);
+      console.error('Failed to update vendor order:', {
+        error: updateError,
+        order_id: existingOrder.id,
+        user_id: user_id
+      });
       throw updateError;
     }
 
-    console.log('Successfully created vendor order:', vendorOrderData);
+    console.log('Successfully updated vendor order:', {
+      order_id: orderNumber,
+      user_id: user_id
+    });
 
     // purchaseFlowデータを作成してlocalStorageに保存
     const purchaseFlowData = {
