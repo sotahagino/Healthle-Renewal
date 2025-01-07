@@ -9,19 +9,42 @@ import LoginModal from '@/components/login-modal'
 
 export default function PurchaseCompletePage() {
   const [showLoginModal, setShowLoginModal] = useState(false)
-  const { isGuestUser } = useAuth()
+  const { user, loading } = useAuth()
+
+  // ゲストユーザーかどうかを判定
+  const isGuestUser = () => {
+    return user?.is_guest === true || 
+           (user?.email && user.email.includes('@guest.healthle.com'))
+  }
 
   useEffect(() => {
-    // ゲストユーザーの場合は即座にモーダルを表示
-    if (isGuestUser()) {
+    // ローディングが完了し、ユーザー情報が取得できた後にゲストユーザーチェックを行う
+    if (!loading && user && isGuestUser()) {
+      console.log('Guest user detected:', { user })
       setShowLoginModal(true)
     }
-  }, [isGuestUser])
+  }, [loading, user])
 
   const handleLoginModalClose = () => {
     if (!isGuestUser()) {
       setShowLoginModal(false)
     }
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#E6F3EF] to-white">
+        <SiteHeader />
+        <main className="flex-grow container mx-auto px-4 py-8 mt-16">
+          <div className="max-w-2xl mx-auto bg-white p-6 rounded-lg shadow-md">
+            <div className="text-center">
+              <p className="text-gray-600">読み込み中...</p>
+            </div>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    )
   }
 
   return (
@@ -39,7 +62,7 @@ export default function PurchaseCompletePage() {
             </p>
           </div>
           
-          {isGuestUser() && (
+          {user && isGuestUser() && (
             <div className="mt-8 p-4 bg-[#E6F3EF] rounded-lg">
               <p className="text-center text-[#4C9A84] mb-4">
                 LINEアカウントと連携して、商品の発送状況をお知らせします
