@@ -308,7 +308,7 @@ export function useAuth() {
   }
 
   // ログアウト処理
-  const logout = async () => {
+  const logout = async (shouldRedirect: boolean = true) => {
     try {
       console.log('Starting logout process...');
       
@@ -344,8 +344,10 @@ export function useAuth() {
 
       console.log('Logout completed successfully');
       
-      // ログインページにリダイレクト
-      router.push('/login');
+      // リダイレクトが必要な場合のみログインページに遷移
+      if (shouldRedirect) {
+        router.push('/login');
+      }
       
     } catch (error) {
       console.error('Logout process failed:', error);
@@ -358,8 +360,8 @@ export function useAuth() {
     try {
       console.log('Starting guest login process...');
       
-      // 既存のセッションを完全にクリア
-      await logout();
+      // 既存のセッションを完全にクリア（リダイレクトなし）
+      await logout(false);
       
       // 少し待機して確実にセッションがクリアされるのを待つ
       await new Promise(resolve => setTimeout(resolve, 1000));
