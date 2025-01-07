@@ -56,8 +56,8 @@ export default function MyPage() {
       if (!user?.email) return false;
       
       const { data, error } = await supabase
-        .from('admin_users')
-        .select('id')
+        .from('users')
+        .select('*')
         .eq('email', user.email)
         .single();
       
@@ -102,20 +102,20 @@ export default function MyPage() {
         }
 
         console.log('Fetching user profile...')
-        const { data, error } = await supabase
+        const { data: userData, error: userError } = await supabase
           .from('users')
           .select('*')
-          .eq('id', user.id)
+          .eq('email', session.user.email)
           .single()
 
-        if (error) {
-          console.error('Error fetching profile:', error)
+        if (userError) {
+          console.error('Error fetching profile:', userError)
           console.log('Error details:', {
-            code: error.code,
-            message: error.message,
-            details: error.details
+            code: userError.code,
+            message: userError.message,
+            details: userError.details
           })
-          if (error.code === 'PGRST301') {
+          if (userError.code === 'PGRST301') {
             // JWTが期限切れの場合は一度だけリフレッシュを試みる
             try {
               const { data: { session: refreshedSession }, error: refreshError } = 
@@ -154,8 +154,8 @@ export default function MyPage() {
           return
         }
 
-        if (data) {
-          setProfile(data)
+        if (userData) {
+          setProfile(userData)
         }
       } catch (error) {
         console.error('Error fetching user profile:', error)

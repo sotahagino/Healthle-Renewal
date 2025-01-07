@@ -106,29 +106,31 @@ export function useAuth() {
   };
 
   useEffect(() => {
-    let mounted = true
-    let authInitialized = false
+    let mounted = true;
+    let authInitialized = false;
 
     async function initializeAuth() {
       if (authInitialized) return;
       authInitialized = true;
 
       try {
-        console.log('Initializing auth...')
-        const { data: { session }, error } = await supabase.auth.getSession()
+        console.log('Initializing auth...');
+        const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
-          console.error('Session error:', error)
+          console.error('Session error:', error);
           if (mounted) {
             setLoading(false);
+            setUser(null);
           }
           return;
         }
 
         if (!session?.user) {
-          console.log('No active session')
+          console.log('No active session');
           if (mounted) {
             setLoading(false);
+            setUser(null);
           }
           return;
         }
@@ -141,13 +143,13 @@ export function useAuth() {
               .from('users')
               .select('*')
               .eq('id', session.user.id)
-              .single()
+              .single();
 
             if (!userError && userData) {
               console.log('User data fetched successfully:', userData);
-              await updateUserAndGuestStatus(userData, session.user)
+              await updateUserAndGuestStatus(userData, session.user);
             } else {
-              console.log('User data not found, checking guest info:', session.user)
+              console.log('User data not found, checking guest info:', session.user);
               const guestInfo = getGuestUserInfo();
               if (guestInfo && guestInfo.id === session.user.id) {
                 // ゲストユーザーの場合、データを再作成
@@ -158,7 +160,9 @@ export function useAuth() {
                     email: session.user.email,
                     is_guest: true,
                     guest_created_at: new Date().toISOString()
-                  }]);
+                  }])
+                  .select()
+                  .single();
                 
                 if (!insertError) {
                   const newUserData = {
@@ -173,35 +177,52 @@ export function useAuth() {
                   await logout(true);
                 }
               } else {
-                console.log('Non-guest user data not found, signing out:', session.user)
+                console.log('Non-guest user data not found, signing out:', session.user);
                 await logout(true);
               }
             }
           } catch (error) {
-            console.error('Error fetching user data:', error)
-            await logout();  // エラーが発生した場合もログアウト
+            console.error('Error fetching user data:', error);
+            await logout(true);
           } finally {
             if (mounted) {
               console.log('Auth initialization completed');
-              setLoading(false)
+              setLoading(false);
             }
           }
         }
       } catch (error) {
-        console.error('Error in initializeAuth:', error)
+        console.error('Error in initializeAuth:', error);
         if (mounted) {
-          await logout();
+          await logout(true);
           setLoading(false);
         }
       }
     }
 
-    initializeAuth()
+    // セッション変更のサブスクリプション
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state changed:', event, session?.user?.id);
+      if (event === 'SIGNED_IN') {
+        await initializeAuth();
+      } else if (event === 'SIGNED_OUT') {
+        if (mounted) {
+          setUser(null);
+          setIsGuestUser(false);
+          setLoading(false);
+        }
+      }
+    });
+
+    initializeAuth();
 
     return () => {
-      mounted = false
-    }
-  }, [])
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, []);
 
   // ゲストアカウントを正規アカウントに移行
   const migrateGuestToRegular = async (newUserId: string) => {

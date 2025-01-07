@@ -138,43 +138,45 @@ export async function GET(request: NextRequest) {
           <head>
             <meta charset="UTF-8">
             <title>認証処理中...</title>
-          </head>
-          <body>
             <script>
-              try {
-                const session = ${JSON.stringify(signInData.session)};
-                const projectRef = '${process.env.NEXT_PUBLIC_SUPABASE_URL!.split('//')[1].split('.')[0]}';
-                
-                // セッション情報を保存
-                localStorage.setItem(\`sb-\${projectRef}-auth-token\`, JSON.stringify({
-                  access_token: session.access_token,
-                  refresh_token: session.refresh_token,
-                  expires_at: Math.floor(Date.now() / 1000) + ${60 * 60 * 24 * 7},
-                  expires_in: ${60 * 60 * 24 * 7},
-                  token_type: 'bearer',
-                  user: session.user
-                }));
+              function handleAuthSuccess() {
+                try {
+                  const session = ${JSON.stringify(signInData.session)};
+                  const projectRef = '${process.env.NEXT_PUBLIC_SUPABASE_URL!.split('//')[1].split('.')[0]}';
+                  
+                  // セッション情報を保存
+                  localStorage.setItem(\`sb-\${projectRef}-auth-token\`, JSON.stringify({
+                    access_token: session.access_token,
+                    refresh_token: session.refresh_token,
+                    expires_at: Math.floor(Date.now() / 1000) + ${60 * 60 * 24 * 7},
+                    expires_in: ${60 * 60 * 24 * 7},
+                    token_type: 'bearer',
+                    user: session.user
+                  }));
 
-                // purchaseFlowの処理
-                const purchaseFlow = localStorage.getItem('purchaseFlow');
-                if (purchaseFlow) {
-                  const purchaseFlowData = JSON.parse(purchaseFlow);
-                  const { order_id, timestamp } = purchaseFlowData;
-                  
-                  // タイムスタンプの検証（24時間以内）
-                  const isValid = timestamp && (Date.now() - timestamp) < 24 * 60 * 60 * 1000;
-                  
-                  if (!isValid) {
-                    console.error('Purchase flow data has expired');
-                    localStorage.removeItem('purchaseFlow');
-                    window.location.replace('${redirectPath}');
-                  } else if (!order_id) {
-                    console.error('No order_id found in purchase flow');
-                    localStorage.removeItem('purchaseFlow');
-                    window.location.replace('${redirectPath}');
-                  } else {
-                    console.log('Updating user_id for order:', order_id);
+                  // purchaseFlowの処理
+                  const purchaseFlow = localStorage.getItem('purchaseFlow');
+                  if (purchaseFlow) {
+                    const purchaseFlowData = JSON.parse(purchaseFlow);
+                    const { order_id, timestamp } = purchaseFlowData;
                     
+                    // タイムスタンプの検証（24時間以内）
+                    const isValid = timestamp && (Date.now() - timestamp) < 24 * 60 * 60 * 1000;
+                    
+                    if (!isValid) {
+                      console.error('Purchase flow data has expired');
+                      localStorage.removeItem('purchaseFlow');
+                      window.location.replace('${redirectPath}');
+                      return;
+                    }
+
+                    if (!order_id) {
+                      console.error('No order_id found in purchase flow');
+                      localStorage.removeItem('purchaseFlow');
+                      window.location.replace('${redirectPath}');
+                      return;
+                    }
+
                     // ユーザーIDを更新
                     fetch('/api/orders/update-user', {
                       method: 'POST',
@@ -187,58 +189,33 @@ export async function GET(request: NextRequest) {
                         order_id: order_id
                       })
                     })
-                    .then(async response => {
-                      const data = await response.json();
-                      if (!response.ok) {
-                        throw new Error(data.error || 'Update request failed');
-                      }
-                      return data;
-                    })
+                    .then(response => response.json())
                     .then(data => {
-                      console.log('Update successful:', data);
+                      if (!data.success) {
+                        throw new Error(data.error || 'Update failed');
+                      }
                       localStorage.removeItem('purchaseFlow');
-
-                      // consultationsテーブルの更新
-                      fetch('/api/consultations/update-user', {
-                        method: 'POST',
-                        headers: {
-                          'Content-Type': 'application/json',
-                          'Authorization': \`Bearer \${session.access_token}\`
-                        },
-                        body: JSON.stringify({
-                          user_id: session.user.id
-                        })
-                      })
-                      .then(async response => {
-                        const data = await response.json();
-                        if (!response.ok) {
-                          console.error('Failed to update consultations:', data.error);
-                        } else {
-                          console.log('Consultations updated successfully');
-                        }
-                      })
-                      .catch(error => {
-                        console.error('Error updating consultations:', error);
-                      })
-                      .finally(() => {
-                        // 最後にリダイレクト
-                        window.location.replace('${redirectPath}');
-                      });
+                      window.location.replace('${redirectPath}');
                     })
                     .catch(error => {
                       console.error('Update failed:', error);
+                      localStorage.removeItem('purchaseFlow');
                       window.location.replace('${redirectPath}');
                     });
+                  } else {
+                    window.location.replace('${redirectPath}');
                   }
-                } else {
-                  // purchaseFlowがない場合は直接リダイレクト
-                  window.location.replace('${redirectPath}');
+                } catch (error) {
+                  console.error('Error in auth success handler:', error);
+                  window.location.replace('/login?error=auth_failed');
                 }
-              } catch (error) {
-                console.error('Error in callback script:', error);
-                window.location.replace('/login?error=auth_failed');
               }
+
+              // DOMContentLoadedイベントで認証処理を開始
+              document.addEventListener('DOMContentLoaded', handleAuthSuccess);
             </script>
+          </head>
+          <body>
             <div style="display: flex; justify-content: center; align-items: center; height: 100vh;">
               <p style="text-align: center;">認証処理中です。しばらくお待ちください...</p>
             </div>
