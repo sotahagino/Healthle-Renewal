@@ -8,41 +8,58 @@ import { Footer } from '@/components/footer'
 import LoginModal from '@/components/login-modal'
 import { CheckCircle, Package, ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
 export default function PurchaseCompletePage() {
   const [showLoginModal, setShowLoginModal] = useState(false)
-  const { user, loading, isGuestUser } = useAuth()
+  const [isGuest, setIsGuest] = useState(false)
+  const { user, loading } = useAuth()
   const searchParams = useSearchParams()
   const sessionId = searchParams.get('session_id')
+  const supabase = createClientComponentClient()
 
   useEffect(() => {
-    // ロバッグ用のログ出力
-    console.log('Purchase complete page state:', {
-      loading,
-      user,
-      isGuestUser,
-      sessionId,
-      showLoginModal
-    })
-    
-    // ローディングが完了し、ユーザーが存在する場合にゲストチェックを行う
-    if (!loading) {
-      if (user && isGuestUser) {
-        console.log('Showing login modal for guest user:', { user })
-        setShowLoginModal(true)
-      } else {
-        console.log('User is not guest or not logged in:', { user, isGuestUser })
+    const checkGuestStatus = async () => {
+      if (!user?.id) return;
+
+      console.log('Checking guest status for user:', user.id);
+
+      try {
+        const { data: userData, error } = await supabase
+          .from('users')
+          .select('is_guest')
+          .eq('id', user.id)
+          .single();
+
+        if (error) {
+          console.error('Error fetching user data:', error);
+          return;
+        }
+
+        console.log('User data from database:', userData);
+        const isGuestUser = userData.is_guest === true;
+        setIsGuest(isGuestUser);
+        
+        if (isGuestUser) {
+          console.log('User is guest, showing login modal');
+          setShowLoginModal(true);
+        }
+      } catch (error) {
+        console.error('Error checking guest status:', error);
       }
+    };
+
+    if (!loading) {
+      checkGuestStatus();
     }
-  }, [loading, user, isGuestUser, sessionId])
+  }, [loading, user?.id, supabase]);
 
   // ゲストユーザーの場合、モーダルを閉じられないようにする
   const handleLoginModalClose = () => {
-    console.log('Attempting to close login modal:', { isGuestUser })
-    if (!isGuestUser) {
-      setShowLoginModal(false)
+    if (!isGuest) {
+      setShowLoginModal(false);
     }
-  }
+  };
 
   if (loading) {
     return (
@@ -91,7 +108,7 @@ export default function PurchaseCompletePage() {
             </div>
           </div>
           
-          {isGuestUser && (
+          {isGuest && (
             <div className="mt-8 p-6 bg-[#E6F3EF] rounded-lg">
               <h2 className="text-xl font-bold text-[#4C9A84] mb-4 text-center">
                 LINEで最新情報をお届け
@@ -114,10 +131,7 @@ export default function PurchaseCompletePage() {
                 </li>
               </ul>
               <Button
-                onClick={() => {
-                  console.log('LINE登録ボタンがクリックされました');
-                  setShowLoginModal(true);
-                }}
+                onClick={() => setShowLoginModal(true)}
                 className="w-full bg-[#4C9A84] text-white py-3 rounded-lg hover:bg-[#3A8B73] transition-colors flex items-center justify-center space-x-2"
               >
                 <span>LINEで登録する</span>
@@ -132,7 +146,7 @@ export default function PurchaseCompletePage() {
       <LoginModal
         isOpen={showLoginModal}
         onClose={handleLoginModalClose}
-        isGuestUser={isGuestUser}
+        isGuestUser={isGuest}
       />
     </div>
   )

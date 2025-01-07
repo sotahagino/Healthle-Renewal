@@ -183,38 +183,32 @@ export function useAuth() {
   }, [router])
 
   // ゲストユーザーかどうかを確認
-  const isGuestUser = useMemo(() => {
-    if (!user) return false;
-    
-    // デバッグ用のログ出力
-    console.log('Checking guest user status:', {
-      user,
-      is_guest: user.is_guest,
-      email: user.email,
-      metadata: user.user_metadata
-    });
+  const isGuestUser = useMemo(async () => {
+    if (!user?.id) return false;
 
-    // データベースのis_guestフラグを確認
-    if (user.is_guest === true) {
-      console.log('User is guest (by is_guest flag)');
-      return true;
+    console.log('Checking guest status for user:', user.id);
+
+    try {
+      // usersテーブルから直接ユーザー情報を取得
+      const { data: userData, error } = await supabase
+        .from('users')
+        .select('is_guest')
+        .eq('id', user.id)
+        .single();
+
+      if (error) {
+        console.error('Error fetching user data:', error);
+        return false;
+      }
+
+      console.log('User data from database:', userData);
+      return userData.is_guest === true;
+
+    } catch (error) {
+      console.error('Error checking guest status:', error);
+      return false;
     }
-
-    // メールアドレスによる判定
-    if (user.email && user.email.includes('@guest.healthle.com')) {
-      console.log('User is guest (by email)');
-      return true;
-    }
-
-    // ユーザーメタデータによる判定
-    if (user.user_metadata && user.user_metadata.is_guest === true) {
-      console.log('User is guest (by metadata)');
-      return true;
-    }
-
-    console.log('User is not guest');
-    return false;
-  }, [user]);
+  }, [user?.id, supabase]);
 
   // ゲストアカウントを正規アカウントに移行
   const migrateGuestToRegular = async (newUserId: string) => {
