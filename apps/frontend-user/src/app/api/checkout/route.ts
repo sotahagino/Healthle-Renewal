@@ -74,6 +74,39 @@ export async function POST(req: Request) {
         consultation_id: consultation_id || '',
       },
       client_reference_id: currentUserId,
+      customer_email: authSession?.user?.email,
+      shipping_address_collection: {
+        allowed_countries: ['JP'],
+      },
+      shipping_options: [
+        {
+          shipping_rate_data: {
+            type: 'fixed_amount',
+            fixed_amount: {
+              amount: 0,
+              currency: 'jpy',
+            },
+            display_name: '通常配送',
+            delivery_estimate: {
+              minimum: {
+                unit: 'business_day',
+                value: 3,
+              },
+              maximum: {
+                unit: 'business_day',
+                value: 7,
+              },
+            },
+          },
+        },
+      ],
+    });
+
+    console.log('Created checkout session:', {
+      session_id: checkoutSession.id,
+      user_id: currentUserId,
+      metadata: checkoutSession.metadata,
+      client_reference_id: checkoutSession.client_reference_id
     });
 
     // vendor_ordersにも事前に注文情報を作成
@@ -90,6 +123,7 @@ export async function POST(req: Request) {
         commission_rate: product.commission_rate || 10,
         consultation_id: consultation_id || null,
         stripe_session_id: checkoutSession.id,
+        customer_email: authSession?.user?.email,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
@@ -114,12 +148,20 @@ export async function POST(req: Request) {
           session_id: checkoutSession.id,
           product_id: product.id,
           user_id: currentUserId,
-          data: vendorOrderData
+          data: vendorOrderData,
+          errorMessage: vendorOrderError.message,
+          details: vendorOrderError.details,
+          hint: vendorOrderError.hint
         });
         throw vendorOrderError;
       }
 
-      console.log('Successfully created vendor order:', insertedOrder);
+      console.log('Successfully created vendor order:', {
+        order: insertedOrder,
+        session_id: checkoutSession.id,
+        product_id: product.id,
+        user_id: currentUserId
+      });
     }
 
     return NextResponse.json({ sessionId: checkoutSession.id });

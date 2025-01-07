@@ -171,12 +171,33 @@ async function createOrderRecords(
       shipping_details: session.shipping_details
     });
 
-    // ユーザーIDの取得
-    const user_id = session.client_reference_id;
+    // ユーザーIDの取得（client_reference_idとmetadataの両方をチェック）
+    const user_id = session.client_reference_id || session.metadata?.user_id;
     if (!user_id) {
-      console.error('No user_id found in session');
+      console.error('No user_id found in session', {
+        session_id: session.id,
+        client_reference_id: session.client_reference_id,
+        metadata: session.metadata,
+        customer_email: session.customer_details?.email
+      });
+
+      // メールアドレスからユーザーを検索
+      if (session.customer_details?.email) {
+        const { data: userByEmail } = await supabase
+          .from('users')
+          .select('id')
+          .eq('email', session.customer_details.email)
+          .single();
+
+        if (userByEmail?.id) {
+          console.log('Found user by email:', userByEmail.id);
+          return userByEmail.id;
+        }
+      }
+
       throw new Error('User ID is required');
     }
+
     console.log('Processing order for user:', user_id);
 
     // 出展者向け注文情報の更新
@@ -205,7 +226,7 @@ async function createOrderRecords(
 
     const vendorOrderData = {
       order_id: orderNumber,
-      user_id: user_id,  // ユーザーIDを明示的に設定
+      user_id: user_id,
       status: 'paid',
       shipping_name: session.shipping_details?.name || '',
       shipping_address: `〒${session.shipping_details?.address?.postal_code || ''} ${session.shipping_details?.address?.state || ''}${session.shipping_details?.address?.city || ''}${session.shipping_details?.address?.line1 || ''}${session.shipping_details?.address?.line2 ? ' ' + session.shipping_details.address.line2 : ''}`,
