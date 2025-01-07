@@ -36,6 +36,30 @@ export function useAuth() {
     }
   };
 
+  // ゲストユーザーの再ログイン処理
+  const reAuthenticateGuestUser = async (guestInfo: { email: string; password: string }) => {
+    try {
+      console.log('Attempting to re-authenticate guest user');
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        email: guestInfo.email,
+        password: guestInfo.password
+      });
+
+      if (signInError || !signInData.user) {
+        console.error('Guest re-authentication failed:', signInError);
+        clearGuestUserInfo();
+        return null;
+      }
+
+      console.log('Guest user re-authenticated:', signInData.user);
+      return signInData.user;
+    } catch (error) {
+      console.error('Error in guest re-authentication:', error);
+      clearGuestUserInfo();
+      return null;
+    }
+  };
+
   useEffect(() => {
     let mounted = true
     let authInitialized = false
@@ -50,12 +74,27 @@ export function useAuth() {
         
         if (error) {
           console.error('Session error:', error)
-          if (mounted) {
-            setUser(null)
-            setIsGuestUser(false)
-            setLoading(false)
+          // セッションエラー時にゲストユーザー情報を確認
+          const guestInfo = getGuestUserInfo()
+          if (guestInfo && typeof guestInfo.email === 'string' && typeof guestInfo.password === 'string') {
+            console.log('Found guest info, attempting re-authentication');
+            const reAuthUser = await reAuthenticateGuestUser(guestInfo);
+            if (reAuthUser && mounted) {
+              const { data: userData } = await supabase
+                .from('users')
+                .select('*')
+                .eq('id', reAuthUser.id)
+                .single();
+
+              if (userData) {
+                await updateUserAndGuestStatus(userData, reAuthUser);
+              }
+            }
           }
-          return
+          if (mounted) {
+            setLoading(false);
+          }
+          return;
         }
 
         if (!session?.user) {
@@ -63,61 +102,22 @@ export function useAuth() {
           if (mounted) {
             const guestInfo = getGuestUserInfo()
             if (guestInfo && typeof guestInfo.email === 'string' && typeof guestInfo.password === 'string') {
-              try {
-                const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-                  email: guestInfo.email,
-                  password: guestInfo.password
-                })
-                
-                if (signInError || !signInData.user) {
-                  console.error('Guest sign in failed:', signInError)
-                  clearGuestUserInfo()
-                  if (mounted) {
-                    setUser(null)
-                    setIsGuestUser(false)
-                    setLoading(false)
-                  }
-                  return
-                }
-
-                const { data: userData, error: userError } = await supabase
+              const reAuthUser = await reAuthenticateGuestUser(guestInfo);
+              if (reAuthUser) {
+                const { data: userData } = await supabase
                   .from('users')
                   .select('*')
-                  .eq('id', signInData.user.id)
-                  .single()
+                  .eq('id', reAuthUser.id)
+                  .single();
 
-                if (userError || !userData) {
-                  console.error('Failed to fetch user data:', userError)
-                  if (mounted) {
-                    setUser(signInData.user)
-                    setIsGuestUser(false)
-                    setLoading(false)
-                  }
-                  return
+                if (userData && mounted) {
+                  await updateUserAndGuestStatus(userData, reAuthUser);
                 }
-
-                if (mounted) {
-                  await updateUserAndGuestStatus(userData, signInData.user)
-                  setLoading(false)
-                }
-              } catch (error) {
-                console.error('Error in guest auth:', error)
-                if (mounted) {
-                  setUser(null)
-                  setIsGuestUser(false)
-                  setLoading(false)
-                }
-              }
-            } else {
-              console.log('No guest info found')
-              if (mounted) {
-                setUser(null)
-                setIsGuestUser(false)
-                setLoading(false)
               }
             }
+            setLoading(false);
           }
-          return
+          return;
         }
 
         // アクティブなセッションがある場合
@@ -154,9 +154,23 @@ export function useAuth() {
       } catch (error) {
         console.error('Error in initializeAuth:', error)
         if (mounted) {
-          setUser(null)
-          setIsGuestUser(false)
-          setLoading(false)
+          // エラー時もゲストユーザーの再認証を試みる
+          const guestInfo = getGuestUserInfo()
+          if (guestInfo && typeof guestInfo.email === 'string' && typeof guestInfo.password === 'string') {
+            const reAuthUser = await reAuthenticateGuestUser(guestInfo);
+            if (reAuthUser && mounted) {
+              const { data: userData } = await supabase
+                .from('users')
+                .select('*')
+                .eq('id', reAuthUser.id)
+                .single();
+
+              if (userData) {
+                await updateUserAndGuestStatus(userData, reAuthUser);
+              }
+            }
+          }
+          setLoading(false);
         }
       }
     }
