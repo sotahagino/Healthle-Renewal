@@ -6,14 +6,11 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-  DialogFooter,
 } from "@/components/ui/dialog"
-import { LoginContent } from '@/components/login-content'
 import { Button } from "@/components/ui/button"
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useAuth } from '@/hooks/useAuth'
-import { useRouter } from 'next/navigation'
-import { Loader2 } from "lucide-react"
+import { Loader2, CheckCircle, Bell, Package } from "lucide-react"
 import Image from "next/image"
 
 interface LoginModalProps {
@@ -26,11 +23,7 @@ export default function LoginModal({
   isOpen,
   onClose,
   isGuestUser = false
-}: {
-  isOpen: boolean;
-  onClose: () => void;
-  isGuestUser?: boolean;
-}) {
+}: LoginModalProps) {
   const [isLoading, setIsLoading] = useState(false)
   const { user } = useAuth()
 
@@ -42,63 +35,100 @@ export default function LoginModal({
   }
 
   const handleLineLogin = () => {
-    // ゲストユーザー情報をローカルストレージに保存
-    if (isGuestUser) {
-      localStorage.setItem('convertGuestAccount', 'true');
+    setIsLoading(true)
+    try {
+      // ゲストユーザー情報をローカルストレージに保存
+      if (isGuestUser) {
+        localStorage.setItem('convertGuestAccount', 'true');
+      }
+
+      // ランダムなstateを生成
+      const state = Array.from(crypto.getRandomValues(new Uint8Array(32)))
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('');
+      
+      // stateをLocalStorageに保存
+      localStorage.setItem('line_login_state', state);
+
+      const lineLoginUrl = new URL(`${process.env.NEXT_PUBLIC_SITE_URL}/api/auth/line`);
+      lineLoginUrl.searchParams.append('state', state);
+      lineLoginUrl.searchParams.append('return_url', '/purchase-complete');
+
+      console.log('Redirecting to LINE login:', lineLoginUrl.toString());
+      window.location.href = lineLoginUrl.toString();
+    } catch (error) {
+      console.error('LINE login error:', error);
+      setIsLoading(false);
     }
-
-    // ランダムなstateを生成
-    const state = Array.from(crypto.getRandomValues(new Uint8Array(32)))
-      .map(b => b.toString(16).padStart(2, '0'))
-      .join('');
-    
-    // stateをLocalStorageに保存
-    localStorage.setItem('line_login_state', state);
-
-    const lineLoginUrl = new URL(`${process.env.NEXT_PUBLIC_SITE_URL}/api/auth/line`);
-    lineLoginUrl.searchParams.append('state', state);
-    lineLoginUrl.searchParams.append('return_url', '/purchase-complete');
-
-    console.log('Redirecting to LINE login:', lineLoginUrl.toString());
-    window.location.href = lineLoginUrl.toString();
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>LINEでログイン</DialogTitle>
-          <DialogDescription>
-            LINEアカウントと連携して、商品の発送状況をお知らせします
+          <DialogTitle className="text-2xl font-bold text-center text-[#4C9A84]">
+            LINEで便利に
+          </DialogTitle>
+          <DialogDescription className="text-center">
+            LINEと連携して、より便利にHealthleをご利用いただけます
           </DialogDescription>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
+
+        <div className="py-6">
+          <div className="space-y-6 mb-8">
+            <div className="flex items-start">
+              <Package className="w-6 h-6 text-[#4C9A84] mr-4 flex-shrink-0" />
+              <div>
+                <h3 className="font-semibold text-[#333333]">発送状況の通知</h3>
+                <p className="text-[#666666] text-sm">商品の発送状況をリアルタイムでお知らせ</p>
+              </div>
+            </div>
+            <div className="flex items-start">
+              <Bell className="w-6 h-6 text-[#4C9A84] mr-4 flex-shrink-0" />
+              <div>
+                <h3 className="font-semibold text-[#333333]">お得な情報</h3>
+                <p className="text-[#666666] text-sm">クーポンや限定情報をいち早くお届け</p>
+              </div>
+            </div>
+            <div className="flex items-start">
+              <CheckCircle className="w-6 h-6 text-[#4C9A84] mr-4 flex-shrink-0" />
+              <div>
+                <h3 className="font-semibold text-[#333333]">簡単な注文管理</h3>
+                <p className="text-[#666666] text-sm">注文履歴の確認や再注文がスムーズに</p>
+              </div>
+            </div>
+          </div>
+
           <Button
             onClick={handleLineLogin}
             disabled={isLoading}
-            className="bg-[#00B900] hover:bg-[#00A000] text-white"
+            className="w-full bg-[#00B900] hover:bg-[#00A000] text-white py-6 font-bold rounded-lg shadow-md transition-all duration-300 ease-in-out transform hover:translate-y-[-2px] hover:shadow-lg"
           >
             {isLoading ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              <>
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                連携中...
+              </>
             ) : (
-              <Image
-                src="/line-icon.png"
-                alt="LINE"
-                width={24}
-                height={24}
-                className="mr-2"
-              />
+              <>
+                <Image
+                  src="/line-icon.png"
+                  alt="LINE"
+                  width={24}
+                  height={24}
+                  className="mr-2"
+                />
+                LINEで連携する
+              </>
             )}
-            LINEでログイン
           </Button>
+
+          {!isGuestUser && (
+            <p className="text-center text-sm text-gray-500 mt-4">
+              キャンセルする場合は、画面外をクリックしてください
+            </p>
+          )}
         </div>
-        {!isGuestUser && (
-          <DialogFooter>
-            <Button variant="outline" onClick={handleClose}>
-              キャンセル
-            </Button>
-          </DialogFooter>
-        )}
       </DialogContent>
     </Dialog>
   )

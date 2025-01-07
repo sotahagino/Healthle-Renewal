@@ -159,10 +159,19 @@ export function useAuth() {
 
   // ゲストユーザーかどうかを確認
   const isGuestUser = () => {
-    return Boolean(
-      user?.is_guest === true || 
-      (user?.email && user.email.includes('@guest.healthle.com'))
-    )
+    if (!user) return false;
+    
+    // データベースのis_guestフラグを優先的に確認
+    if (user.is_guest === true) return true;
+    
+    // メールアドレスによる判定（バックアップ判定）
+    if (user.email && user.email.includes('@guest.healthle.com')) return true;
+    
+    // ユーザーメタデータによる判定
+    const userMetadata = user.user_metadata;
+    if (userMetadata && userMetadata.is_guest === true) return true;
+    
+    return false;
   }
 
   // ゲストアカウントを正規アカウントに移行
@@ -204,13 +213,25 @@ export function useAuth() {
           throw orderUpdateError;
         }
 
+        // consultationsテーブルのユーザーIDを更新
+        const { error: consultationUpdateError } = await supabase
+          .from('consultations')
+          .update({ user_id: newUserId })
+          .eq('user_id', guestUserId);
+
+        if (consultationUpdateError) {
+          console.error('Failed to update consultations:', consultationUpdateError);
+          throw consultationUpdateError;
+        }
+
         // ユーザーの移行状態を更新
         const { error: userUpdateError } = await supabase
           .from('users')
           .update({
             migrated_to: newUserId,
             migrated_at: new Date().toISOString(),
-            migration_status: 'completed'
+            migration_status: 'completed',
+            is_guest: false // ゲストフラグを更新
           })
           .eq('id', guestUserId);
 
@@ -240,7 +261,11 @@ export function useAuth() {
 
     while (retryCount < MAX_RETRIES) {
       const success = await migrate();
-      if (success) return;
+      if (success) {
+        // 成功時にユーザー情報を更新
+        setUser(null);
+        return;
+      }
 
       retryCount++;
       if (retryCount < MAX_RETRIES) {
