@@ -90,8 +90,12 @@ export async function POST(req: Request) {
       cancel_url: process.env.NEXT_PUBLIC_SITE_URL 
         ? `${process.env.NEXT_PUBLIC_SITE_URL}/result`
         : `https://healthle-renewal-p8nm.vercel.app/result`,
-      client_reference_id: client_reference_id,
-      metadata: metadata,
+      client_reference_id: orderNumber,
+      metadata: {
+        user_id: user_id,
+        product_id: product_id,
+        ...metadata
+      },
       shipping_address_collection: {
         allowed_countries: ['JP'],
       },

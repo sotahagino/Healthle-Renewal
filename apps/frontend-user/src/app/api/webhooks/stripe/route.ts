@@ -438,26 +438,39 @@ export async function POST(req: Request) {
       console.log('Processing checkout.session.completed event:', {
         event_id: event.id,
         session_id: session.id,
-        payment_status: session.payment_status
+        payment_status: session.payment_status,
+        client_reference_id: session.client_reference_id
       });
 
-      // vendor_ordersテーブルのステータスを直接更新
+      if (!session.client_reference_id) {
+        console.error('No client_reference_id found in session');
+        throw new Error('Order ID not found in session');
+      }
+
+      const order_id = session.client_reference_id;
+      console.log('Using order_id from session:', order_id);
+
+      // order_idを使って直接注文ステータスを更新
       const { error: updateOrderError } = await supabase
         .from('vendor_orders')
         .update({ 
           status: 'completed',
           updated_at: new Date().toISOString()
         })
-        .eq('stripe_session_id', session.id);
+        .eq('order_id', order_id);
 
       if (updateOrderError) {
         console.error('Error updating order status:', updateOrderError);
         throw updateOrderError;
       }
 
-      console.log('Successfully updated order status for session:', session.id);
+      console.log('Successfully updated order status for order:', order_id);
 
-      return NextResponse.json({ received: true });
+      return NextResponse.json({ 
+        received: true,
+        order_id: order_id,
+        status: 'completed'
+      });
     }
 
     return NextResponse.json({ received: true });
