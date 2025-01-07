@@ -40,20 +40,26 @@ export async function GET(request: Request) {
       );
     }
 
-    // vendor_ordersテーブルから注文情報を取得
-    const { data: order, error: orderError } = await supabase
+    // stripe_session_idを使って注文情報を取得し、同時にステータスを更新
+    const { data: updatedOrder, error: updateError } = await supabase
       .from('vendor_orders')
+      .update({ 
+        status: 'completed',
+        updated_at: new Date().toISOString()
+      })
+      .eq('stripe_session_id', session.id)
       .select('order_id, created_at, total_amount, product_id, status')
-      .eq('stripe_session_id', session_id)
       .single();
 
-    console.log('Order query result:', {
-      order,
-      error: orderError,
-      email: session.customer_details?.email
-    });
+    if (updateError) {
+      console.error('Error updating order:', updateError);
+      return NextResponse.json(
+        { error: 'Failed to update order' },
+        { status: 500 }
+      );
+    }
 
-    if (orderError || !order) {
+    if (!updatedOrder) {
       console.warn('No order found for session');
       return NextResponse.json(
         { error: 'Order not found' },
@@ -61,20 +67,11 @@ export async function GET(request: Request) {
       );
     }
 
-    // 注文ステータスが正しくない場合
-    if (order.status !== 'completed') {
-      console.log('Order not completed:', order.status);
-      return NextResponse.json(
-        { status: 'processing', message: 'Order is being processed' },
-        { status: 202 }
-      );
-    }
-
     // 商品情報を取得
     const { data: product, error: productError } = await supabase
       .from('products')
       .select('name')
-      .eq('id', order.product_id)
+      .eq('id', updatedOrder.product_id)
       .single();
 
     console.log('Product query result:', {
@@ -84,14 +81,14 @@ export async function GET(request: Request) {
 
     // purchaseFlowデータを作成
     const purchaseFlowData = {
-      order_id: order.order_id,
+      order_id: updatedOrder.order_id,
       timestamp: Date.now(),
       product: {
-        id: order.product_id,
+        id: updatedOrder.product_id,
         name: product?.name || '',
-        price: order.total_amount
+        price: updatedOrder.total_amount
       },
-      status: 'completed'
+      status: updatedOrder.status
     };
 
     console.log('Created purchaseFlow data:', purchaseFlowData);

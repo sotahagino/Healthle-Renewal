@@ -438,37 +438,83 @@ export async function POST(req: Request) {
       console.log('Processing checkout.session.completed event:', {
         event_id: event.id,
         session_id: session.id,
-        payment_status: session.payment_status,
-        client_reference_id: session.client_reference_id
+        payment_status: session.payment_status
       });
 
-      if (!session.client_reference_id) {
-        console.error('No client_reference_id found in session');
-        throw new Error('Order ID not found in session');
+      // まず注文情報を取得
+      const { data: order, error: fetchError } = await supabase
+        .from('vendor_orders')
+        .select('*')
+        .eq('stripe_session_id', session.id)
+        .single();
+
+      if (fetchError) {
+        console.error('Error fetching order:', {
+          error: fetchError,
+          session_id: session.id
+        });
+        // 注文が見つからない場合は202を返して後でリトライ
+        if (fetchError.code === 'PGRST116') {
+          return NextResponse.json(
+            { message: 'Order not found, will retry' },
+            { status: 202 }
+          );
+        }
+        throw fetchError;
       }
 
-      const order_id = session.client_reference_id;
-      console.log('Using order_id from session:', order_id);
+      if (!order) {
+        console.log('Order not found, will retry later:', session.id);
+        return NextResponse.json(
+          { message: 'Order not found, will retry' },
+          { status: 202 }
+        );
+      }
 
-      // order_idを使って直接注文ステータスを更新
-      const { error: updateOrderError } = await supabase
+      console.log('Found order:', {
+        order_id: order.order_id,
+        current_status: order.status
+      });
+
+      // すでに完了している場合は成功を返す
+      if (order.status === 'completed') {
+        return NextResponse.json({ 
+          received: true,
+          order_id: order.order_id,
+          status: 'completed',
+          message: 'Order already completed'
+        });
+      }
+
+      // ステータスを更新
+      const { data: updatedOrder, error: updateError } = await supabase
         .from('vendor_orders')
         .update({ 
           status: 'completed',
           updated_at: new Date().toISOString()
         })
-        .eq('order_id', order_id);
+        .eq('stripe_session_id', session.id)
+        .select()
+        .single();
 
-      if (updateOrderError) {
-        console.error('Error updating order status:', updateOrderError);
-        throw updateOrderError;
+      if (updateError) {
+        console.error('Error updating order status:', {
+          error: updateError,
+          order_id: order.order_id
+        });
+        throw updateError;
       }
 
-      console.log('Successfully updated order status for order:', order_id);
+      console.log('Successfully updated order:', {
+        order_id: order.order_id,
+        session_id: session.id,
+        old_status: order.status,
+        new_status: 'completed'
+      });
 
       return NextResponse.json({ 
         received: true,
-        order_id: order_id,
+        order_id: order.order_id,
         status: 'completed'
       });
     }
@@ -477,6 +523,7 @@ export async function POST(req: Request) {
 
   } catch (error) {
     console.error('Webhook handler error:', error);
+    // 500エラーを返すと、Stripeは自動的にリトライします
     return NextResponse.json(
       { 
         error: error instanceof Error ? error.message : 'Webhook handler failed',
