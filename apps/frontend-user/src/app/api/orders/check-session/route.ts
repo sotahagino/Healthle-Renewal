@@ -44,7 +44,7 @@ export async function GET(request: Request) {
     const { data: updatedOrder, error: updateError } = await supabase
       .from('vendor_orders')
       .update({ 
-        status: 'completed',
+        status: 'paid',
         updated_at: new Date().toISOString()
       })
       .eq('stripe_session_id', session.id)
