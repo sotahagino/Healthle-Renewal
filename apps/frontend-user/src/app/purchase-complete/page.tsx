@@ -21,23 +21,42 @@ export default function PurchaseCompletePage() {
       user,
       isGuestUser,
       sessionId,
-      showLoginModal
+      showLoginModal,
+      timestamp: new Date().toISOString()
     });
 
-    if (!loading && user && isGuestUser) {
-      console.log('Showing login modal for guest user');
-      setShowLoginModal(true);
+    if (!loading) {
+      console.log('Loading completed, checking guest status:', {
+        user,
+        isGuestUser,
+        timestamp: new Date().toISOString()
+      });
+
+      if (user && isGuestUser) {
+        console.log('Showing login modal for guest user:', {
+          userId: user.id,
+          timestamp: new Date().toISOString()
+        });
+        setShowLoginModal(true);
+      }
     }
   }, [loading, user, isGuestUser, sessionId]);
 
   // ゲストユーザーの場合、モーダルを閉じられないようにする
   const handleLoginModalClose = () => {
+    console.log('Attempting to close login modal:', {
+      isGuestUser,
+      timestamp: new Date().toISOString()
+    });
     if (!isGuestUser) {
       setShowLoginModal(false);
     }
   };
 
   if (loading) {
+    console.log('Rendering loading state:', {
+      timestamp: new Date().toISOString()
+    });
     return (
       <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#E6F3EF] to-white">
         <SiteHeader />
@@ -53,6 +72,13 @@ export default function PurchaseCompletePage() {
       </div>
     )
   }
+
+  console.log('Rendering complete page:', {
+    user,
+    isGuestUser,
+    showLoginModal,
+    timestamp: new Date().toISOString()
+  });
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#E6F3EF] to-white">
@@ -107,7 +133,10 @@ export default function PurchaseCompletePage() {
                 </li>
               </ul>
               <Button
-                onClick={() => setShowLoginModal(true)}
+                onClick={() => {
+                  console.log('LINE登録ボタンがクリックされました');
+                  setShowLoginModal(true);
+                }}
                 className="w-full bg-[#4C9A84] text-white py-3 rounded-lg hover:bg-[#3A8B73] transition-colors flex items-center justify-center space-x-2"
               >
                 <span>LINEで登録する</span>
