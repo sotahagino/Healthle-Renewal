@@ -17,6 +17,8 @@ export default function PurchaseCompletePage() {
   const [order, setOrder] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [retryCount, setRetryCount] = useState(0)
+  const MAX_RETRIES = 10 // 最大10回まで試行（合計50秒）
 
   useEffect(() => {
     if (isGuestUser()) {
@@ -35,12 +37,37 @@ export default function PurchaseCompletePage() {
 
         const response = await fetch(`/api/orders/check-session?session_id=${sessionId}`)
         if (!response.ok) {
+          if (response.status === 202) {
+            // 処理中の場合は5秒後に再試行
+            const data = await response.json()
+            console.log('Order processing:', data)
+            
+            if (retryCount < MAX_RETRIES) {
+              setTimeout(() => {
+                setRetryCount(prev => prev + 1)
+              }, 5000)
+              return
+            } else {
+              throw new Error('注文処理のタイムアウト')
+            }
+          }
           console.error('Session check failed:', await response.text())
           throw new Error('Failed to check session')
         }
 
         const purchaseFlowData = await response.json()
         console.log('Purchase flow data:', purchaseFlowData)
+
+        if (purchaseFlowData.status !== 'completed') {
+          if (retryCount < MAX_RETRIES) {
+            setTimeout(() => {
+              setRetryCount(prev => prev + 1)
+            }, 5000)
+            return
+          } else {
+            throw new Error('注文処理のタイムアウト')
+          }
+        }
 
         const { data: orderData, error: orderError } = await supabase
           .from('vendor_orders')
@@ -64,16 +91,18 @@ export default function PurchaseCompletePage() {
 
         console.log('Order data:', orderData)
         setOrder(orderData)
+        setLoading(false)
       } catch (error) {
         console.error('Error fetching order:', error)
-        setError('注文情報の取得に失敗しました')
-      } finally {
+        setError(error instanceof Error ? error.message : '注文情報の取得に失敗しました')
         setLoading(false)
       }
     }
 
-    fetchOrderDetails()
-  }, [searchParams])
+    if (loading) {
+      fetchOrderDetails()
+    }
+  }, [searchParams, retryCount, loading])
 
   const handleLoginModalClose = () => {
     if (!isGuestUser()) {
@@ -87,7 +116,12 @@ export default function PurchaseCompletePage() {
         <SiteHeader />
         <main className="flex-grow container mx-auto px-4 py-8 mt-16">
           <div className="text-center">
-            <p>読み込み中...</p>
+            <p>注文処理中です...</p>
+            {retryCount > 0 && (
+              <p className="text-sm text-gray-600 mt-2">
+                処理の完了まで今しばらくお待ちください ({retryCount}/{MAX_RETRIES})
+              </p>
+            )}
           </div>
         </main>
         <Footer />

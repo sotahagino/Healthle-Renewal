@@ -40,10 +40,30 @@ export async function GET(request: Request) {
       );
     }
 
+    // webhook_logsテーブルでwebhookの処理状態を確認
+    const { data: webhookLog, error: webhookError } = await supabase
+      .from('webhook_logs')
+      .select('status, processed_at')
+      .eq('stripe_event_id', session.id)
+      .single();
+
+    if (webhookError) {
+      console.error('Error checking webhook status:', webhookError);
+    }
+
+    // webhookの処理が完了していない場合は待機を指示
+    if (!webhookLog || webhookLog.status !== 'completed') {
+      console.log('Webhook processing not completed:', webhookLog);
+      return NextResponse.json(
+        { status: 'processing', message: 'Order is being processed' },
+        { status: 202 }
+      );
+    }
+
     // vendor_ordersテーブルから注文情報を取得
     const { data: order, error: orderError } = await supabase
       .from('vendor_orders')
-      .select('order_id, created_at, total_amount, product_id')
+      .select('order_id, created_at, total_amount, product_id, status')
       .eq('stripe_session_id', session_id)
       .single();
 
@@ -58,6 +78,15 @@ export async function GET(request: Request) {
       return NextResponse.json(
         { error: 'Order not found' },
         { status: 404 }
+      );
+    }
+
+    // 注文ステータスが正しくない場合
+    if (order.status !== 'completed') {
+      console.log('Order not completed:', order.status);
+      return NextResponse.json(
+        { status: 'processing', message: 'Order is being processed' },
+        { status: 202 }
       );
     }
 
@@ -81,7 +110,8 @@ export async function GET(request: Request) {
         id: order.product_id,
         name: product?.name || '',
         price: order.total_amount
-      }
+      },
+      status: 'completed'
     };
 
     console.log('Created purchaseFlow data:', purchaseFlowData);

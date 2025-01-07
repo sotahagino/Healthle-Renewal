@@ -427,110 +427,76 @@ export async function POST(req: Request) {
     }
 
     // Webhookの重複処理を防ぐ
-    const { data: existingLog } = await supabase
+    const { data: existingLog, error: existingLogError } = await supabase
       .from('webhook_logs')
-      .select('id')
+      .select('id, status')
       .eq('stripe_event_id', event.id)
       .single();
 
-    if (existingLog) {
-      return NextResponse.json({ message: 'Already processed' });
+    if (existingLogError) {
+      console.error('Error checking existing webhook log:', existingLogError);
     }
 
-    // Webhookログを作成
-    const { error: logError } = await supabase
+    if (existingLog) {
+      console.log('Webhook already processed:', existingLog);
+      return NextResponse.json({ message: 'Already processed', status: existingLog.status });
+    }
+
+    // 新しいWebhookログを作成
+    const { data: newLog, error: createLogError } = await supabase
       .from('webhook_logs')
       .insert([
         {
           stripe_event_id: event.id,
           event_type: event.type,
-          status: 'processing'
+          status: 'processing',
+          raw_event: event,
+          created_at: new Date().toISOString()
         }
-      ]);
+      ])
+      .select()
+      .single();
 
-    if (logError) throw logError;
+    if (createLogError) {
+      console.error('Error creating webhook log:', createLogError);
+      throw createLogError;
+    }
+
+    console.log('Created new webhook log:', newLog);
 
     try {
       if (event.type === 'checkout.session.completed') {
         const session = event.data.object as Stripe.Checkout.Session;
         
-        console.log('Webhook event received:', {
-          event_type: event.type,
+        console.log('Processing checkout.session.completed event:', {
           event_id: event.id,
-          payment_link: session.payment_link,
-          client_reference_id: session.client_reference_id,
-          amount_total: session.amount_total,
+          session_id: session.id,
+          payment_status: session.payment_status,
+          client_reference_id: session.client_reference_id
         });
 
-        if (!session.payment_link) {
-          throw new Error('Payment link is required but not provided');
-        }
+        const result = await processOrder(session, null, event);
 
-        // payment_linkの詳細をログ出力
-        const paymentLinkId = typeof session.payment_link === 'string' 
-          ? session.payment_link 
-          : session.payment_link.id;
-        
-        console.log('Payment link details:', {
-          id: paymentLinkId,
-          raw_value: session.payment_link
-        });
-
-        // まずpayment_link_idで商品を検索
-        let product = null;
-        let productError = null;
-
-        const { data: productById, error: idError } = await supabase
-          .from('products')
-          .select('*, vendor:vendor_id(*)')
-          .eq('stripe_payment_link_id', paymentLinkId)
-          .single();
-
-        if (productById) {
-          product = productById;
-          console.log('Product found by payment_link_id:', product);
-        } else {
-          productError = idError;
-          console.log('Product not found by payment_link_id, error:', idError);
-
-          // 代替の検索方法を試行
-          const { data: productByUrl, error: urlError } = await supabase
-            .from('products')
-            .select('*, vendor:vendor_id(*)')
-            .eq('stripe_payment_link_url', session.payment_link)
-            .single();
-
-          if (productByUrl) {
-            product = productByUrl;
-            console.log('Product found by payment_link_url:', product);
-            
-            // stripe_payment_link_idを更新
-            const { error: updateError } = await supabase
-              .from('products')
-              .update({ stripe_payment_link_id: paymentLinkId })
-              .eq('id', product.id);
-
-            if (updateError) {
-              console.error('Failed to update payment_link_id:', updateError);
+        // Webhookログを成功で更新
+        const { error: updateLogError } = await supabase
+          .from('webhook_logs')
+          .update({ 
+            status: 'completed',
+            processed_at: new Date().toISOString(),
+            processed_data: {
+              session_id: session.id,
+              payment_status: session.payment_status,
+              client_reference_id: session.client_reference_id,
+              result: result
             }
-          } else {
-            productError = urlError;
-            console.log('Product not found by payment_link_url, error:', urlError);
-          }
+          })
+          .eq('stripe_event_id', event.id);
+
+        if (updateLogError) {
+          console.error('Error updating webhook log:', updateLogError);
         }
 
-        // 商品が見つからない場合、全商品の情報をログ出力
-        if (!product) {
-          const { data: allProducts } = await supabase
-            .from('products')
-            .select('id, name, stripe_payment_link_id, stripe_payment_link_url');
-          
-          const errorMessage = `Product not found. Payment Link ID: ${paymentLinkId}, URL: ${session.payment_link}. Available products: ${JSON.stringify(allProducts?.map(p => ({ id: p.id, name: p.name })))}`;
-          console.error(errorMessage);
-          throw new Error(errorMessage);
-        }
-
-        return await processOrder(session, product, event);
+        return result;
       }
 
       return NextResponse.json({ received: true });
@@ -548,11 +514,12 @@ export async function POST(req: Request) {
         event_id: event.id
       });
 
-      await supabase
+      const { error: updateLogError } = await supabase
         .from('webhook_logs')
         .update({ 
           status: 'failed',
           error_message: errorMessage,
+          processed_at: new Date().toISOString(),
           processed_data: {
             event_type: event.type,
             error_details: error instanceof Error ? {
@@ -563,6 +530,10 @@ export async function POST(req: Request) {
           }
         })
         .eq('stripe_event_id', event.id);
+
+      if (updateLogError) {
+        console.error('Error updating webhook log with error:', updateLogError);
+      }
 
       throw error;
     }
