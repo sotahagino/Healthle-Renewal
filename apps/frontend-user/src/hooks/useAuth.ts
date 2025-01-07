@@ -236,20 +236,24 @@ export function useAuth() {
           attempt: retryCount + 1
         });
 
+        if (!user?.id) {
+          throw new Error('Guest user ID not found');
+        }
+
         // データベースからゲストユーザー情報を取得
         const { data: userData, error: userError } = await supabase
           .from('users')
           .select('id')
           .eq('is_guest', true)
-          .eq('id', user?.id)
+          .eq('id', user.id)
           .single();
 
-        if (userError) {
+        if (userError || !userData) {
           console.error('Failed to find guest user:', userError);
           throw new Error('Guest user not found in database');
         }
 
-        const guestUserId = userData.id;
+        const guestUserId: string = userData.id;
 
         // vendor_ordersテーブルのユーザーIDを更新
         const { error: orderUpdateError } = await supabase
@@ -280,7 +284,7 @@ export function useAuth() {
             migrated_to: newUserId,
             migrated_at: new Date().toISOString(),
             migration_status: 'completed',
-            is_guest: false // ゲストフラグを更新
+            is_guest: false
           })
           .eq('id', guestUserId);
 
