@@ -222,7 +222,10 @@ export function useAuth() {
           .update({ user_id: newUserId })
           .eq('user_id', guestUserId)
 
-        if (error) throw error
+        if (error) {
+          console.error(`Failed to update ${table}:`, error)
+          throw error
+        }
       }
 
       // ゲストユーザー情報をクリア

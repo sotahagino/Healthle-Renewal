@@ -42,18 +42,9 @@ export default function LoginModal({
   }
 
   const handleLineLogin = () => {
-    const purchaseFlow = localStorage.getItem('purchaseFlow');
-    let order_id = '';
-    let return_url = '/mypage';
-    if (purchaseFlow) {
-      try {
-        const purchaseFlowData = JSON.parse(purchaseFlow);
-        order_id = purchaseFlowData.order_id;
-        return_url = '/purchase-complete';
-        console.log('Retrieved order_id from purchaseFlow:', order_id);
-      } catch (error) {
-        console.error('Error parsing purchaseFlow:', error);
-      }
+    // ゲストユーザー情報をローカルストレージに保存
+    if (isGuestUser) {
+      localStorage.setItem('convertGuestAccount', 'true');
     }
 
     // ランダムなstateを生成
@@ -66,7 +57,7 @@ export default function LoginModal({
 
     const lineLoginUrl = new URL(`${process.env.NEXT_PUBLIC_SITE_URL}/api/auth/line`);
     lineLoginUrl.searchParams.append('state', state);
-    lineLoginUrl.searchParams.append('return_url', return_url);
+    lineLoginUrl.searchParams.append('return_url', '/purchase-complete');
 
     console.log('Redirecting to LINE login:', lineLoginUrl.toString());
     window.location.href = lineLoginUrl.toString();

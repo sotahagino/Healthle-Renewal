@@ -15,9 +15,34 @@ export async function POST(req: Request) {
     const { data: { session: authSession }, error: sessionError } = await supabase.auth.getSession();
     if (sessionError) throw sessionError;
 
-    // 現在のユーザーIDを取得（ゲストユーザーの場合でも）
+    // 現在のユーザーIDを取得
     const currentUserId = authSession?.user?.id;
-    console.log('Current user ID:', currentUserId);
+    if (!currentUserId) {
+      console.error('No user ID found in session');
+      return NextResponse.json(
+        { error: 'ユーザー情報が見つかりません' },
+        { status: 401 }
+      );
+    }
+
+    // ユーザー情報を取得してゲストかどうかを確認
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', currentUserId)
+      .single();
+
+    if (userError) {
+      console.error('Failed to fetch user data:', userError);
+      throw userError;
+    }
+
+    const isGuestUser = userData?.is_guest || false;
+    console.log('User info:', {
+      id: currentUserId,
+      is_guest: isGuestUser,
+      email: userData?.email
+    });
 
     // リクエストボディの解析
     const body = await req.json();
@@ -59,11 +84,11 @@ export async function POST(req: Request) {
       success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/purchase-complete?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/checkout/cancel`,
       metadata: {
-        user_id: currentUserId || '',  // 現在のユーザーIDを設定
+        user_id: currentUserId,
         consultation_id: consultation_id || '',
-        is_guest_order: !currentUserId ? 'true' : 'false'
+        is_guest_order: isGuestUser ? 'true' : 'false'
       },
-      client_reference_id: currentUserId || undefined,  // 現在のユーザーIDを設定
+      client_reference_id: currentUserId,
     });
 
     // vendor_ordersにも事前に注文情報を作成
@@ -72,7 +97,7 @@ export async function POST(req: Request) {
       if (!product) continue;
 
       const vendorOrderData = {
-        user_id: currentUserId,  // 現在のユーザーIDを設定（nullではなく）
+        user_id: currentUserId,
         vendor_id: product.vendor_id,
         product_id: product.id,
         status: 'pending',
@@ -87,7 +112,8 @@ export async function POST(req: Request) {
       console.log('Creating vendor order:', {
         session_id: checkoutSession.id,
         product_id: product.id,
-        user_id: currentUserId,  // ログ出力も修正
+        user_id: currentUserId,
+        is_guest: isGuestUser,
         data: vendorOrderData
       });
 
@@ -100,7 +126,8 @@ export async function POST(req: Request) {
           error: vendorOrderError,
           session_id: checkoutSession.id,
           product_id: product.id,
-          user_id: currentUserId  // エラーログも修正
+          user_id: currentUserId,
+          is_guest: isGuestUser
         });
         throw vendorOrderError;
       }
