@@ -40,6 +40,7 @@ export function useAuth() {
     }
   };
 
+  // ユーザー情報が変更されたときにゲストステータスをチェック
   useEffect(() => {
     if (user?.id) {
       checkGuestStatus(user.id);
@@ -214,34 +215,6 @@ export function useAuth() {
       subscription.unsubscribe()
     }
   }, [router])
-
-  // ゲストユーザーかどうかを確認
-  const isGuestUser = useMemo(async () => {
-    if (!user?.id) return false;
-
-    console.log('Checking guest status for user:', user.id);
-
-    try {
-      // usersテーブルから直接ユーザー情報を取得
-      const { data: userData, error } = await supabase
-        .from('users')
-        .select('is_guest')
-        .eq('id', user.id)
-        .single();
-
-      if (error) {
-        console.error('Error fetching user data:', error);
-        return false;
-      }
-
-      console.log('User data from database:', userData);
-      return userData.is_guest === true;
-
-    } catch (error) {
-      console.error('Error checking guest status:', error);
-      return false;
-    }
-  }, [user?.id, supabase]);
 
   // ゲストアカウントを正規アカウントに移行
   const migrateGuestToRegular = async (newUserId: string) => {
