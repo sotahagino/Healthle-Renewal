@@ -1,16 +1,11 @@
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import { 
-  generateGuestEmail, 
-  generateGuestPassword, 
-  saveGuestUserInfo, 
-  getGuestUserInfo, 
-  clearGuestUserInfo 
-} from '@/lib/guest-utils'
+import { getSupabaseClient } from '@/lib/supabase'
+import { getGuestUserInfo, clearGuestUserInfo, saveGuestUserInfo } from '@/utils/guest-utils'
+import { generateGuestEmail, generateGuestPassword } from '@/utils/guest-utils'
 
 export function useAuth() {
-  const supabase = createClientComponentClient()
+  const supabase = getSupabaseClient()
   const router = useRouter()
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -351,28 +346,48 @@ export function useAuth() {
   // ログアウト処理
   const logout = async () => {
     try {
-      const { error } = await supabase.auth.signOut()
-      if (error) throw error
+      console.log('Starting logout process...');
       
-      // ブラウザのストレージをクリア
-      window.sessionStorage.clear()
-      window.localStorage.clear()
+      // Supabaseからログアウト
+      const { error } = await supabase.auth.signOut()
+      if (error) {
+        console.error('Supabase signOut error:', error);
+        throw error;
+      }
+      
+      // ゲストユーザー情報をクリア
+      clearGuestUserInfo();
+      
+      // ローカルストレージをクリア
+      window.localStorage.clear();
+      
+      // セッションストレージをクリア
+      window.sessionStorage.clear();
 
-      // セッションクッキーを削除
+      // すべてのクッキーを削除
       document.cookie.split(';').forEach(cookie => {
-        const [name] = cookie.split('=')
-        const cookieName = name.trim()
-        document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`
-        document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/api;`
-      })
+        const [name] = cookie.split('=');
+        const cookieName = name.trim();
+        document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+        document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/api;`;
+        document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; domain=${window.location.hostname}; path=/;`;
+      });
 
-      setUser(null)
-      router.push('/login')
+      // 状態をリセット
+      setUser(null);
+      setIsGuestUser(false);
+      setLoading(false);
+
+      console.log('Logout completed successfully');
+      
+      // ログインページにリダイレクト
+      router.push('/login');
+      
     } catch (error) {
-      console.error('Logout error:', error)
-      throw error
+      console.error('Logout process failed:', error);
+      throw error;
     }
-  }
+  };
 
   // ゲストユーザーとしてログイン
   const loginAsGuest = async () => {
