@@ -196,7 +196,31 @@ export async function GET(request: NextRequest) {
                     .then(data => {
                       console.log('Update successful:', data);
                       localStorage.removeItem('purchaseFlow');
-                      window.location.replace('${redirectPath}');
+
+                      // consultationsテーブルの更新
+                      fetch('/api/consultations/update-user', {
+                        method: 'POST',
+                        headers: {
+                          'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                          user_id: session.user.id
+                        })
+                      })
+                      .then(async response => {
+                        const data = await response.json();
+                        if (!response.ok) {
+                          console.error('Failed to update consultations:', data.error);
+                        } else {
+                          console.log('Consultations updated successfully');
+                        }
+                      })
+                      .catch(error => {
+                        console.error('Error updating consultations:', error);
+                      })
+                      .finally(() => {
+                        window.location.replace('${redirectPath}');
+                      });
                     })
                     .catch(error => {
                       console.error('Update failed:', error);
