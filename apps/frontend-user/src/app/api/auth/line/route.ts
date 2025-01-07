@@ -14,16 +14,17 @@ export async function GET(request: NextRequest) {
     const lineAuthUrl = new URL('https://access.line.me/oauth2/v2.1/authorize')
     lineAuthUrl.searchParams.append('response_type', 'code')
     lineAuthUrl.searchParams.append('client_id', process.env.LINE_CLIENT_ID!)
-    lineAuthUrl.searchParams.append('redirect_uri', process.env.LINE_CALLBACK_URL!)
-    lineAuthUrl.searchParams.append('state', state)
     lineAuthUrl.searchParams.append('scope', 'profile openid email')
+    lineAuthUrl.searchParams.append('state', state)
 
-    // return_urlがある場合は、コールバックURLにクエリパラメータとして追加
+    // コールバックURLの構築
+    const callbackUrl = new URL(process.env.LINE_CALLBACK_URL!)
     if (returnUrl) {
-      const callbackUrl = new URL(process.env.LINE_CALLBACK_URL!)
       callbackUrl.searchParams.append('return_url', returnUrl)
-      lineAuthUrl.searchParams.set('redirect_uri', callbackUrl.toString())
     }
+    lineAuthUrl.searchParams.append('redirect_uri', callbackUrl.toString())
+
+    console.log('Redirecting to LINE auth:', lineAuthUrl.toString())
 
     // LINE認証ページにリダイレクト
     return NextResponse.redirect(lineAuthUrl.toString())

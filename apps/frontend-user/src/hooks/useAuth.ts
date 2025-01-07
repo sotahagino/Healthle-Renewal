@@ -147,8 +147,35 @@ export function useAuth() {
               console.log('User data fetched successfully:', userData);
               await updateUserAndGuestStatus(userData, session.user)
             } else {
-              console.log('User data not found, signing out:', session.user)
-              await logout();  // ユーザーデータが見つからない場合はログアウト
+              console.log('User data not found, checking guest info:', session.user)
+              const guestInfo = getGuestUserInfo();
+              if (guestInfo && guestInfo.userId === session.user.id) {
+                // ゲストユーザーの場合、データを再作成
+                const { error: insertError } = await supabase
+                  .from('users')
+                  .insert([{
+                    id: session.user.id,
+                    email: session.user.email,
+                    is_guest: true,
+                    guest_created_at: new Date().toISOString()
+                  }]);
+                
+                if (!insertError) {
+                  const newUserData = {
+                    id: session.user.id,
+                    email: session.user.email,
+                    is_guest: true,
+                    guest_created_at: new Date().toISOString()
+                  };
+                  await updateUserAndGuestStatus(newUserData, session.user);
+                } else {
+                  console.error('Failed to recreate guest user data:', insertError);
+                  await logout(true);
+                }
+              } else {
+                console.log('Non-guest user data not found, signing out:', session.user)
+                await logout(true);
+              }
             }
           } catch (error) {
             console.error('Error fetching user data:', error)
@@ -322,16 +349,23 @@ export function useAuth() {
       // ゲストユーザー情報をクリア
       clearGuestUserInfo();
       
-      // ローカルストレージをクリア
-      window.localStorage.clear();
+      // 購入フローに関連する情報のみをクリア
+      const keysToKeep = ['line_login_state']; // 保持したいキーのリスト
+      const purchaseFlowKeys = ['purchaseFlow', 'convertGuestAccount'];
       
-      // セッションストレージをクリア
-      window.sessionStorage.clear();
+      // ローカルストレージから購入フロー関連の情報のみを削除
+      purchaseFlowKeys.forEach(key => {
+        window.localStorage.removeItem(key);
+      });
+      
+      // セッションストレージから購入フロー関連の情報のみを削除
+      purchaseFlowKeys.forEach(key => {
+        window.sessionStorage.removeItem(key);
+      });
 
-      // すべてのクッキーを削除
-      document.cookie.split(';').forEach(cookie => {
-        const [name] = cookie.split('=');
-        const cookieName = name.trim();
+      // 認証関連のクッキーのみを削除
+      const authCookies = ['sb-access-token', 'sb-refresh-token'];
+      authCookies.forEach(cookieName => {
         document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
         document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/api;`;
         document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; domain=${window.location.hostname}; path=/;`;

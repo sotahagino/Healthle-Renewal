@@ -180,6 +180,7 @@ export async function GET(request: NextRequest) {
                       method: 'POST',
                       headers: {
                         'Content-Type': 'application/json',
+                        'Authorization': \`Bearer \${session.access_token}\`
                       },
                       body: JSON.stringify({
                         user_id: session.user.id,
@@ -202,6 +203,7 @@ export async function GET(request: NextRequest) {
                         method: 'POST',
                         headers: {
                           'Content-Type': 'application/json',
+                          'Authorization': \`Bearer \${session.access_token}\`
                         },
                         body: JSON.stringify({
                           user_id: session.user.id
@@ -219,6 +221,7 @@ export async function GET(request: NextRequest) {
                         console.error('Error updating consultations:', error);
                       })
                       .finally(() => {
+                        // 最後にリダイレクト
                         window.location.replace('${redirectPath}');
                       });
                     })
@@ -228,6 +231,7 @@ export async function GET(request: NextRequest) {
                     });
                   }
                 } else {
+                  // purchaseFlowがない場合は直接リダイレクト
                   window.location.replace('${redirectPath}');
                 }
               } catch (error) {
@@ -235,6 +239,9 @@ export async function GET(request: NextRequest) {
                 window.location.replace('/login?error=auth_failed');
               }
             </script>
+            <div style="display: flex; justify-content: center; align-items: center; height: 100vh;">
+              <p style="text-align: center;">認証処理中です。しばらくお待ちください...</p>
+            </div>
           </body>
         </html>
       `;
@@ -250,7 +257,7 @@ export async function GET(request: NextRequest) {
 
     } catch (error) {
       console.error('Error in callback process:', error)
-      return NextResponse.redirect(new URL(redirectPath, request.url))
+      return NextResponse.redirect(new URL('/login?error=callback_failed', request.url))
     }
 
   } catch (error) {
