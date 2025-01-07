@@ -426,117 +426,41 @@ export async function POST(req: Request) {
       );
     }
 
-    // Webhookの重複処理を防ぐ
-    const { data: existingLog, error: existingLogError } = await supabase
-      .from('webhook_logs')
-      .select('id, status')
-      .eq('stripe_event_id', event.id)
-      .single();
+    console.log('Received webhook event:', {
+      id: event.id,
+      type: event.type,
+      object: event.data.object
+    });
 
-    if (existingLogError) {
-      console.error('Error checking existing webhook log:', existingLogError);
-    }
+    if (event.type === 'checkout.session.completed') {
+      const session = event.data.object as Stripe.Checkout.Session;
+      
+      console.log('Processing checkout.session.completed event:', {
+        event_id: event.id,
+        session_id: session.id,
+        payment_status: session.payment_status,
+        client_reference_id: session.client_reference_id
+      });
 
-    if (existingLog) {
-      console.log('Webhook already processed:', existingLog);
-      return NextResponse.json({ message: 'Already processed', status: existingLog.status });
-    }
+      // vendor_ordersテーブルのステータスを更新
+      const { error: updateOrderError } = await supabase
+        .from('vendor_orders')
+        .update({ 
+          status: 'completed',
+          updated_at: new Date().toISOString()
+        })
+        .eq('stripe_session_id', session.id);
 
-    // 新しいWebhookログを作成
-    const { data: newLog, error: createLogError } = await supabase
-      .from('webhook_logs')
-      .insert([
-        {
-          stripe_event_id: event.id,
-          event_type: event.type,
-          status: 'processing',
-          raw_event: event,
-          created_at: new Date().toISOString()
-        }
-      ])
-      .select()
-      .single();
-
-    if (createLogError) {
-      console.error('Error creating webhook log:', createLogError);
-      throw createLogError;
-    }
-
-    console.log('Created new webhook log:', newLog);
-
-    try {
-      if (event.type === 'checkout.session.completed') {
-        const session = event.data.object as Stripe.Checkout.Session;
-        
-        console.log('Processing checkout.session.completed event:', {
-          event_id: event.id,
-          session_id: session.id,
-          payment_status: session.payment_status,
-          client_reference_id: session.client_reference_id
-        });
-
-        const result = await processOrder(session, null, event);
-
-        // Webhookログを成功で更新
-        const { error: updateLogError } = await supabase
-          .from('webhook_logs')
-          .update({ 
-            status: 'completed',
-            processed_at: new Date().toISOString(),
-            processed_data: {
-              session_id: session.id,
-              payment_status: session.payment_status,
-              client_reference_id: session.client_reference_id,
-              result: result
-            }
-          })
-          .eq('stripe_event_id', event.id);
-
-        if (updateLogError) {
-          console.error('Error updating webhook log:', updateLogError);
-        }
-
-        return result;
+      if (updateOrderError) {
+        console.error('Error updating order status:', updateOrderError);
+        throw updateOrderError;
       }
 
       return NextResponse.json({ received: true });
-    } catch (error) {
-      // エラー発生時はWebhookログを更新
-      const errorMessage = error instanceof Error 
-        ? error.message 
-        : typeof error === 'object' && error !== null
-          ? JSON.stringify(error)
-          : 'Unknown error occurred';
-
-      console.error('Webhook processing error:', {
-        error: errorMessage,
-        event_type: event.type,
-        event_id: event.id
-      });
-
-      const { error: updateLogError } = await supabase
-        .from('webhook_logs')
-        .update({ 
-          status: 'failed',
-          error_message: errorMessage,
-          processed_at: new Date().toISOString(),
-          processed_data: {
-            event_type: event.type,
-            error_details: error instanceof Error ? {
-              name: error.name,
-              message: error.message,
-              stack: error.stack
-            } : error
-          }
-        })
-        .eq('stripe_event_id', event.id);
-
-      if (updateLogError) {
-        console.error('Error updating webhook log with error:', updateLogError);
-      }
-
-      throw error;
     }
+
+    return NextResponse.json({ received: true });
+
   } catch (error) {
     console.error('Webhook handler error:', error);
     return NextResponse.json(

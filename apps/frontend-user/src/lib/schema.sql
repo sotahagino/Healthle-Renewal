@@ -5,7 +5,9 @@ CREATE TABLE webhook_logs (
   event_type VARCHAR(100),
   processed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
   status VARCHAR(50),
-  error_message TEXT
+  error_message TEXT,
+  raw_event JSONB,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 -- vendor_ordersテーブルにuser_idカラムを追加
