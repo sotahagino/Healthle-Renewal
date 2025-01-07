@@ -1,5 +1,5 @@
 import { useRouter } from 'next/navigation'
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { 
   generateGuestEmail, 
@@ -14,6 +14,39 @@ export function useAuth() {
   const router = useRouter()
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [isGuestUser, setIsGuestUser] = useState(false)
+
+  // ユーザーのゲストステータスを確認する関数
+  const checkGuestStatus = async (userId: string) => {
+    try {
+      console.log('Checking guest status for user:', userId);
+      const { data: userData, error } = await supabase
+        .from('users')
+        .select('is_guest')
+        .eq('id', userId)
+        .single();
+
+      if (error) {
+        console.error('Error fetching user data:', error);
+        setIsGuestUser(false);
+        return;
+      }
+
+      console.log('User data from database:', userData);
+      setIsGuestUser(userData.is_guest === true);
+    } catch (error) {
+      console.error('Error checking guest status:', error);
+      setIsGuestUser(false);
+    }
+  };
+
+  useEffect(() => {
+    if (user?.id) {
+      checkGuestStatus(user.id);
+    } else {
+      setIsGuestUser(false);
+    }
+  }, [user?.id]);
 
   useEffect(() => {
     let mounted = true

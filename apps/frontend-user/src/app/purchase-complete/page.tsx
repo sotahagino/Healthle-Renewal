@@ -8,55 +8,31 @@ import { Footer } from '@/components/footer'
 import LoginModal from '@/components/login-modal'
 import { CheckCircle, Package, ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
 export default function PurchaseCompletePage() {
   const [showLoginModal, setShowLoginModal] = useState(false)
-  const [isGuest, setIsGuest] = useState(false)
-  const { user, loading } = useAuth()
+  const { user, loading, isGuestUser } = useAuth()
   const searchParams = useSearchParams()
   const sessionId = searchParams.get('session_id')
-  const supabase = createClientComponentClient()
 
   useEffect(() => {
-    const checkGuestStatus = async () => {
-      if (!user?.id) return;
+    console.log('Purchase complete page state:', {
+      loading,
+      user,
+      isGuestUser,
+      sessionId,
+      showLoginModal
+    });
 
-      console.log('Checking guest status for user:', user.id);
-
-      try {
-        const { data: userData, error } = await supabase
-          .from('users')
-          .select('is_guest')
-          .eq('id', user.id)
-          .single();
-
-        if (error) {
-          console.error('Error fetching user data:', error);
-          return;
-        }
-
-        console.log('User data from database:', userData);
-        const isGuestUser = userData.is_guest === true;
-        setIsGuest(isGuestUser);
-        
-        if (isGuestUser) {
-          console.log('User is guest, showing login modal');
-          setShowLoginModal(true);
-        }
-      } catch (error) {
-        console.error('Error checking guest status:', error);
-      }
-    };
-
-    if (!loading) {
-      checkGuestStatus();
+    if (!loading && user && isGuestUser) {
+      console.log('Showing login modal for guest user');
+      setShowLoginModal(true);
     }
-  }, [loading, user?.id, supabase]);
+  }, [loading, user, isGuestUser, sessionId]);
 
   // ゲストユーザーの場合、モーダルを閉じられないようにする
   const handleLoginModalClose = () => {
-    if (!isGuest) {
+    if (!isGuestUser) {
       setShowLoginModal(false);
     }
   };
@@ -108,7 +84,7 @@ export default function PurchaseCompletePage() {
             </div>
           </div>
           
-          {isGuest && (
+          {isGuestUser && (
             <div className="mt-8 p-6 bg-[#E6F3EF] rounded-lg">
               <h2 className="text-xl font-bold text-[#4C9A84] mb-4 text-center">
                 LINEで最新情報をお届け
@@ -146,7 +122,7 @@ export default function PurchaseCompletePage() {
       <LoginModal
         isOpen={showLoginModal}
         onClose={handleLoginModalClose}
-        isGuestUser={isGuest}
+        isGuestUser={isGuestUser}
       />
     </div>
   )
