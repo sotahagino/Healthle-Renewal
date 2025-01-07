@@ -119,23 +119,6 @@ export function useAuth() {
         
         if (error) {
           console.error('Session error:', error)
-          // セッションエラー時にゲストユーザー情報を確認
-          const guestInfo = getGuestUserInfo()
-          if (guestInfo && typeof guestInfo.email === 'string' && typeof guestInfo.password === 'string') {
-            console.log('Found guest info, attempting re-authentication');
-            const reAuthUser = await reAuthenticateGuestUser(guestInfo);
-            if (reAuthUser && mounted) {
-              const { data: userData } = await supabase
-                .from('users')
-                .select('*')
-                .eq('id', reAuthUser.id)
-                .single();
-
-              if (userData) {
-                await updateUserAndGuestStatus(userData, reAuthUser);
-              }
-            }
-          }
           if (mounted) {
             setLoading(false);
           }
@@ -143,23 +126,8 @@ export function useAuth() {
         }
 
         if (!session?.user) {
-          console.log('No active session, checking local storage')
+          console.log('No active session')
           if (mounted) {
-            const guestInfo = getGuestUserInfo()
-            if (guestInfo && typeof guestInfo.email === 'string' && typeof guestInfo.password === 'string') {
-              const reAuthUser = await reAuthenticateGuestUser(guestInfo);
-              if (reAuthUser) {
-                const { data: userData } = await supabase
-                  .from('users')
-                  .select('*')
-                  .eq('id', reAuthUser.id)
-                  .single();
-
-                if (userData && mounted) {
-                  await updateUserAndGuestStatus(userData, reAuthUser);
-                }
-              }
-            }
             setLoading(false);
           }
           return;
@@ -179,16 +147,12 @@ export function useAuth() {
               console.log('User data fetched successfully:', userData);
               await updateUserAndGuestStatus(userData, session.user)
             } else {
-              console.log('Setting session user without database info:', session.user)
-              setUser(session.user)
-              setIsGuestUser(false)
+              console.log('User data not found, signing out:', session.user)
+              await logout();  // ユーザーデータが見つからない場合はログアウト
             }
           } catch (error) {
             console.error('Error fetching user data:', error)
-            if (mounted) {
-              setUser(session?.user || null)
-              setIsGuestUser(false)
-            }
+            await logout();  // エラーが発生した場合もログアウト
           } finally {
             if (mounted) {
               console.log('Auth initialization completed');
@@ -199,79 +163,18 @@ export function useAuth() {
       } catch (error) {
         console.error('Error in initializeAuth:', error)
         if (mounted) {
-          // エラー時もゲストユーザーの再認証を試みる
-          const guestInfo = getGuestUserInfo()
-          if (guestInfo && typeof guestInfo.email === 'string' && typeof guestInfo.password === 'string') {
-            const reAuthUser = await reAuthenticateGuestUser(guestInfo);
-            if (reAuthUser && mounted) {
-              const { data: userData } = await supabase
-                .from('users')
-                .select('*')
-                .eq('id', reAuthUser.id)
-                .single();
-
-              if (userData) {
-                await updateUserAndGuestStatus(userData, reAuthUser);
-              }
-            }
-          }
+          await logout();
           setLoading(false);
         }
       }
     }
 
-    // 認証状態の変更を監視
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth state changed:', { event, session })
-      
-      if (!mounted) return
-
-      try {
-        if (!session?.user) {
-          console.log('No user in session after state change')
-          setUser(null)
-          setIsGuestUser(false)
-          setLoading(false)
-          return
-        }
-
-        console.log('Fetching user data after auth state change:', session.user.id);
-        const { data: userData, error: userError } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', session.user.id)
-          .single()
-
-        if (!userError && userData) {
-          console.log('User data fetched after auth state change:', userData);
-          await updateUserAndGuestStatus(userData, session.user)
-        } else {
-          console.log('Setting session user without database info:', session.user)
-          setUser(session.user)
-          setIsGuestUser(false)
-        }
-      } catch (error) {
-        console.error('Error in auth state change:', error)
-        setUser(session?.user || null)
-        setIsGuestUser(false)
-      } finally {
-        if (mounted) {
-          console.log('Auth state change completed');
-          setLoading(false)
-        }
-      }
-    })
-
-    // 初期化を実行
     initializeAuth()
 
     return () => {
       mounted = false
-      subscription.unsubscribe()
     }
-  }, [router])
+  }, [])
 
   // ゲストアカウントを正規アカウントに移行
   const migrateGuestToRegular = async (newUserId: string) => {
@@ -455,9 +358,11 @@ export function useAuth() {
     try {
       console.log('Starting guest login process...');
       
-      // 既存のセッションをクリア
-      await supabase.auth.signOut();
-      clearGuestUserInfo();
+      // 既存のセッションを完全にクリア
+      await logout();
+      
+      // 少し待機して確実にセッションがクリアされるのを待つ
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
       const email = generateGuestEmail()
       const password = generateGuestPassword()
@@ -505,8 +410,6 @@ export function useAuth() {
         setAuthError(new Error('ゲストユーザーの作成に失敗しました。もう一度お試しください。'));
         throw userError;
       }
-
-      console.log('Guest user info saved to database');
 
       // ゲストユーザー情報をローカルストレージに保存
       saveGuestUserInfo(signUpData.user.id, email, password);
