@@ -15,30 +15,20 @@ export default function PurchaseCompletePage() {
   const { user, isGuestUser } = useAuth()
   const supabase = createClientComponentClient()
   const [order, setOrder] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    // ゲストユーザーの場合は即座にモーダルを表示
+    if (isGuestUser()) {
+      setShowLoginModal(true)
+    }
+
     const fetchOrderDetails = async () => {
       try {
         const sessionId = searchParams.get('session_id')
         if (!sessionId) {
           setError('注文情報が見つかりません')
           return
-        }
-
-        const response = await fetch(`/api/orders/check-session?session_id=${sessionId}`)
-        if (!response.ok) {
-          console.error('Session check failed:', await response.json())
-          throw new Error('Failed to check session')
-        }
-
-        const purchaseFlowData = await response.json()
-        console.log('Purchase flow data:', purchaseFlowData)
-
-        // ゲストユーザーの場合はモーダルを表示
-        if (purchaseFlowData.is_guest) {
-          setShowLoginModal(true)
         }
 
         const { data: orderData, error: orderError } = await supabase
@@ -63,35 +53,19 @@ export default function PurchaseCompletePage() {
 
         console.log('Order data:', orderData)
         setOrder(orderData)
-        setLoading(false)
       } catch (error) {
         console.error('Error fetching order:', error)
         setError(error instanceof Error ? error.message : '注文情報の取得に失敗しました')
-        setLoading(false)
       }
     }
 
     fetchOrderDetails()
-  }, [searchParams])
+  }, [searchParams, isGuestUser])
 
   const handleLoginModalClose = () => {
     if (!isGuestUser()) {
       setShowLoginModal(false)
     }
-  }
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#E6F3EF] to-white">
-        <SiteHeader />
-        <main className="flex-grow container mx-auto px-4 py-8 mt-16">
-          <div className="text-center">
-            <p>注文情報を取得中...</p>
-          </div>
-        </main>
-        <Footer />
-      </div>
-    )
   }
 
   if (error) {
@@ -118,7 +92,7 @@ export default function PurchaseCompletePage() {
             ご購入ありがとうございます
           </h1>
           
-          {order && (
+          {order ? (
             <div className="space-y-6">
               <div className="border-t border-b py-4">
                 <h2 className="text-lg font-semibold mb-2">注文番号</h2>
@@ -148,6 +122,10 @@ export default function PurchaseCompletePage() {
                   </p>
                 </div>
               </div>
+            </div>
+          ) : (
+            <div className="text-center py-4">
+              <p>注文情報を取得中...</p>
             </div>
           )}
           
