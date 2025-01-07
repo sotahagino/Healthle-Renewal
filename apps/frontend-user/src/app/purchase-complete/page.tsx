@@ -6,43 +6,159 @@ import { useAuth } from '@/hooks/useAuth'
 import { SiteHeader } from '@/components/site-header'
 import { Footer } from '@/components/footer'
 import LoginModal from '@/components/login-modal'
-import { CheckCircle, Package, ArrowRight } from 'lucide-react'
+import { CheckCircle, Package, ArrowRight, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { getGuestUserInfo } from '@/utils/guest-utils'
+
+interface OrderStatus {
+  orderId: string | null;
+  status: 'pending' | 'paid' | 'error';
+  error?: string;
+}
+
+interface ErrorComponentProps {
+  error: Error;
+  onRetry: () => void;
+}
+
+const ErrorComponent = ({ error, onRetry }: ErrorComponentProps) => (
+  <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#E6F3EF] to-white">
+    <SiteHeader />
+    <main className="flex-grow container mx-auto px-4 py-8 mt-16">
+      <div className="max-w-2xl mx-auto bg-white p-8 rounded-lg shadow-md">
+        <div className="flex flex-col items-center justify-center space-y-4">
+          <AlertCircle className="w-12 h-12 text-red-500" />
+          <p className="text-lg text-gray-600">{error.message}</p>
+          <Button onClick={onRetry} className="bg-[#4C9A84] text-white">
+            再試行
+          </Button>
+        </div>
+      </div>
+    </main>
+    <Footer />
+  </div>
+);
 
 export default function PurchaseCompletePage() {
   const [showLoginModal, setShowLoginModal] = useState(false)
-  const { user, loading, isGuestUser } = useAuth()
+  const { user, loading, isGuestUser, loginAsGuest, authError } = useAuth()
   const searchParams = useSearchParams()
   const sessionId = searchParams.get('session_id')
+  const [pageLoading, setPageLoading] = useState(true)
+  const [initializationError, setInitializationError] = useState<Error | null>(null)
+  const [retryCount, setRetryCount] = useState(0)
+  const [orderStatus, setOrderStatus] = useState<OrderStatus>({
+    orderId: null,
+    status: 'pending'
+  })
+
+  const checkOrderStatus = async (sessionId: string) => {
+    try {
+      const response = await fetch(`/api/orders/check-session?session_id=${sessionId}`);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || '注文情報の取得に失敗しました');
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error checking order status:', error);
+      throw error;
+    }
+  };
+
+  const initializeGuestUser = async () => {
+    try {
+      setInitializationError(null);
+      const guestInfo = getGuestUserInfo();
+      if (!user && guestInfo) {
+        console.log('Found guest info, attempting to restore session');
+        await loginAsGuest();
+      }
+
+      if (sessionId) {
+        const orderData = await checkOrderStatus(sessionId);
+        setOrderStatus({
+          orderId: orderData.order_id,
+          status: 'paid'
+        });
+      }
+    } catch (error) {
+      console.error('Failed to initialize guest user or check order:', error);
+      setInitializationError(error as Error);
+      setOrderStatus(prev => ({
+        ...prev,
+        status: 'error',
+        error: error instanceof Error ? error.message : '初期化に失敗しました'
+      }));
+    } finally {
+      setPageLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    let mounted = true;
+    let timeoutId: NodeJS.Timeout;
+    
+    const initialize = async () => {
+      if (!loading && mounted) {
+        try {
+          await initializeGuestUser();
+        } catch (error) {
+          if (mounted && retryCount < 3) {
+            timeoutId = setTimeout(() => {
+              setRetryCount(prev => prev + 1);
+              initialize();
+            }, Math.min(1000 * Math.pow(2, retryCount), 8000));
+          }
+        }
+      }
+    };
+
+    initialize();
+
+    return () => {
+      mounted = false;
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, [loading, user, loginAsGuest, sessionId, retryCount]);
+
+  useEffect(() => {
+    if (authError) {
+      setInitializationError(authError);
+    }
+  }, [authError]);
 
   useEffect(() => {
     console.log('Purchase complete page state:', {
       loading,
+      pageLoading,
       user,
       isGuestUser,
       sessionId,
       showLoginModal,
+      initializationError,
+      retryCount,
+      orderStatus,
       timestamp: new Date().toISOString()
     });
 
-    if (!loading) {
-      console.log('Loading completed, checking guest status:', {
-        user,
-        isGuestUser,
-        timestamp: new Date().toISOString()
-      });
-
-      if (user && isGuestUser) {
-        console.log('Showing login modal for guest user:', {
-          userId: user.id,
-          timestamp: new Date().toISOString()
-        });
-        setShowLoginModal(true);
-      }
+    if (!loading && !pageLoading && user && isGuestUser && !showLoginModal) {
+      console.log('Showing login modal for guest user');
+      setShowLoginModal(true);
     }
-  }, [loading, user, isGuestUser, sessionId]);
+  }, [loading, pageLoading, user, isGuestUser, sessionId, showLoginModal, initializationError, retryCount, orderStatus]);
 
-  // ゲストユーザーの場合、モーダルを閉じられないようにする
+  const handleRetry = async () => {
+    setRetryCount(prev => prev + 1);
+    setPageLoading(true);
+    setOrderStatus({ orderId: null, status: 'pending' });
+    await initializeGuestUser();
+  };
+
   const handleLoginModalClose = () => {
     console.log('Attempting to close login modal:', {
       isGuestUser,
@@ -53,10 +169,11 @@ export default function PurchaseCompletePage() {
     }
   };
 
-  if (loading) {
-    console.log('Rendering loading state:', {
-      timestamp: new Date().toISOString()
-    });
+  if (initializationError) {
+    return <ErrorComponent error={initializationError} onRetry={handleRetry} />;
+  }
+
+  if (loading || pageLoading || orderStatus.status === 'pending') {
     return (
       <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#E6F3EF] to-white">
         <SiteHeader />
@@ -73,12 +190,12 @@ export default function PurchaseCompletePage() {
     )
   }
 
-  console.log('Rendering complete page:', {
-    user,
-    isGuestUser,
-    showLoginModal,
-    timestamp: new Date().toISOString()
-  });
+  if (orderStatus.status === 'error') {
+    return <ErrorComponent 
+      error={new Error(orderStatus.error || '注文情報の取得に失敗しました')} 
+      onRetry={handleRetry} 
+    />;
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#E6F3EF] to-white">
@@ -93,9 +210,9 @@ export default function PurchaseCompletePage() {
             <p className="text-gray-600 mb-2">
               ご注文の確認メールをお送りしましたので、ご確認ください。
             </p>
-            {sessionId && (
+            {orderStatus.orderId && (
               <p className="text-sm text-gray-500">
-                注文番号: {sessionId}
+                注文番号: {orderStatus.orderId}
               </p>
             )}
           </div>
@@ -133,10 +250,7 @@ export default function PurchaseCompletePage() {
                 </li>
               </ul>
               <Button
-                onClick={() => {
-                  console.log('LINE登録ボタンがクリックされました');
-                  setShowLoginModal(true);
-                }}
+                onClick={() => setShowLoginModal(true)}
                 className="w-full bg-[#4C9A84] text-white py-3 rounded-lg hover:bg-[#3A8B73] transition-colors flex items-center justify-center space-x-2"
               >
                 <span>LINEで登録する</span>

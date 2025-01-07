@@ -10,6 +10,29 @@ export function useAuth() {
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [isGuestUser, setIsGuestUser] = useState(false)
+  const [authError, setAuthError] = useState<Error | null>(null)
+
+  // ユーザー情報を取得する関数
+  const fetchUserData = async (userId: string) => {
+    try {
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', userId)
+        .single()
+        .throwOnError();
+
+      if (userError) {
+        console.error('Error fetching user data:', userError);
+        return null;
+      }
+
+      return userData;
+    } catch (error) {
+      console.error('Error in fetchUserData:', error);
+      return null;
+    }
+  };
 
   // ユーザー情報を設定し、ゲストステータスを更新する関数
   const updateUserAndGuestStatus = async (userData: any, sessionUser: any) => {
@@ -17,42 +40,69 @@ export function useAuth() {
       console.log('Updating user and guest status:', { userData, sessionUser });
       const userWithMetadata = {
         ...sessionUser,
-        is_guest: userData.is_guest,
-        guest_created_at: userData.guest_created_at
+        ...userData,
+        is_guest: userData?.is_guest ?? false,
+        guest_created_at: userData?.guest_created_at
       };
       setUser(userWithMetadata);
-      setIsGuestUser(userData.is_guest === true);
+      setIsGuestUser(userData?.is_guest === true);
+      setAuthError(null);
       return userWithMetadata;
     } catch (error) {
       console.error('Error updating user and guest status:', error);
-      setUser(null);
+      setAuthError(error as Error);
+      setUser(sessionUser);
       setIsGuestUser(false);
-      throw error;
+      return sessionUser;
     }
   };
 
-  // ゲストユーザーの再ログイン処理
+  // ゲストユーザーの再認証処理
   const reAuthenticateGuestUser = async (guestInfo: { email: string; password: string }) => {
-    try {
-      console.log('Attempting to re-authenticate guest user');
-      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-        email: guestInfo.email,
-        password: guestInfo.password
-      });
+    const MAX_RETRIES = 3;
+    let retryCount = 0;
 
-      if (signInError || !signInData.user) {
-        console.error('Guest re-authentication failed:', signInError);
-        clearGuestUserInfo();
-        return null;
+    const attemptAuth = async (): Promise<any> => {
+      try {
+        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+          email: guestInfo.email,
+          password: guestInfo.password
+        });
+
+        if (signInError) {
+          throw signInError;
+        }
+
+        if (!signInData.user) {
+          throw new Error('No user data returned from authentication');
+        }
+
+        return signInData.user;
+      } catch (error) {
+        console.error(`Authentication attempt ${retryCount + 1} failed:`, error);
+        throw error;
       }
+    };
 
-      console.log('Guest user re-authenticated:', signInData.user);
-      return signInData.user;
-    } catch (error) {
-      console.error('Error in guest re-authentication:', error);
-      clearGuestUserInfo();
-      return null;
+    while (retryCount < MAX_RETRIES) {
+      try {
+        const user = await attemptAuth();
+        console.log('Guest user re-authenticated:', user);
+        return user;
+      } catch (error) {
+        retryCount++;
+        if (retryCount < MAX_RETRIES) {
+          const delay = Math.min(1000 * Math.pow(2, retryCount), 8000);
+          console.log(`Retrying authentication in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
     }
+
+    console.error('Guest re-authentication failed after all retries');
+    clearGuestUserInfo();
+    setAuthError(new Error('再認証に失敗しました。もう一度お試しください。'));
+    return null;
   };
 
   useEffect(() => {
@@ -421,16 +471,19 @@ export function useAuth() {
 
       if (signUpError) {
         console.error('Failed to sign up guest user:', signUpError);
+        setAuthError(signUpError);
         throw signUpError;
       }
+
       if (!signUpData.user) {
-        console.error('No user data after sign up');
-        throw new Error('ユーザー作成に失敗しました');
+        const error = new Error('ゲストユーザーの作成に失敗しました');
+        setAuthError(error);
+        throw error;
       }
 
       console.log('Guest user created:', signUpData.user);
 
-      // 次にusersテーブルにゲストユーザー情報を追加
+      // トランザクションでユーザー情報を保存
       const { error: userError } = await supabase
         .from('users')
         .insert([{
@@ -442,8 +495,9 @@ export function useAuth() {
 
       if (userError) {
         console.error('Failed to create guest user in database:', userError);
-        // usersテーブルへの挿入に失敗した場合、認証ユーザーを削除
+        // Rollback: 認証ユーザーを削除
         await supabase.auth.admin.deleteUser(signUpData.user.id);
+        setAuthError(userError);
         throw userError;
       }
 
@@ -461,6 +515,7 @@ export function useAuth() {
 
       if (signInError || !signInData.user) {
         console.error('Failed to sign in guest user:', signInError);
+        setAuthError(signInError || new Error('ゲストユーザーのログインに失敗しました'));
         throw signInError || new Error('Failed to sign in guest user');
       }
 
@@ -473,12 +528,14 @@ export function useAuth() {
         guest_created_at: new Date().toISOString()
       };
       
-      console.log('Setting user with metadata:', userWithMetadata);
+      setAuthError(null);
       setUser(userWithMetadata);
+      setIsGuestUser(true);
       return userWithMetadata;
 
     } catch (error) {
       console.error('Guest login error:', error);
+      setAuthError(error as Error);
       throw error;
     }
   }
@@ -486,6 +543,7 @@ export function useAuth() {
   return {
     user,
     loading,
+    authError,
     setUser,
     login,
     logout,

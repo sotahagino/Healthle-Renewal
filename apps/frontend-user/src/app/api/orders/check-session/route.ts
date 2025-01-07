@@ -11,6 +11,42 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+const MAX_RETRIES = 3;
+const RETRY_DELAY = 1000; // 1秒
+
+async function wait(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function getOrderWithRetry(sessionId: string, attempt: number = 1): Promise<any> {
+  try {
+    const { data: order, error } = await supabase
+      .from('vendor_orders')
+      .select('*')
+      .eq('stripe_session_id', sessionId)
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    if (!order && attempt < MAX_RETRIES) {
+      console.log(`Order not found, attempt ${attempt} of ${MAX_RETRIES}`);
+      await wait(RETRY_DELAY * Math.pow(2, attempt - 1));
+      return getOrderWithRetry(sessionId, attempt + 1);
+    }
+
+    return order;
+  } catch (error) {
+    console.error(`Error fetching order (attempt ${attempt}):`, error);
+    if (attempt < MAX_RETRIES) {
+      await wait(RETRY_DELAY * Math.pow(2, attempt - 1));
+      return getOrderWithRetry(sessionId, attempt + 1);
+    }
+    throw error;
+  }
+}
+
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
@@ -40,82 +76,64 @@ export async function GET(request: Request) {
       );
     }
 
-    // stripe_session_idを使って注文情報を取得し、同時にステータスを更新
-    const { data: updatedOrder, error: updateError } = await supabase
-      .from('vendor_orders')
-      .update({ 
-        status: 'paid',
-        updated_at: new Date().toISOString()
-      })
-      .eq('stripe_session_id', session.id)
-      .select('order_id, created_at, total_amount, product_id, status, user_id')
-      .single();
+    // リトライロジックを使用して注文情報を取得
+    const order = await getOrderWithRetry(session.id);
 
-    if (updateError) {
-      console.error('Error updating order:', updateError);
-      return NextResponse.json(
-        { error: 'Failed to update order' },
-        { status: 500 }
-      );
-    }
-
-    if (!updatedOrder) {
-      console.warn('No order found for session');
+    if (!order) {
+      console.error('Order not found after all retries');
       return NextResponse.json(
         { error: 'Order not found' },
         { status: 404 }
       );
     }
 
-    // ユーザー情報を取得してゲストかどうかを確認
-    const { data: userData, error: userError } = await supabase
-      .from('users')
-      .select('is_guest')
-      .eq('id', updatedOrder.user_id)
-      .single();
+    // 注文ステータスを更新
+    const { error: updateError } = await supabase
+      .from('vendor_orders')
+      .update({ 
+        status: 'paid',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', order.id);
 
-    if (userError) {
-      console.error('Error fetching user data:', userError);
-      return NextResponse.json(
-        { error: 'Failed to fetch user data' },
-        { status: 500 }
-      );
+    if (updateError) {
+      console.error('Error updating order status:', updateError);
+      throw updateError;
     }
 
-    // 商品情報を取得
-    const { data: product, error: productError } = await supabase
-      .from('products')
-      .select('name')
-      .eq('id', updatedOrder.product_id)
-      .single();
+    // 配送先情報を更新（存在する場合）
+    if (session.shipping_details) {
+      const { error: shippingError } = await supabase
+        .from('vendor_orders')
+        .update({
+          shipping_name: session.shipping_details.name,
+          shipping_address: `〒${session.shipping_details.address?.postal_code || ''} ${session.shipping_details.address?.state || ''}${session.shipping_details.address?.city || ''}${session.shipping_details.address?.line1 || ''}${session.shipping_details.address?.line2 ? ' ' + session.shipping_details.address.line2 : ''}`,
+          shipping_phone: session.shipping_details.phone,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', order.id);
 
-    console.log('Product query result:', {
-      product,
-      error: productError
+      if (shippingError) {
+        console.error('Error updating shipping information:', shippingError);
+        // 配送情報の更新エラーは致命的ではないため、続行
+      }
+    }
+
+    return NextResponse.json({
+      order_id: order.order_id,
+      status: 'paid',
+      shipping_details: session.shipping_details,
+      customer_details: session.customer_details
     });
 
-    // purchaseFlowデータを作成
-    const purchaseFlowData = {
-      order_id: updatedOrder.order_id,
-      timestamp: Date.now(),
-      product: {
-        id: updatedOrder.product_id,
-        name: product?.name || '',
-        price: updatedOrder.total_amount
-      },
-      status: updatedOrder.status,
-      is_guest: userData?.is_guest || false
-    };
-
-    console.log('Created purchaseFlow data:', purchaseFlowData);
-
-    return NextResponse.json(purchaseFlowData);
-
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error checking session:', error);
     return NextResponse.json(
-      { error: 'Failed to check session' },
-      { status: 500 }
+      { 
+        error: error.message || 'Failed to check session',
+        details: error.stack
+      },
+      { status: error.status || 500 }
     );
   }
 }
