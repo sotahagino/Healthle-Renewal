@@ -149,7 +149,7 @@ export function useAuth() {
             } else {
               console.log('User data not found, checking guest info:', session.user)
               const guestInfo = getGuestUserInfo();
-              if (guestInfo && guestInfo.userId === session.user.id) {
+              if (guestInfo && guestInfo.id === session.user.id) {
                 // ゲストユーザーの場合、データを再作成
                 const { error: insertError } = await supabase
                   .from('users')
