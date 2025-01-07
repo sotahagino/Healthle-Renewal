@@ -12,6 +12,7 @@ interface AuthContextType {
   logout: () => Promise<void>
   isGuestUser: () => boolean
   migrateGuestToRegular: (newUserId: string) => Promise<void>
+  loginAsGuest: () => Promise<any>
 }
 
 export const AuthContext = createContext<AuthContextType>({
@@ -21,7 +22,8 @@ export const AuthContext = createContext<AuthContextType>({
   login: async () => {},
   logout: async () => {},
   isGuestUser: () => false,
-  migrateGuestToRegular: async () => {}
+  migrateGuestToRegular: async () => {},
+  loginAsGuest: async () => {}
 })
 
 export const useAuth = () => {

@@ -295,6 +295,62 @@ export function useAuth() {
     }
   }
 
+  // ゲストユーザーとしてログイン
+  const loginAsGuest = async () => {
+    try {
+      const email = generateGuestEmail()
+      const password = generateGuestPassword()
+
+      // まずSupabase認証でユーザーを作成
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            is_guest: true,
+            guest_created_at: new Date().toISOString()
+          }
+        }
+      })
+
+      if (signUpError) throw signUpError
+      if (!signUpData.user) throw new Error('ユーザー作成に失敗しました')
+
+      // 次にusersテーブルにゲストユーザー情報を追加
+      const { error: userError } = await supabase
+        .from('users')
+        .insert([{
+          id: signUpData.user.id,
+          email: email,
+          is_guest: true,
+          guest_created_at: new Date().toISOString()
+        }])
+
+      if (userError) {
+        // usersテーブルへの挿入に失敗した場合、認証ユーザーを削除
+        console.error('Failed to create guest user in database:', userError)
+        await supabase.auth.admin.deleteUser(signUpData.user.id)
+        throw userError
+      }
+
+      // ゲストユーザー情報をローカルストレージに保存
+      saveGuestUserInfo(signUpData.user.id, email, password)
+      
+      // ユーザー情報を設定
+      const userWithMetadata = {
+        ...signUpData.user,
+        is_guest: true,
+        guest_created_at: new Date().toISOString()
+      }
+      setUser(userWithMetadata)
+      return userWithMetadata
+
+    } catch (error) {
+      console.error('Guest login error:', error)
+      throw error
+    }
+  }
+
   return {
     user,
     loading,
@@ -302,6 +358,7 @@ export function useAuth() {
     login,
     logout,
     isGuestUser,
-    migrateGuestToRegular
+    migrateGuestToRegular,
+    loginAsGuest
   }
 } 
