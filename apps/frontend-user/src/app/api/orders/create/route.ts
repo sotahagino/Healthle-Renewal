@@ -84,10 +84,14 @@ export async function POST(req: Request) {
         },
       ],
       mode: 'payment',
-      success_url: `${process.env.NEXT_PUBLIC_SITE_URL}/purchase-complete?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.NEXT_PUBLIC_SITE_URL}/result`,
-      client_reference_id: client_reference_id, // ユーザーIDを設定
-      metadata: metadata, // 追加のメタデータを設定
+      success_url: process.env.NEXT_PUBLIC_SITE_URL 
+        ? `${process.env.NEXT_PUBLIC_SITE_URL}/purchase-complete?session_id={CHECKOUT_SESSION_ID}`
+        : `https://healthle-renewal-p8nm.vercel.app/purchase-complete?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: process.env.NEXT_PUBLIC_SITE_URL 
+        ? `${process.env.NEXT_PUBLIC_SITE_URL}/result`
+        : `https://healthle-renewal-p8nm.vercel.app/result`,
+      client_reference_id: client_reference_id,
+      metadata: metadata,
       shipping_address_collection: {
         allowed_countries: ['JP'],
       },
