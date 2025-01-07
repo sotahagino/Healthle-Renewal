@@ -254,9 +254,53 @@ export function useAuth() {
     throw new Error(`Migration failed after ${MAX_RETRIES} attempts`);
   };
 
+  // ログイン処理
+  const login = async (email: string, password: string) => {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+      if (error) throw error
+      setUser(data.user)
+    } catch (error) {
+      console.error('Login error:', error)
+      throw error
+    }
+  }
+
+  // ログアウト処理
+  const logout = async () => {
+    try {
+      const { error } = await supabase.auth.signOut()
+      if (error) throw error
+      
+      // ブラウザのストレージをクリア
+      window.sessionStorage.clear()
+      window.localStorage.clear()
+
+      // セッションクッキーを削除
+      document.cookie.split(';').forEach(cookie => {
+        const [name] = cookie.split('=')
+        const cookieName = name.trim()
+        document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`
+        document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/api;`
+      })
+
+      setUser(null)
+      router.push('/login')
+    } catch (error) {
+      console.error('Logout error:', error)
+      throw error
+    }
+  }
+
   return {
     user,
     loading,
+    setUser,
+    login,
+    logout,
     isGuestUser,
     migrateGuestToRegular
   }

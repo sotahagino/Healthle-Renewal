@@ -10,6 +10,8 @@ interface AuthContextType {
   setUser: (user: User | null) => void
   login: (email: string, password: string) => Promise<void>
   logout: () => Promise<void>
+  isGuestUser: () => boolean
+  migrateGuestToRegular: (newUserId: string) => Promise<void>
 }
 
 export const AuthContext = createContext<AuthContextType>({
@@ -17,7 +19,9 @@ export const AuthContext = createContext<AuthContextType>({
   loading: true,
   setUser: () => {},
   login: async () => {},
-  logout: async () => {}
+  logout: async () => {},
+  isGuestUser: () => false,
+  migrateGuestToRegular: async () => {}
 })
 
 export const useAuth = () => {
