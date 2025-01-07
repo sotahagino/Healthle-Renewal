@@ -1,5 +1,5 @@
 import { useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { 
   generateGuestEmail, 
@@ -183,7 +183,7 @@ export function useAuth() {
   }, [router])
 
   // ゲストユーザーかどうかを確認
-  const isGuestUser = (() => {
+  const isGuestUser = useMemo(() => {
     if (!user) return false;
     
     // デバッグ用のログ出力
@@ -214,7 +214,7 @@ export function useAuth() {
 
     console.log('User is not guest');
     return false;
-  })();
+  }, [user]);
 
   // ゲストアカウントを正規アカウントに移行
   const migrateGuestToRegular = async (newUserId: string) => {
