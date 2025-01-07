@@ -127,7 +127,6 @@ export async function GET(request: NextRequest) {
     if (signInErr) throw signInErr
 
     // リダイレクト先の決定
-    const searchParams = request.nextUrl.searchParams
     const returnUrl = searchParams.get('return_url')
     const redirectPath = returnUrl || '/mypage'
 
