@@ -183,7 +183,38 @@ export function useAuth() {
   }, [router])
 
   // ゲストユーザーかどうかを確認
-  const isGuestUser = user?.is_guest === true || (user?.email && user.email.includes('@guest.healthle.com')) || false;
+  const isGuestUser = (() => {
+    if (!user) return false;
+    
+    // デバッグ用のログ出力
+    console.log('Checking guest user status:', {
+      user,
+      is_guest: user.is_guest,
+      email: user.email,
+      metadata: user.user_metadata
+    });
+
+    // データベースのis_guestフラグを確認
+    if (user.is_guest === true) {
+      console.log('User is guest (by is_guest flag)');
+      return true;
+    }
+
+    // メールアドレスによる判定
+    if (user.email && user.email.includes('@guest.healthle.com')) {
+      console.log('User is guest (by email)');
+      return true;
+    }
+
+    // ユーザーメタデータによる判定
+    if (user.user_metadata && user.user_metadata.is_guest === true) {
+      console.log('User is guest (by metadata)');
+      return true;
+    }
+
+    console.log('User is not guest');
+    return false;
+  })();
 
   // ゲストアカウントを正規アカウントに移行
   const migrateGuestToRegular = async (newUserId: string) => {
@@ -334,6 +365,7 @@ export function useAuth() {
   // ゲストユーザーとしてログイン
   const loginAsGuest = async () => {
     try {
+      console.log('Starting guest login process...');
       const email = generateGuestEmail()
       const password = generateGuestPassword()
 
@@ -349,8 +381,16 @@ export function useAuth() {
         }
       })
 
-      if (signUpError) throw signUpError
-      if (!signUpData.user) throw new Error('ユーザー作成に失敗しました')
+      if (signUpError) {
+        console.error('Failed to sign up guest user:', signUpError);
+        throw signUpError;
+      }
+      if (!signUpData.user) {
+        console.error('No user data after sign up');
+        throw new Error('ユーザー作成に失敗しました');
+      }
+
+      console.log('Guest user created:', signUpData.user);
 
       // 次にusersテーブルにゲストユーザー情報を追加
       const { error: userError } = await supabase
@@ -363,27 +403,45 @@ export function useAuth() {
         }])
 
       if (userError) {
+        console.error('Failed to create guest user in database:', userError);
         // usersテーブルへの挿入に失敗した場合、認証ユーザーを削除
-        console.error('Failed to create guest user in database:', userError)
-        await supabase.auth.admin.deleteUser(signUpData.user.id)
-        throw userError
+        await supabase.auth.admin.deleteUser(signUpData.user.id);
+        throw userError;
       }
 
+      console.log('Guest user info saved to database');
+
       // ゲストユーザー情報をローカルストレージに保存
-      saveGuestUserInfo(signUpData.user.id, email, password)
+      saveGuestUserInfo(signUpData.user.id, email, password);
+      console.log('Guest user info saved to local storage');
+      
+      // 自動的にログインを実行
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (signInError || !signInData.user) {
+        console.error('Failed to sign in guest user:', signInError);
+        throw signInError || new Error('Failed to sign in guest user');
+      }
+
+      console.log('Guest user signed in:', signInData.user);
       
       // ユーザー情報を設定
       const userWithMetadata = {
-        ...signUpData.user,
+        ...signInData.user,
         is_guest: true,
         guest_created_at: new Date().toISOString()
-      }
-      setUser(userWithMetadata)
-      return userWithMetadata
+      };
+      
+      console.log('Setting user with metadata:', userWithMetadata);
+      setUser(userWithMetadata);
+      return userWithMetadata;
 
     } catch (error) {
-      console.error('Guest login error:', error)
-      throw error
+      console.error('Guest login error:', error);
+      throw error;
     }
   }
 

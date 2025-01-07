@@ -17,17 +17,28 @@ export default function PurchaseCompletePage() {
 
   useEffect(() => {
     // ロバッグ用のログ出力
-    console.log('Purchase complete page state:', { loading, user, isGuestUser })
+    console.log('Purchase complete page state:', {
+      loading,
+      user,
+      isGuestUser,
+      sessionId,
+      showLoginModal
+    })
     
     // ローディングが完了し、ユーザーが存在する場合にゲストチェックを行う
-    if (!loading && user && isGuestUser) {
-      console.log('Showing login modal for guest user')
-      setShowLoginModal(true)
+    if (!loading) {
+      if (user && isGuestUser) {
+        console.log('Showing login modal for guest user:', { user })
+        setShowLoginModal(true)
+      } else {
+        console.log('User is not guest or not logged in:', { user, isGuestUser })
+      }
     }
-  }, [loading, user, isGuestUser])
+  }, [loading, user, isGuestUser, sessionId])
 
   // ゲストユーザーの場合、モーダルを閉じられないようにする
   const handleLoginModalClose = () => {
+    console.log('Attempting to close login modal:', { isGuestUser })
     if (!isGuestUser) {
       setShowLoginModal(false)
     }
@@ -103,7 +114,10 @@ export default function PurchaseCompletePage() {
                 </li>
               </ul>
               <Button
-                onClick={() => setShowLoginModal(true)}
+                onClick={() => {
+                  console.log('LINE登録ボタンがクリックされました');
+                  setShowLoginModal(true);
+                }}
                 className="w-full bg-[#4C9A84] text-white py-3 rounded-lg hover:bg-[#3A8B73] transition-colors flex items-center justify-center space-x-2"
               >
                 <span>LINEで登録する</span>
