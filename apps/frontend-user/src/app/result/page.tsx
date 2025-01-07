@@ -602,35 +602,45 @@ export default function ResultPage() {
 
   const handlePurchaseClick = async (product: RecommendedProduct) => {
     try {
-      // 購入フロー情報をlocalStorageに保存（order_idは後で追加される）
-      const purchaseFlowData = {
-        timestamp: Date.now()
-      }
-      localStorage.setItem('purchaseFlow', JSON.stringify(purchaseFlowData))
-      console.log('Saved purchaseFlow data:', purchaseFlowData)
+      // 現在のユーザー情報を取得
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      if (userError) throw userError
 
-      // 商品のペイメントリンクURLを直接取得
-      const { data: productData, error: productError } = await supabase
-        .from('products')
-        .select('stripe_payment_link_url')
-        .eq('id', product.id)
-        .single()
-
-      if (productError || !productData?.stripe_payment_link_url) {
-        throw new Error('決済リンクの取得に失敗しました')
+      if (!user) {
+        console.error('User not authenticated')
+        throw new Error('ログインが必要です')
       }
 
-      // 成功時のリダイレクトURLを追加
-      const successUrl = `${window.location.origin}/purchase-complete`
-      const paymentUrl = new URL(productData.stripe_payment_link_url)
-      paymentUrl.searchParams.set('redirect_to', successUrl)
+      // 注文情報を作成
+      const response = await fetch('/api/orders/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          product_id: product.id,
+          user_id: user.id,
+          client_reference_id: user.id, // ユーザーIDを明示的に設定
+          metadata: {
+            user_id: user.id, // バックアップとしてmetadataにも設定
+          }
+        }),
+      })
 
-      // ペイメントリンクに遷移
-      window.location.href = paymentUrl.toString()
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.message || '注文の作成に失敗しました')
+      }
 
+      const { url } = await response.json()
+      if (url) {
+        window.location.href = url
+      } else {
+        throw new Error('決済URLの取得に失敗しました')
+      }
     } catch (error) {
-      console.error('Error in handlePurchaseClick:', error)
-      alert('エラーが発生しました。もう一度お試しください。')
+      console.error('Purchase error:', error)
+      // エラーハンドリング（UIへの表示など）
     }
   }
 

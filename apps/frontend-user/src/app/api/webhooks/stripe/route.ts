@@ -171,34 +171,32 @@ async function createOrderRecords(
       shipping_details: session.shipping_details
     });
 
-    // ユーザーIDの取得（client_reference_idとmetadataの両方をチェック）
-    const user_id = session.client_reference_id || session.metadata?.user_id;
-    if (!user_id) {
-      console.error('No user_id found in session', {
-        session_id: session.id,
-        client_reference_id: session.client_reference_id,
-        metadata: session.metadata,
-        customer_email: session.customer_details?.email
-      });
-
-      // メールアドレスからユーザーを検索
-      if (session.customer_details?.email) {
-        const { data: userByEmail } = await supabase
-          .from('users')
-          .select('id')
-          .eq('email', session.customer_details.email)
-          .single();
-
-        if (userByEmail?.id) {
-          console.log('Found user by email:', userByEmail.id);
-          return userByEmail.id;
-        }
-      }
-
-      throw new Error('User ID is required');
+    // ユーザーIDの取得（優先順位: client_reference_id > metadata > email検索）
+    let user_id = session.client_reference_id;
+    
+    if (!user_id && session.metadata?.user_id) {
+      user_id = session.metadata.user_id;
+      console.log('Using user_id from metadata:', user_id);
     }
 
-    console.log('Processing order for user:', user_id);
+    if (!user_id && session.customer_details?.email) {
+      const { data: userByEmail } = await supabase
+        .from('users')
+        .select('id, is_guest')
+        .eq('email', session.customer_details.email)
+        .single();
+
+      if (userByEmail?.id && !userByEmail.is_guest) {
+        console.log('Found non-guest user by email:', userByEmail.id);
+        user_id = userByEmail.id;
+      } else {
+        console.log('No valid user found by email or user is guest');
+      }
+    }
+
+    if (!user_id) {
+      throw new Error('Unable to determine user ID for order');
+    }
 
     // 出展者向け注文情報の更新
     const { data: existingOrder, error: fetchError } = await supabase
