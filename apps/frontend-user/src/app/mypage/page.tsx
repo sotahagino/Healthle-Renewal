@@ -16,6 +16,7 @@ export default function MyPage() {
     
     // 初期化が完了し、かつloadingがfalseになった時のみリダイレクトを判断
     if (!loading && !isInitialized) {
+      console.log('MyPage - Initialization complete, checking user:', user)
       setIsInitialized(true)
       if (!user || user.is_guest) {
         console.log('MyPage - Redirecting to login due to:', { user, loading })
@@ -26,7 +27,7 @@ export default function MyPage() {
 
   // ローディング中は読み込み画面を表示
   if (loading || !isInitialized) {
-    console.log('MyPage - Showing loading state')
+    console.log('MyPage - Showing loading state:', { loading, isInitialized })
     return (
       <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#E6F3EF] to-white">
         <SiteHeader />
@@ -61,11 +62,23 @@ export default function MyPage() {
               <dl className="space-y-2">
                 <div>
                   <dt className="text-gray-600">メールアドレス</dt>
-                  <dd>{user.email}</dd>
+                  <dd>{user.email || '未設定'}</dd>
                 </div>
                 <div>
                   <dt className="text-gray-600">アカウントタイプ</dt>
                   <dd>{user.is_guest ? 'ゲストユーザー' : '正規ユーザー'}</dd>
+                </div>
+                <div>
+                  <dt className="text-gray-600">ユーザーID</dt>
+                  <dd>{user.id || '未設定'}</dd>
+                </div>
+                <div>
+                  <dt className="text-gray-600">名前</dt>
+                  <dd>{user.name || '未設定'}</dd>
+                </div>
+                <div>
+                  <dt className="text-gray-600">電話番号</dt>
+                  <dd>{user.phone_number || '未設定'}</dd>
                 </div>
               </dl>
             </div>

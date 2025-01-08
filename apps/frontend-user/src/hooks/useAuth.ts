@@ -45,9 +45,10 @@ export function useAuth(): AuthContextType {
         }
 
         console.log('Session status:', session ? 'Found' : 'Not found')
+        console.log('Session data:', session)
         
         if (session?.user) {
-          console.log('Fetching user data...')
+          console.log('Fetching user data for ID:', session.user.id)
           const { data: userData, error: userError } = await supabase
             .from('users')
             .select('*')
@@ -59,8 +60,10 @@ export function useAuth(): AuthContextType {
             throw userError
           }
 
+          console.log('Fetched user data:', userData)
+
           if (mounted) {
-            console.log('User data fetched successfully')
+            console.log('Setting user data:', userData)
             setUser(userData)
           }
         } else if (mounted) {
@@ -84,12 +87,13 @@ export function useAuth(): AuthContextType {
     const setupAuthSubscription = () => {
       const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
         console.log('Auth state changed:', event, session?.user?.id)
+        console.log('Full session data:', session)
         
         if (!mounted) return
 
         if (session?.user) {
           try {
-            console.log('Fetching updated user data...')
+            console.log('Fetching updated user data for ID:', session.user.id)
             const { data: userData, error: userError } = await supabase
               .from('users')
               .select('*')
@@ -101,8 +105,10 @@ export function useAuth(): AuthContextType {
               return
             }
 
+            console.log('Updated user data:', userData)
+
             if (mounted) {
-              console.log('User data updated successfully')
+              console.log('Setting updated user data:', userData)
               setUser(userData)
             }
           } catch (error) {
