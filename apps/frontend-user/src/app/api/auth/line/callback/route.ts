@@ -200,7 +200,7 @@ export async function GET(request: NextRequest) {
               if (purchaseFlow) {
                 try {
                   const { consultation_id } = JSON.parse(purchaseFlow);
-                  await fetch('/api/orders/update-user', {
+                  fetch('/api/orders/update-user', {
                     method: 'POST',
                     headers: {
                       'Content-Type': 'application/json',
@@ -209,31 +209,26 @@ export async function GET(request: NextRequest) {
                       user_id: '${signInData.session.user.id}',
                       consultation_id
                     })
+                  }).then(() => {
+                    localStorage.removeItem('purchaseFlow');
+                  }).catch(error => {
+                    console.error('Error updating purchase flow:', error);
                   });
-                  localStorage.removeItem('purchaseFlow');
                 } catch (error) {
-                  console.error('Error updating purchase flow:', error);
+                  console.error('Error processing purchase flow:', error);
                 }
               }
 
               // セッションの初期化を確認
-              try {
-                await new Promise((resolve) => {
-                  const checkSession = () => {
-                    const storedSession = localStorage.getItem(\`sb-\${projectRef}-auth-token\`);
-                    if (storedSession) {
-                      resolve(true);
-                    } else {
-                      setTimeout(checkSession, 100);
-                    }
-                  };
-                  checkSession();
-                });
-                window.location.href = '${redirectUrl}';
-              } catch (error) {
-                console.error('Session initialization error:', error);
-                window.location.href = '/login?error=session_failed';
-              }
+              const checkSession = () => {
+                const storedSession = localStorage.getItem(\`sb-\${projectRef}-auth-token\`);
+                if (storedSession) {
+                  window.location.href = '${redirectUrl}';
+                } else {
+                  setTimeout(checkSession, 100);
+                }
+              };
+              checkSession();
             </script>
             <p>認証処理中...</p>
             <p>自動的にリダイレクトされない場合は<a href="${redirectUrl}">こちら</a>をクリックしてください。</p>
