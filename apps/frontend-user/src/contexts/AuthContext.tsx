@@ -1,37 +1,29 @@
 import { createContext, useContext } from 'react'
-import { User, Session, WeakPassword } from '@supabase/supabase-js'
+import { User, Session, WeakPassword, Provider } from '@supabase/supabase-js'
 import { useAuth as useSupabaseAuth } from '@/hooks/useAuth'
 
 interface AuthContextType {
-  user: User | null
-  loading: boolean
-  isGuestUser: boolean
-  authError: Error | null
-  login: (email: string, password: string) => Promise<{
-    user: User
-    session: Session
-    weakPassword?: WeakPassword
-  } | null>
-  logout: () => Promise<void>
-  loginAsGuest: () => Promise<{
-    user: User
-    session: Session
-  } | null>
-  migrateGuestToRegular: (email: string, password: string) => Promise<{
-    user: User
-    session: Session
-  } | null>
+  user: User | null;
+  loading: boolean;
+  login: () => Promise<{ provider: Provider; url: string }>;
+  loginAsGuest: () => Promise<{ user: any } | undefined>;
+  logout: () => Promise<void>;
+  isGuest: boolean;
+  isGuestUser: boolean;
+  authError: Error | null;
+  migrateGuestToRegular: () => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
+  login: async () => ({ provider: 'line' as Provider, url: '' }),
+  loginAsGuest: async () => undefined,
+  logout: async () => {},
+  isGuest: false,
   isGuestUser: false,
   authError: null,
-  login: async () => null,
-  logout: async () => {},
-  loginAsGuest: async () => null,
-  migrateGuestToRegular: async () => null
+  migrateGuestToRegular: async () => {},
 })
 
 export const useAuth = () => {
