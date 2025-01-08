@@ -78,39 +78,47 @@ export async function GET(request: NextRequest) {
       .single()
 
     let user = null
+    let session = null
     
     if (existingUser) {
       // 既存ユーザーの場合は直接サインイン
       console.log('Existing user found:', existingUser)
-      const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
+      const { data, error: signInErr } = await supabase.auth.signInWithPassword({
         email: existingUser.email,
         password: `line_${line_user_id}`
       })
       if (signInErr) throw signInErr
-      user = signInData.user
+      user = data.user
+      session = data.session
     } else {
       // 新規ユーザー作成
       console.log('Creating new user with:', { email, line_user_id })
       
       try {
-        // まずAuthユーザーを作成
-        const { data: newUser, error: newUserErr } = await supabase.auth.admin.createUser({
+        // 新規ユーザーの作成とサインアップ
+        const { data, error: signUpErr } = await supabase.auth.signUp({
           email: email,
           password: `line_${line_user_id}`,
-          user_metadata: { line_user_id, line_email: email },
-          email_confirm: true
+          options: {
+            data: { 
+              line_user_id,
+              line_email: email
+            },
+            emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`
+          }
         })
         
-        if (newUserErr) {
-          console.error('Auth user creation error:', newUserErr)
-          throw newUserErr
+        if (signUpErr) {
+          console.error('Auth user creation error:', signUpErr)
+          throw signUpErr
         }
         
-        if (!newUser || !newUser.user) {
+        if (!data.user) {
           throw new Error('Failed to create auth user')
         }
         
-        user = newUser.user
+        user = data.user
+        session = data.session
         console.log('Auth user created:', user)
 
         // usersテーブルに登録
@@ -127,7 +135,7 @@ export async function GET(request: NextRequest) {
 
         if (insertErr) {
           console.error('User profile creation error:', insertErr)
-          await supabase.auth.admin.deleteUser(user.id)
+          // ユーザー削除は不要（signUpを使用しているため）
           throw insertErr
         }
 
@@ -138,15 +146,12 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // セッション作成（新規・既存共通）
-    const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
-      email: user!.email!,
-      password: `line_${line_user_id}`
-    })
-    if (signInErr) throw signInErr
+    if (!session) {
+      throw new Error('No session created')
+    }
 
     // セッションの確認
-    console.log('Session created:', signInData.session)
+    console.log('Session created:', session)
 
     // ゲストユーザーデータの移行
     const guestUser = searchParams.get('guest_user_id') || 
@@ -174,52 +179,36 @@ export async function GET(request: NextRequest) {
     const redirectPath = returnUrl || '/mypage'
 
     // セッションクッキーの設定とリダイレクト
-    if (signInData.session) {
-      const domain = new URL(process.env.NEXT_PUBLIC_SITE_URL!).hostname
-      const cookieOptions = {
-        domain,
-        path: '/',
-        httpOnly: true,
-        secure: true,
-        sameSite: 'lax',
-        maxAge: 60 * 60 * 24 * 7 // 7 days
-      }
-
-      console.log('Setting session cookies:', {
-        accessToken: signInData.session.access_token,
-        refreshToken: signInData.session.refresh_token,
-        domain: cookieOptions.domain,
-        path: cookieOptions.path
-      })
-
-      const headers = new Headers()
-      headers.append('Set-Cookie', [
-        `sb-access-token=${signInData.session.access_token}; Domain=${cookieOptions.domain}; Path=${cookieOptions.path}; HttpOnly; Secure; SameSite=Lax; Max-Age=${cookieOptions.maxAge}`,
-        `sb-refresh-token=${signInData.session.refresh_token}; Domain=${cookieOptions.domain}; Path=${cookieOptions.path}; HttpOnly; Secure; SameSite=Lax; Max-Age=${cookieOptions.maxAge}`
-      ].join(', '))
-
-      // セッションの設定を確認
-      const { data: { session }, error: sessionErr } = await supabase.auth.setSession({
-        access_token: signInData.session.access_token,
-        refresh_token: signInData.session.refresh_token
-      })
-
-      if (sessionErr) {
-        console.error('Failed to set session:', sessionErr)
-      } else {
-        console.log('Session set successfully:', session)
-      }
-      
-      return new Response(null, {
-        status: 302,
-        headers: {
-          ...Object.fromEntries(headers.entries()),
-          Location: new URL(redirectPath, process.env.NEXT_PUBLIC_SITE_URL).toString()
-        }
-      })
+    const domain = new URL(process.env.NEXT_PUBLIC_SITE_URL!).hostname
+    const cookieOptions = {
+      domain,
+      path: '/',
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 7 // 7 days
     }
 
-    return Response.redirect(new URL(redirectPath, process.env.NEXT_PUBLIC_SITE_URL))
+    console.log('Setting session cookies:', {
+      accessToken: session.access_token,
+      refreshToken: session.refresh_token,
+      domain: cookieOptions.domain,
+      path: cookieOptions.path
+    })
+
+    const headers = new Headers()
+    headers.append('Set-Cookie', [
+      `sb-access-token=${session.access_token}; Domain=${cookieOptions.domain}; Path=${cookieOptions.path}; HttpOnly; Secure; SameSite=Lax; Max-Age=${cookieOptions.maxAge}`,
+      `sb-refresh-token=${session.refresh_token}; Domain=${cookieOptions.domain}; Path=${cookieOptions.path}; HttpOnly; Secure; SameSite=Lax; Max-Age=${cookieOptions.maxAge}`
+    ].join(', '))
+
+    return new Response(null, {
+      status: 302,
+      headers: {
+        ...Object.fromEntries(headers.entries()),
+        Location: new URL(redirectPath, process.env.NEXT_PUBLIC_SITE_URL).toString()
+      }
+    })
 
   } catch (error) {
     console.error('Error in callback route:', error)
