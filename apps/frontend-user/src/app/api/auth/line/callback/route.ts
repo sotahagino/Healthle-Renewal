@@ -13,9 +13,8 @@ export async function GET(request: NextRequest) {
     const code = searchParams.get('code')
     const returnUrl = searchParams.get('return_url')
     
-    // 現在のリクエストURLからベースURLを取得
-    const currentUrl = new URL(request.url)
-    const baseCallbackUrl = `${currentUrl.origin}${currentUrl.pathname}`
+    // ベースURLのみを使用
+    const baseCallbackUrl = process.env.LINE_CALLBACK_URL!.split('?')[0]
     
     // デバッグログを追加
     console.log('Callback Debug Info:', {
@@ -23,7 +22,7 @@ export async function GET(request: NextRequest) {
       returnUrl,
       requestUrl: request.url,
       baseCallbackUrl,
-      callbackUrl: process.env.LINE_CALLBACK_URL,
+      originalCallbackUrl: process.env.LINE_CALLBACK_URL,
       fullParams: Object.fromEntries(searchParams.entries())
     })
 
@@ -32,10 +31,7 @@ export async function GET(request: NextRequest) {
     }
 
     console.log('Getting LINE token with code:', code)
-
-    // コールバックURLの処理を修正
-    const callbackUrl = process.env.LINE_CALLBACK_URL!
-    console.log('Using callback URL:', callbackUrl)
+    console.log('Using base callback URL:', baseCallbackUrl)
 
     // LINEトークンの取得
     const tokenResponse = await fetch('https://api.line.me/oauth2/v2.1/token', {
@@ -46,7 +42,7 @@ export async function GET(request: NextRequest) {
       body: new URLSearchParams({
         grant_type: 'authorization_code',
         code: code,
-        redirect_uri: callbackUrl,
+        redirect_uri: baseCallbackUrl,
         client_id: process.env.LINE_CLIENT_ID!,
         client_secret: process.env.LINE_CLIENT_SECRET!,
       }).toString(),

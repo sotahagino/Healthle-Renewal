@@ -17,14 +17,16 @@ export async function GET(request: NextRequest) {
     lineAuthUrl.searchParams.append('scope', 'profile openid email')
     lineAuthUrl.searchParams.append('state', state)
 
-    // コールバックURLの構築
-    const callbackUrl = new URL(process.env.LINE_CALLBACK_URL!)
-    if (returnUrl) {
-      callbackUrl.searchParams.append('return_url', returnUrl)
-    }
-    lineAuthUrl.searchParams.append('redirect_uri', callbackUrl.toString())
+    // ベースURLのみを使用
+    const baseCallbackUrl = process.env.LINE_CALLBACK_URL!.split('?')[0]
+    lineAuthUrl.searchParams.append('redirect_uri', baseCallbackUrl)
 
-    console.log('Redirecting to LINE auth:', lineAuthUrl.toString())
+    console.log('Redirecting to LINE auth:', {
+      lineAuthUrl: lineAuthUrl.toString(),
+      baseCallbackUrl,
+      state,
+      returnUrl
+    })
 
     // LINE認証ページにリダイレクト
     return NextResponse.redirect(lineAuthUrl.toString())
