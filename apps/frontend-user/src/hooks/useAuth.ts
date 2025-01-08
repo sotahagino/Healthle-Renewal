@@ -12,9 +12,23 @@ interface CustomUser {
   [key: string]: any
 }
 
-export function useAuth() {
+export type AuthContextType = {
+  user: CustomUser | null;
+  loading: boolean;
+  login: () => Promise<{ provider: Provider; url: string }>;
+  loginAsGuest: () => Promise<{ user: any } | undefined>;
+  logout: () => Promise<void>;
+  isGuest: boolean;
+  isGuestUser: boolean;
+  authError: Error | null;
+  migrateGuestToRegular: () => Promise<void>;
+};
+
+export function useAuth(): AuthContextType {
   const [user, setUser] = useState<CustomUser | null>(null)
   const [loading, setLoading] = useState(true)
+  const [isGuest, setIsGuest] = useState(false)
+  const [authError, setAuthError] = useState<Error | null>(null)
   const router = useRouter()
 
   useEffect(() => {
@@ -147,12 +161,32 @@ export function useAuth() {
     }
   }
 
+  const migrateGuestToRegular = async () => {
+    try {
+      if (!user || !user.is_guest) return;
+      const { data, error } = await supabase
+        .from('users')
+        .update({ is_guest: false })
+        .eq('id', user.id);
+      
+      if (error) throw error;
+      
+      setUser(prev => prev ? { ...prev, is_guest: false } : null);
+    } catch (error) {
+      console.error('Error migrating guest to regular user:', error);
+      setAuthError(error instanceof Error ? error : new Error('Failed to migrate user'));
+    }
+  };
+
   return {
     user,
     loading,
     login,
     loginAsGuest,
     logout,
-    isGuest: user?.is_guest || false,
+    isGuest,
+    isGuestUser: user?.is_guest ?? false,
+    authError,
+    migrateGuestToRegular,
   }
 } 
