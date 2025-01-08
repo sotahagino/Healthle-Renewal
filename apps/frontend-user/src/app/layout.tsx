@@ -1,5 +1,7 @@
 'use client'
 
+import { useEffect } from 'react'
+import { supabase } from '@/utils/supabase'
 import { Inter } from "next/font/google"
 import "./globals.css"
 import { AuthContext, useSupabaseAuth } from '@/contexts/AuthContext'
@@ -15,6 +17,24 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   const auth = useSupabaseAuth()
+
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data: { session }, error } = await supabase.auth.getSession()
+      console.log('Client session check:', { session, error })
+
+      // セッション変更のリスナーを設定
+      const {
+        data: { subscription },
+      } = supabase.auth.onAuthStateChange((event, session) => {
+        console.log('Auth state changed:', event, session)
+      })
+
+      return () => subscription.unsubscribe()
+    }
+
+    checkSession()
+  }, [])
 
   return (
     <html lang="ja">

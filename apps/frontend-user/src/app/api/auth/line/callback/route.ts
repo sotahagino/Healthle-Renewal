@@ -175,7 +175,9 @@ export async function GET(request: NextRequest) {
 
     // セッションクッキーの設定とリダイレクト
     if (signInData.session) {
+      const domain = new URL(process.env.NEXT_PUBLIC_SITE_URL!).hostname
       const cookieOptions = {
+        domain,
         path: '/',
         httpOnly: true,
         secure: true,
@@ -183,9 +185,30 @@ export async function GET(request: NextRequest) {
         maxAge: 60 * 60 * 24 * 7 // 7 days
       }
 
+      console.log('Setting session cookies:', {
+        accessToken: signInData.session.access_token,
+        refreshToken: signInData.session.refresh_token,
+        domain: cookieOptions.domain,
+        path: cookieOptions.path
+      })
+
       const headers = new Headers()
-      headers.append('Set-Cookie', `sb-access-token=${signInData.session.access_token}; ${Object.entries(cookieOptions).map(([key, value]) => `${key}=${value}`).join('; ')}`)
-      headers.append('Set-Cookie', `sb-refresh-token=${signInData.session.refresh_token}; ${Object.entries(cookieOptions).map(([key, value]) => `${key}=${value}`).join('; ')}`)
+      headers.append('Set-Cookie', [
+        `sb-access-token=${signInData.session.access_token}; Domain=${cookieOptions.domain}; Path=${cookieOptions.path}; HttpOnly; Secure; SameSite=Lax; Max-Age=${cookieOptions.maxAge}`,
+        `sb-refresh-token=${signInData.session.refresh_token}; Domain=${cookieOptions.domain}; Path=${cookieOptions.path}; HttpOnly; Secure; SameSite=Lax; Max-Age=${cookieOptions.maxAge}`
+      ].join(', '))
+
+      // セッションの設定を確認
+      const { data: { session }, error: sessionErr } = await supabase.auth.setSession({
+        access_token: signInData.session.access_token,
+        refresh_token: signInData.session.refresh_token
+      })
+
+      if (sessionErr) {
+        console.error('Failed to set session:', sessionErr)
+      } else {
+        console.log('Session set successfully:', session)
+      }
       
       return new Response(null, {
         status: 302,
