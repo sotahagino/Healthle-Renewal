@@ -11,27 +11,12 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
     const code = searchParams.get('code')
-    const returnUrl = searchParams.get('return_url')
     
-    // ベースURLのみを使用
-    const baseCallbackUrl = process.env.LINE_CALLBACK_URL!.split('?')[0]
-    
-    // デバッグログを追加
-    console.log('Callback Debug Info:', {
-      code,
-      returnUrl,
-      requestUrl: request.url,
-      baseCallbackUrl,
-      originalCallbackUrl: process.env.LINE_CALLBACK_URL,
-      fullParams: Object.fromEntries(searchParams.entries())
-    })
-
     if (!code) {
-      throw new Error('�証コードが提供されていません')
+      throw new Error('認証コードが提供されていません')
     }
 
     console.log('Getting LINE token with code:', code)
-    console.log('Using base callback URL:', baseCallbackUrl)
 
     // LINEトークンの取得
     const tokenResponse = await fetch('https://api.line.me/oauth2/v2.1/token', {
@@ -41,20 +26,15 @@ export async function GET(request: NextRequest) {
       },
       body: new URLSearchParams({
         grant_type: 'authorization_code',
-        code: code,
-        redirect_uri: baseCallbackUrl,
+        code,
+        redirect_uri: process.env.LINE_CALLBACK_URL!,
         client_id: process.env.LINE_CLIENT_ID!,
         client_secret: process.env.LINE_CLIENT_SECRET!,
-      }).toString(),
+      }),
     })
 
     const tokenData = await tokenResponse.json()
-    console.log('LINE token response:', tokenData)
-
-    if (tokenData.error) {
-      console.error('LINE token error:', tokenData)
-      throw new Error(`LINE認証エラー: ${tokenData.error_description || tokenData.error}`)
-    }
+    console.log('LINE token data:', tokenData)
 
     if (!tokenData.id_token) {
       throw new Error('LINE IDトークンの取得に失敗しました')
@@ -64,13 +44,8 @@ export async function GET(request: NextRequest) {
     const [headerB64, payloadB64] = tokenData.id_token.split('.')
     const payload = JSON.parse(Buffer.from(payloadB64, 'base64').toString())
     
-    // メールアドレスの必須チェック
-    if (!payload.email) {
-      throw new Error('メールアドレスが取得できませんでした。LINEアカウントにメールアドレスを登録してください。')
-    }
-
     const line_user_id = payload.sub
-    const email = payload.email
+    const email = payload.email || `line_${line_user_id}@line-auth.fake`
     const name = payload.name
 
     console.log('LINE user info:', { line_user_id, email, name })
@@ -83,58 +58,39 @@ export async function GET(request: NextRequest) {
       .single()
 
     let user = null
-    let session = null
     
     if (existingUser) {
-      // 既存ユーザーの場合
-      const { data, error: signInErr } = await supabase.auth.signInWithPassword({
+      // 既存ユーザーの場合は直接サインイン
+      console.log('Existing user found:', existingUser)
+      const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
         email: existingUser.email,
-        password: line_user_id
+        password: `line_${line_user_id}`
       })
       if (signInErr) throw signInErr
-      user = data.user
-      session = data.session
-
-      // メールアドレスが変更されている場合は更新
-      if (existingUser.email !== email) {
-        const { error: updateErr } = await supabase
-          .from('users')
-          .update({
-            email: email,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', user.id)
-
-        if (updateErr) throw updateErr
-      }
+      user = signInData.user
     } else {
       // 新規ユーザー作成
       console.log('Creating new user with:', { email, line_user_id })
       
       try {
-        const { data, error: signUpErr } = await supabase.auth.signUp({
+        // まずAuthユーザーを作成
+        const { data: newUser, error: newUserErr } = await supabase.auth.admin.createUser({
           email: email,
-          password: line_user_id,
-          options: {
-            data: { 
-              line_user_id,
-              line_email: email
-            },
-            emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`
-          }
+          password: `line_${line_user_id}`,
+          user_metadata: { line_user_id, line_email: email },
+          email_confirm: true
         })
         
-        if (signUpErr) {
-          console.error('Auth user creation error:', signUpErr)
-          throw signUpErr
+        if (newUserErr) {
+          console.error('Auth user creation error:', newUserErr)
+          throw newUserErr
         }
         
-        if (!data.user) {
-          throw new Error('ユーザーの作成に失敗しました')
+        if (!newUser || !newUser.user) {
+          throw new Error('認証ユーザーの作成に失敗しました')
         }
         
-        user = data.user
-        session = data.session
+        user = newUser.user
         console.log('Auth user created:', user)
 
         // usersテーブルに登録
@@ -151,6 +107,7 @@ export async function GET(request: NextRequest) {
 
         if (insertErr) {
           console.error('User profile creation error:', insertErr)
+          await supabase.auth.admin.deleteUser(user.id)
           throw insertErr
         }
 
@@ -161,56 +118,94 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    if (!session) {
-      throw new Error('セッションの作成に失敗しました')
-    }
-
-    // セッションの確認
-    console.log('Session created:', session)
-
-    // リダイレクト先の決定
-    const redirectPath = returnUrl || '/mypage'
-
-    // セッションクッキーの設定とリダイレクト
-    const domain = new URL(process.env.NEXT_PUBLIC_SITE_URL!).hostname
-    const cookieOptions = {
-      domain,
-      path: '/',
-      httpOnly: true,
-      secure: true,
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 7 // 7 days
-    }
-
-    console.log('Setting session cookies:', {
-      accessToken: session.access_token,
-      refreshToken: session.refresh_token,
-      domain: cookieOptions.domain,
-      path: cookieOptions.path
+    // セッション作成（新規・既存共通）
+    const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
+      email: user.email!,
+      password: `line_${line_user_id}`
     })
+    if (signInErr) throw signInErr
 
-    const headers = new Headers()
-    headers.append('Set-Cookie', [
-      `sb-access-token=${session.access_token}; Domain=${cookieOptions.domain}; Path=${cookieOptions.path}; HttpOnly; Secure; SameSite=Lax; Max-Age=${cookieOptions.maxAge}`,
-      `sb-refresh-token=${session.refresh_token}; Domain=${cookieOptions.domain}; Path=${cookieOptions.path}; HttpOnly; Secure; SameSite=Lax; Max-Age=${cookieOptions.maxAge}`
-    ].join(', '))
+    // returnToパラメータを取得
+    const returnTo = searchParams.get('returnTo')
+    // 許可されたリダイレクト先かチェック（セキュリティ対策）
+    const allowedPaths = ['/mypage', '/result', '/purchase-complete']
+    const redirectPath = returnTo && allowedPaths.some(path => returnTo.startsWith(path))
+      ? returnTo
+      : '/mypage'
 
-    return new Response(null, {
-      status: 302,
-      headers: {
-        ...Object.fromEntries(headers.entries()),
-        Location: new URL(redirectPath, process.env.NEXT_PUBLIC_SITE_URL).toString()
-      }
-    })
+    // vendor_ordersテーブルのuser_idを更新
+    try {
+      // ローカルストレージから購入情報を取得するためのスクリプトを追加
+      const purchaseFlowScript = `
+        const purchaseFlow = localStorage.getItem('purchaseFlow');
+        if (purchaseFlow) {
+          try {
+            const { consultation_id } = JSON.parse(purchaseFlow);
+            console.log('Updating user_id for consultation:', consultation_id);
+            fetch('/api/orders/update-user', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                user_id: '${user.id}',
+                consultation_id
+              })
+            })
+            .then(response => response.json())
+            .then(data => {
+              console.log('Update response:', data);
+              if (data.error) {
+                console.error('Update failed:', data.error);
+              }
+            })
+            .catch(error => {
+              console.error('Update request failed:', error);
+            });
+          } catch (error) {
+            console.error('Error processing purchaseFlow:', error);
+          }
+          localStorage.removeItem('purchaseFlow');
+        } else {
+          console.log('No purchaseFlow found in localStorage');
+        }
+      `;
+
+      const redirectUrl = new URL(redirectPath, request.url)
+
+      // セッショントークンをlocalStorageに保存し、vendor_ordersの更新を行うスクリプトを返す
+      const html = `
+        <!DOCTYPE html>
+        <html>
+          <script>
+            const session = ${JSON.stringify(signInData.session)};
+            const projectRef = '${process.env.NEXT_PUBLIC_SUPABASE_URL!.match(/(?:https:\/\/)?([^.]+)/)?.[1] ?? ''}';
+            localStorage.setItem(\`sb-\${projectRef}-auth-token\`, JSON.stringify({
+              access_token: session.access_token,
+              refresh_token: session.refresh_token,
+              expires_at: Math.floor(Date.now() / 1000) + ${60 * 60 * 24 * 7},
+              expires_in: ${60 * 60 * 24 * 7},
+              token_type: 'bearer',
+              user: session.user
+            }));
+            ${purchaseFlowScript}
+            window.location.href = '${redirectUrl}';
+          </script>
+        </html>
+      `
+
+      return new NextResponse(html, {
+        headers: { 'Content-Type': 'text/html' }
+      })
+
+    } catch (error) {
+      console.error('Error updating vendor_orders:', error)
+      // エラーが発生しても認証自体は成功しているので、リダイレクトは続行
+      return NextResponse.redirect(new URL(redirectPath, request.url))
+    }
 
   } catch (error) {
-    console.error('Error in callback route:', error)
-    const errorMessage = encodeURIComponent(error instanceof Error ? error.message : '認証に失敗しました')
-    return new Response(null, {
-      status: 302,
-      headers: {
-        Location: `${process.env.NEXT_PUBLIC_SITE_URL}/login?error=${errorMessage}`
-      }
-    })
+    console.error('Callback error:', error)
+    return NextResponse.redirect(new URL('/login?error=auth_failed', request.url))
   }
 }
