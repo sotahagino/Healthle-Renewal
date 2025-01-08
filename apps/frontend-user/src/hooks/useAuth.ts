@@ -231,6 +231,12 @@ export function useAuth() {
       })
 
       if (error) throw error
+      if (!data.user) throw new Error('ユーザー情報の更新に失敗しました')
+
+      // セッションを取得
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+      if (sessionError) throw sessionError
+      if (!session) throw new Error('セッションの取得に失敗しました')
 
       // ユーザーデータを更新
       const { error: updateError } = await supabase
@@ -245,7 +251,7 @@ export function useAuth() {
       if (updateError) throw updateError
 
       setIsGuestUser(false)
-      return data
+      return { user: data.user, session }
     } catch (error) {
       console.error('Migration error:', error)
       setAuthError(error as Error)
