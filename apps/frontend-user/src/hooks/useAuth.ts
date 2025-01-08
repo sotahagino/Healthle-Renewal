@@ -1,15 +1,14 @@
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
-import { Provider } from '@supabase/supabase-js'
+import { Provider, User as SupabaseUser } from '@supabase/supabase-js'
 
 // シングルトンインスタンスを作成
 const supabase = createClientComponentClient()
 
-interface CustomUser {
-  id: string
-  is_guest: boolean
-  [key: string]: any
+interface CustomUser extends SupabaseUser {
+  is_guest: boolean;
+  [key: string]: any;
 }
 
 export type AuthContextType = {
