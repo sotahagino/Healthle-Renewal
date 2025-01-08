@@ -15,11 +15,13 @@ export default function Login() {
   const { user, loading } = useAuth()
 
   useEffect(() => {
-    if (!loading && user) {
-      console.log('Redirecting to mypage...')
-      window.location.replace('/mypage')
+    if (!loading) {
+      if (user && !user.is_guest) {
+        console.log('Redirecting to mypage...')
+        router.push('/mypage')
+      }
     }
-  }, [user, loading])
+  }, [user, loading, router])
 
   const handleLogin = () => {
     if (lineLoginUrl) {
@@ -43,7 +45,7 @@ export default function Login() {
     )
   }
 
-  if (user) {
+  if (user && !user.is_guest) {
     return null
   }
 
