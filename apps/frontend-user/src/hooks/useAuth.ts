@@ -215,6 +215,46 @@ export function useAuth() {
     }
   }
 
+  const migrateGuestToRegular = async (email: string, password: string) => {
+    try {
+      setLoading(true)
+      setAuthError(null)
+
+      if (!user || !isGuestUser) {
+        throw new Error('ゲストユーザーでログインしている必要があります')
+      }
+
+      // メールアドレスとパスワードを更新
+      const { data, error } = await supabase.auth.updateUser({
+        email,
+        password
+      })
+
+      if (error) throw error
+
+      // ユーザーデータを更新
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({
+          email,
+          is_guest: false,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', user.id)
+
+      if (updateError) throw updateError
+
+      setIsGuestUser(false)
+      return data
+    } catch (error) {
+      console.error('Migration error:', error)
+      setAuthError(error as Error)
+      throw error
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return {
     user,
     loading,
@@ -222,6 +262,7 @@ export function useAuth() {
     authError,
     login,
     logout,
-    loginAsGuest
+    loginAsGuest,
+    migrateGuestToRegular
   }
 } 
