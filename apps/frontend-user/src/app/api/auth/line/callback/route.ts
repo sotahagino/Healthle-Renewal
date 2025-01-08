@@ -173,24 +173,57 @@ export async function GET(request: NextRequest) {
 
       const redirectUrl = new URL(redirectPath, request.url)
 
-      // セッショントークンをlocalStorageに保存し、vendor_ordersの更新を行うスクリプトを返す
+      // セッショントークンをlocalStorageに保存し、即座にリダイレクトするスクリプトを返す
       const html = `
         <!DOCTYPE html>
         <html>
-          <script>
-            const session = ${JSON.stringify(signInData.session)};
-            const projectRef = '${process.env.NEXT_PUBLIC_SUPABASE_URL!.match(/(?:https:\/\/)?([^.]+)/)?.[1] ?? ''}';
-            localStorage.setItem(\`sb-\${projectRef}-auth-token\`, JSON.stringify({
-              access_token: session.access_token,
-              refresh_token: session.refresh_token,
-              expires_at: Math.floor(Date.now() / 1000) + ${60 * 60 * 24 * 7},
-              expires_in: ${60 * 60 * 24 * 7},
-              token_type: 'bearer',
-              user: session.user
-            }));
-            ${purchaseFlowScript}
-            window.location.href = '${redirectUrl}';
-          </script>
+          <head>
+            <title>Redirecting...</title>
+          </head>
+          <body>
+            <script>
+              const session = ${JSON.stringify(signInData.session)};
+              const projectRef = '${process.env.NEXT_PUBLIC_SUPABASE_URL!.match(/(?:https:\/\/)?([^.]+)/)?.[1] ?? ''}';
+              
+              // セッション情報を保存
+              localStorage.setItem(\`sb-\${projectRef}-auth-token\`, JSON.stringify({
+                access_token: session.access_token,
+                refresh_token: session.refresh_token,
+                expires_at: Math.floor(Date.now() / 1000) + ${60 * 60 * 24 * 7},
+                expires_in: ${60 * 60 * 24 * 7},
+                token_type: 'bearer',
+                user: session.user
+              }));
+
+              // 購入フロー情報の更新
+              const purchaseFlow = localStorage.getItem('purchaseFlow');
+              if (purchaseFlow) {
+                try {
+                  const { consultation_id } = JSON.parse(purchaseFlow);
+                  fetch('/api/orders/update-user', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                      user_id: '${signInData.session.user.id}',
+                      consultation_id
+                    })
+                  }).then(() => {
+                    localStorage.removeItem('purchaseFlow');
+                    window.location.href = '${redirectUrl}';
+                  }).catch(() => {
+                    window.location.href = '${redirectUrl}';
+                  });
+                } catch (error) {
+                  window.location.href = '${redirectUrl}';
+                }
+              } else {
+                window.location.href = '${redirectUrl}';
+              }
+            </script>
+            <p>リダイレクト中...</p>
+          </body>
         </html>
       `
 

@@ -16,9 +16,9 @@ export default function Login() {
 
   useEffect(() => {
     if (user) {
-      router.push('/mypage')
+      window.location.href = '/mypage'
     }
-  }, [user, router])
+  }, [user])
 
   const handleLogin = () => {
     if (lineLoginUrl) {
