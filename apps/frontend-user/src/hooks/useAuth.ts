@@ -3,6 +3,16 @@ import { useRouter } from 'next/navigation'
 import { getSupabaseClient } from '@/utils/supabase'
 import { User } from '@supabase/supabase-js'
 
+// ゲストユーザー用のメールアドレスと暗号化されたパスワードを生成
+const generateGuestCredentials = () => {
+  const timestamp = new Date().getTime()
+  const random = Math.random().toString(36).substring(2, 15)
+  return {
+    email: `guest_${timestamp}_${random}@healthle.temp`,
+    password: `guest_${timestamp}_${random}_${Math.random().toString(36).substring(2, 15)}`
+  }
+}
+
 export function useAuth() {
   const router = useRouter()
   const [user, setUser] = useState<User | null>(null)
@@ -135,6 +145,58 @@ export function useAuth() {
     }
   }
 
+  const loginAsGuest = async () => {
+    try {
+      setLoading(true)
+      setAuthError(null)
+
+      // ゲストユーザーの認証情報を生成
+      const { email, password } = generateGuestCredentials()
+
+      // ゲストユーザーを作成
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            is_guest: true
+          }
+        }
+      })
+
+      if (signUpError) throw signUpError
+      if (!signUpData.user) throw new Error('ゲストユーザーの作成に失敗しました')
+
+      // ユーザーデータを作成
+      const { error: insertError } = await supabase
+        .from('users')
+        .insert([{
+          id: signUpData.user.id,
+          email: email,
+          is_guest: true,
+          created_at: new Date().toISOString()
+        }])
+
+      if (insertError) throw insertError
+
+      // 自動的にログイン
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      })
+
+      if (signInError) throw signInError
+
+      return signInData
+    } catch (error) {
+      console.error('Guest login error:', error)
+      setAuthError(error as Error)
+      throw error
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const logout = async () => {
     try {
       setLoading(true)
@@ -159,6 +221,7 @@ export function useAuth() {
     isGuestUser,
     authError,
     login,
-    logout
+    logout,
+    loginAsGuest
   }
 } 

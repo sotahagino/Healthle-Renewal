@@ -13,6 +13,10 @@ interface AuthContextType {
     weakPassword?: WeakPassword
   } | null>
   logout: () => Promise<void>
+  loginAsGuest: () => Promise<{
+    user: User
+    session: Session
+  } | null>
 }
 
 export const AuthContext = createContext<AuthContextType>({
@@ -21,7 +25,8 @@ export const AuthContext = createContext<AuthContextType>({
   isGuestUser: false,
   authError: null,
   login: async () => null,
-  logout: async () => {}
+  logout: async () => {},
+  loginAsGuest: async () => null
 })
 
 export const useAuth = () => {
