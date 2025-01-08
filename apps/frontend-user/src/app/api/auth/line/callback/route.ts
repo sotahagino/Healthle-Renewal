@@ -13,6 +13,15 @@ export async function GET(request: NextRequest) {
     const code = searchParams.get('code')
     const returnTo = searchParams.get('returnTo')
     
+    // デバッグログを追加
+    console.log('Callback Debug Info:', {
+      code,
+      returnTo,
+      requestUrl: request.url,
+      callbackUrl: process.env.LINE_CALLBACK_URL,
+      fullParams: Object.fromEntries(searchParams.entries())
+    })
+
     if (!code) {
       throw new Error('No code provided')
     }
@@ -27,15 +36,20 @@ export async function GET(request: NextRequest) {
       },
       body: new URLSearchParams({
         grant_type: 'authorization_code',
-        code,
+        code: code,
         redirect_uri: process.env.LINE_CALLBACK_URL!,
         client_id: process.env.LINE_CLIENT_ID!,
         client_secret: process.env.LINE_CLIENT_SECRET!,
-      }),
+      }).toString(),
     })
 
     const tokenData = await tokenResponse.json()
-    console.log('LINE token data:', tokenData)
+    console.log('LINE token response:', tokenData)
+
+    if (tokenData.error) {
+      console.error('LINE token error:', tokenData)
+      throw new Error(`LINE token error: ${tokenData.error_description || tokenData.error}`)
+    }
 
     if (!tokenData.id_token) {
       throw new Error('Failed to get LINE id_token')
