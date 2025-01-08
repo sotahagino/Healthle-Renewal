@@ -9,17 +9,24 @@ import { Footer } from '@/components/footer'
 export default function MyPage() {
   const router = useRouter()
   const { user, loading } = useAuth()
+  const [isInitialized, setIsInitialized] = useState(false)
 
   useEffect(() => {
-    if (!loading) {
+    console.log('MyPage useEffect - Current state:', { user, loading, isInitialized })
+    
+    // 初期化が完了し、かつloadingがfalseになった時のみリダイレクトを判断
+    if (!loading && !isInitialized) {
+      setIsInitialized(true)
       if (!user || user.is_guest) {
-        console.log('Redirecting to login...')
+        console.log('MyPage - Redirecting to login due to:', { user, loading })
         router.push('/login')
       }
     }
-  }, [user, loading, router])
+  }, [user, loading, router, isInitialized])
 
-  if (loading) {
+  // ローディング中は読み込み画面を表示
+  if (loading || !isInitialized) {
+    console.log('MyPage - Showing loading state')
     return (
       <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#E6F3EF] to-white">
         <SiteHeader />
@@ -33,15 +40,37 @@ export default function MyPage() {
     )
   }
 
+  // 未認証またはゲストユーザーの場合は何も表示しない
   if (!user || user.is_guest) {
+    console.log('MyPage - User not authorized:', { user })
     return null
   }
 
+  // 認証済みユーザーの場合はマイページを表示
+  console.log('MyPage - Rendering content for user:', user)
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#E6F3EF] to-white">
       <SiteHeader />
       <main className="flex-grow container mx-auto px-4 py-12 mt-16">
-        {/* マイページのコンテンツ */}
+        <h1 className="text-2xl font-bold mb-4">マイページ</h1>
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="space-y-4">
+            <p className="text-lg">ようこそ {user.email || 'ゲスト'} さん</p>
+            <div className="border-t pt-4">
+              <h2 className="text-xl font-semibold mb-2">アカウント情報</h2>
+              <dl className="space-y-2">
+                <div>
+                  <dt className="text-gray-600">メールアドレス</dt>
+                  <dd>{user.email}</dd>
+                </div>
+                <div>
+                  <dt className="text-gray-600">アカウントタイプ</dt>
+                  <dd>{user.is_guest ? 'ゲストユーザー' : '正規ユーザー'}</dd>
+                </div>
+              </dl>
+            </div>
+          </div>
+        </div>
       </main>
       <Footer />
     </div>
