@@ -8,31 +8,30 @@ if (
   throw new Error('Missing Supabase environment variables')
 }
 
-let supabaseClient: ReturnType<typeof createClient<Database>> | null = null
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-export function getSupabaseClient() {
-  if (!supabaseClient) {
-    supabaseClient = createClient<Database>(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-      {
-        auth: {
-          persistSession: true,
-          autoRefreshToken: true,
-          detectSessionInUrl: true
-        }
-      }
-    )
+// シングルトンインスタンスを作成
+const supabaseClient = createClient<Database>(
+  supabaseUrl,
+  supabaseAnonKey,
+  {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true
+    }
   }
-  return supabaseClient
-}
+)
 
-export const supabase = getSupabaseClient()
+export const getSupabaseClient = () => supabaseClient
+
+export const supabase = supabaseClient
 
 // サービスロール用クライアント
 export const serviceClient = process.env.SUPABASE_SERVICE_ROLE_KEY
   ? createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      supabaseUrl,
       process.env.SUPABASE_SERVICE_ROLE_KEY,
       {
         auth: {
