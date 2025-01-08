@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
     })
 
     if (!code) {
-      throw new Error('No code provided')
+      throw new Error('�証コードが提供されていません')
     }
 
     console.log('Getting LINE token with code:', code)
@@ -53,19 +53,24 @@ export async function GET(request: NextRequest) {
 
     if (tokenData.error) {
       console.error('LINE token error:', tokenData)
-      throw new Error(`LINE token error: ${tokenData.error_description || tokenData.error}`)
+      throw new Error(`LINE認証エラー: ${tokenData.error_description || tokenData.error}`)
     }
 
     if (!tokenData.id_token) {
-      throw new Error('Failed to get LINE id_token')
+      throw new Error('LINE IDトークンの取得に失敗しました')
     }
 
     // id_tokenの検証とデコード
     const [headerB64, payloadB64] = tokenData.id_token.split('.')
     const payload = JSON.parse(Buffer.from(payloadB64, 'base64').toString())
     
+    // メールアドレスの必須チェック
+    if (!payload.email) {
+      throw new Error('メールアドレスが取得できませんでした。LINEアカウントにメールアドレスを登録してください。')
+    }
+
     const line_user_id = payload.sub
-    const email = payload.email || `line_${line_user_id}@line-auth.fake`
+    const email = payload.email
     const name = payload.name
 
     console.log('LINE user info:', { line_user_id, email, name })
@@ -81,24 +86,35 @@ export async function GET(request: NextRequest) {
     let session = null
     
     if (existingUser) {
-      // 既存ユーザーの場合は直接サインイン
-      console.log('Existing user found:', existingUser)
+      // 既存ユーザーの場合
       const { data, error: signInErr } = await supabase.auth.signInWithPassword({
         email: existingUser.email,
-        password: `line_${line_user_id}`
+        password: line_user_id
       })
       if (signInErr) throw signInErr
       user = data.user
       session = data.session
+
+      // メールアドレスが変更されている場合は更新
+      if (existingUser.email !== email) {
+        const { error: updateErr } = await supabase
+          .from('users')
+          .update({
+            email: email,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', user.id)
+
+        if (updateErr) throw updateErr
+      }
     } else {
       // 新規ユーザー作成
       console.log('Creating new user with:', { email, line_user_id })
       
       try {
-        // 新規ユーザーの作成とサインアップ
         const { data, error: signUpErr } = await supabase.auth.signUp({
           email: email,
-          password: `line_${line_user_id}`,
+          password: line_user_id,
           options: {
             data: { 
               line_user_id,
@@ -114,7 +130,7 @@ export async function GET(request: NextRequest) {
         }
         
         if (!data.user) {
-          throw new Error('Failed to create auth user')
+          throw new Error('ユーザーの作成に失敗しました')
         }
         
         user = data.user
@@ -135,7 +151,6 @@ export async function GET(request: NextRequest) {
 
         if (insertErr) {
           console.error('User profile creation error:', insertErr)
-          // ユーザー削除は不要（signUpを使用しているため）
           throw insertErr
         }
 
@@ -147,33 +162,11 @@ export async function GET(request: NextRequest) {
     }
 
     if (!session) {
-      throw new Error('No session created')
+      throw new Error('セッションの作成に失敗しました')
     }
 
     // セッションの確認
     console.log('Session created:', session)
-
-    // ゲストユーザーデータの移行
-    const guestUser = searchParams.get('guest_user_id') || 
-      (typeof window !== 'undefined' ? 
-        JSON.parse(localStorage.getItem('healthle_guest_user') || '{}').id : 
-        null)
-
-    if (guestUser) {
-      console.log('Migrating guest user data:', { guestUser, newUserId: user!.id })
-      
-      // トランザクションの開始
-      const { error: trxErr } = await supabase.rpc('migrate_guest_user_data', {
-        p_guest_user_id: guestUser,
-        p_new_user_id: user!.id
-      })
-      
-      if (trxErr) {
-        console.error('Failed to migrate guest user data:', trxErr)
-      } else {
-        console.log('Guest user data migration completed')
-      }
-    }
 
     // リダイレクト先の決定
     const redirectPath = returnUrl || '/mypage'
@@ -212,6 +205,12 @@ export async function GET(request: NextRequest) {
 
   } catch (error) {
     console.error('Error in callback route:', error)
-    return new Response('Error in callback route', { status: 500 })
+    const errorMessage = encodeURIComponent(error instanceof Error ? error.message : '認証に失敗しました')
+    return new Response(null, {
+      status: 302,
+      headers: {
+        Location: `${process.env.NEXT_PUBLIC_SITE_URL}/login?error=${errorMessage}`
+      }
+    })
   }
 }

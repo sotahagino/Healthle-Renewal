@@ -25,7 +25,7 @@ export default function LoginModal({
   isGuestUser = false
 }: LoginModalProps) {
   const [isLoading, setIsLoading] = useState(false)
-  const { user } = useAuth()
+  const { user, initiateLineLogin } = useAuth()
 
   // ゲストユーザーの場合、ESCキーとクリックでの閉じる操作を無効化
   const handleClose = () => {
@@ -34,33 +34,15 @@ export default function LoginModal({
     }
   }
 
-  const handleLineLogin = () => {
+  const handleLineLogin = async () => {
     setIsLoading(true)
     try {
-      // ゲストユーザー情報をローカルストレージに保存
-      if (isGuestUser) {
-        localStorage.setItem('convertGuestAccount', 'true');
-      }
-
-      // ランダムなstateを生成
-      const state = Array.from(crypto.getRandomValues(new Uint8Array(32)))
-        .map(b => b.toString(16).padStart(2, '0'))
-        .join('');
-      
-      // stateをLocalStorageに保存
-      localStorage.setItem('line_login_state', state);
-
-      const lineLoginUrl = new URL(`${process.env.NEXT_PUBLIC_SITE_URL}/api/auth/line`);
-      lineLoginUrl.searchParams.append('state', state);
-      lineLoginUrl.searchParams.append('return_url', '/purchase-complete');
-
-      console.log('Redirecting to LINE login:', lineLoginUrl.toString());
-      window.location.href = lineLoginUrl.toString();
+      await initiateLineLogin()
     } catch (error) {
-      console.error('LINE login error:', error);
-      setIsLoading(false);
+      console.error('LINE login error:', error)
+      setIsLoading(false)
     }
-  };
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>

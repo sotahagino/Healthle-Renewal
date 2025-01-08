@@ -274,6 +274,29 @@ export function useAuth() {
     }
   }
 
+  const initiateLineLogin = () => {
+    try {
+      // ランダムなstateを生成
+      const state = Array.from(crypto.getRandomValues(new Uint8Array(32)))
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('');
+      
+      // stateをLocalStorageに保存
+      localStorage.setItem('line_login_state', state);
+
+      // LINE認証URLの構築
+      const lineLoginUrl = new URL(`${process.env.NEXT_PUBLIC_SITE_URL}/api/auth/line`);
+      lineLoginUrl.searchParams.append('state', state);
+      lineLoginUrl.searchParams.append('return_url', window.location.pathname);
+
+      // LINE認証ページへリダイレクト
+      window.location.href = lineLoginUrl.toString();
+    } catch (error) {
+      console.error('LINE login initialization error:', error);
+      throw error;
+    }
+  };
+
   return {
     user,
     loading,
@@ -282,6 +305,7 @@ export function useAuth() {
     login,
     logout,
     loginAsGuest,
-    migrateGuestToRegular
+    migrateGuestToRegular,
+    initiateLineLogin
   }
 } 
