@@ -194,16 +194,24 @@ export async function GET(request: NextRequest) {
     const redirectPath = returnUrl || '/mypage'
 
     // セッションクッキーの設定とリダイレクト
-    const response = Response.redirect(new URL(redirectPath, process.env.NEXT_PUBLIC_SITE_URL))
     if (signInData.session) {
       const { data: { session } } = await supabase.auth.setSession(signInData.session)
       if (session) {
-        response.headers.set('Set-Cookie', `sb-access-token=${session.access_token}; Path=/; HttpOnly; Secure; SameSite=Lax`)
-        response.headers.set('Set-Cookie', `sb-refresh-token=${session.refresh_token}; Path=/; HttpOnly; Secure; SameSite=Lax`)
+        const headers = new Headers()
+        headers.append('Set-Cookie', `sb-access-token=${session.access_token}; Path=/; HttpOnly; Secure; SameSite=Lax`)
+        headers.append('Set-Cookie', `sb-refresh-token=${session.refresh_token}; Path=/; HttpOnly; Secure; SameSite=Lax`)
+        
+        return new Response(null, {
+          status: 302,
+          headers: {
+            ...headers,
+            Location: new URL(redirectPath, process.env.NEXT_PUBLIC_SITE_URL).toString()
+          }
+        })
       }
     }
 
-    return response
+    return Response.redirect(new URL(redirectPath, process.env.NEXT_PUBLIC_SITE_URL))
 
   } catch (error) {
     console.error('Error in callback route:', error)
