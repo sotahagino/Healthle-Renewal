@@ -26,11 +26,13 @@ export default function RootLayout({
       // セッション変更のリスナーを設定
       const {
         data: { subscription },
-      } = supabase.auth.onAuthStateChange((event, session) => {
-        console.log('Auth state changed:', event, session)
+      } = supabase.auth.onAuthStateChange((_event, session) => {
+        console.log('Auth state changed:', _event, session?.user?.id)
       })
 
-      return () => subscription.unsubscribe()
+      return () => {
+        subscription.unsubscribe()
+      }
     }
 
     checkSession()

@@ -65,7 +65,6 @@ export function useAuth() {
                 email: session.user.email,
                 created_at: new Date().toISOString()
               }])
-              .single()
 
             if (insertError) {
               throw insertError
@@ -76,12 +75,7 @@ export function useAuth() {
         }
 
         if (mounted) {
-          const userWithMetadata = {
-            ...session.user,
-            ...userData,
-            is_guest: userData?.is_guest ?? false
-          }
-          setUser(userWithMetadata)
+          setUser(session.user)
           setIsGuestUser(userData?.is_guest ?? false)
           setLoading(false)
           setAuthError(null)
@@ -135,6 +129,22 @@ export function useAuth() {
 
       if (error) throw error
 
+      // セッションを確認
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+      if (sessionError) throw sessionError
+      if (!session) throw new Error('セッションの取得に失敗しました')
+
+      // ユーザーデータを取得
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', data.user.id)
+        .single()
+
+      if (userError && userError.code !== 'PGRST116') throw userError
+
+      setUser(data.user)
+      setIsGuestUser(userData?.is_guest ?? false)
       return data
     } catch (error) {
       console.error('Login error:', error)
@@ -187,6 +197,8 @@ export function useAuth() {
 
       if (signInError) throw signInError
 
+      setUser(signInData.user)
+      setIsGuestUser(true)
       return signInData
     } catch (error) {
       console.error('Guest login error:', error)
@@ -250,6 +262,7 @@ export function useAuth() {
 
       if (updateError) throw updateError
 
+      setUser(data.user)
       setIsGuestUser(false)
       return { user: data.user, session }
     } catch (error) {
