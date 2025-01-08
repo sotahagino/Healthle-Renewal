@@ -116,3 +116,10 @@ CREATE TABLE IF NOT EXISTS user_migration_logs (
   FOREIGN KEY (old_user_id) REFERENCES users(id),
   FOREIGN KEY (new_user_id) REFERENCES users(id)
 ); 
+
+-- consultationsテーブルのuser_id外部キー制約を削除
+ALTER TABLE consultations
+DROP CONSTRAINT IF EXISTS consultations_user_id_fkey;
+
+-- user_idにインデックスを追加（パフォーマンス向上のため）
+CREATE INDEX IF NOT EXISTS idx_consultations_user_id ON consultations(user_id); 

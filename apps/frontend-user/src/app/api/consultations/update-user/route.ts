@@ -33,34 +33,42 @@ export async function POST(req: NextRequest) {
       }, { status: 400 })
     }
 
-    console.log('Updating consultations for user:', {
+    console.log('Starting user data migration:', {
       old_user_id: oldUserId,
-      new_user_id: user_id
+      new_user_id: user_id,
+      timestamp: new Date().toISOString()
     })
 
-    // consultationsテーブルの更新
-    const { error: updateError } = await serviceClient
-      .from('consultations')
-      .update({ user_id: user_id })
-      .eq('user_id', oldUserId)
+    // トランザクションの開始
+    const { error: migrationError } = await serviceClient.rpc(
+      'migrate_guest_user_data',
+      {
+        p_guest_user_id: oldUserId,
+        p_new_user_id: user_id
+      }
+    )
 
-    if (updateError) {
-      console.error('Failed to update consultations:', updateError)
+    if (migrationError) {
+      console.error('Migration failed:', migrationError)
       return NextResponse.json({ 
-        error: '相談履歴の更新に失敗しました',
-        details: updateError.message 
+        error: 'ユーザーデータの移行に失敗しました',
+        details: migrationError.message 
       }, { status: 500 })
     }
 
-    console.log('Successfully updated consultations')
+    console.log('Migration completed successfully:', {
+      old_user_id: oldUserId,
+      new_user_id: user_id,
+      timestamp: new Date().toISOString()
+    })
     
     return NextResponse.json({
       success: true,
-      message: '相談履歴を更新しました'
+      message: 'ユーザーデータを正常に移行しました'
     })
     
   } catch (error) {
-    console.error('Unexpected error:', error)
+    console.error('Unexpected error during migration:', error)
     return NextResponse.json({ 
       error: '予期せぬエラーが発生しました',
       details: error instanceof Error ? error.message : String(error)
