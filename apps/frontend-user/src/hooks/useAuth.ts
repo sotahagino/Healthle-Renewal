@@ -31,6 +31,9 @@ export function useAuth(): AuthContextType {
   const router = useRouter()
 
   useEffect(() => {
+    let mounted = true
+    let authSubscription: { unsubscribe: () => void } | null = null
+
     const initializeAuth = async () => {
       try {
         console.log('Initializing auth...')
@@ -56,50 +59,73 @@ export function useAuth(): AuthContextType {
             throw userError
           }
 
-          console.log('User data fetched successfully')
-          setUser(userData)
-        } else {
+          if (mounted) {
+            console.log('User data fetched successfully')
+            setUser(userData)
+          }
+        } else if (mounted) {
           console.log('No session found, setting user to null')
           setUser(null)
         }
       } catch (error) {
         console.error('Auth initialization error:', error)
-        setUser(null)
+        if (mounted) {
+          setUser(null)
+          setAuthError(error instanceof Error ? error : new Error('認証の初期化に失敗しました'))
+        }
       } finally {
-        console.log('Auth initialization completed')
-        setLoading(false)
+        if (mounted) {
+          console.log('Auth initialization completed')
+          setLoading(false)
+        }
       }
     }
 
-    initializeAuth()
+    const setupAuthSubscription = () => {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+        console.log('Auth state changed:', event, session?.user?.id)
+        
+        if (!mounted) return
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth state changed:', event)
-      if (session?.user) {
-        console.log('Fetching updated user data...')
-        const { data: userData, error: userError } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', session.user.id)
-          .single()
+        if (session?.user) {
+          try {
+            console.log('Fetching updated user data...')
+            const { data: userData, error: userError } = await supabase
+              .from('users')
+              .select('*')
+              .eq('id', session.user.id)
+              .single()
 
-        if (userError) {
-          console.error('User data error on state change:', userError)
+            if (userError) {
+              console.error('User data error on state change:', userError)
+              return
+            }
+
+            if (mounted) {
+              console.log('User data updated successfully')
+              setUser(userData)
+            }
+          } catch (error) {
+            console.error('Error updating user data:', error)
+          }
+        } else if (mounted) {
+          console.log('No session in state change, setting user to null')
           setUser(null)
-        } else {
-          console.log('User data updated successfully')
-          setUser(userData)
         }
-      } else {
-        console.log('No session in state change, setting user to null')
-        setUser(null)
-      }
-      setLoading(false)
-    })
+      })
+
+      authSubscription = subscription
+    }
+
+    initializeAuth()
+    setupAuthSubscription()
 
     return () => {
-      console.log('Cleaning up auth subscription')
-      subscription.unsubscribe()
+      mounted = false
+      if (authSubscription) {
+        console.log('Cleaning up auth subscription')
+        authSubscription.unsubscribe()
+      }
     }
   }, [])
 
