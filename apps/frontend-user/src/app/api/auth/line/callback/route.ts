@@ -33,6 +33,10 @@ export async function GET(request: NextRequest) {
 
     console.log('Getting LINE token with code:', code)
 
+    // コールバックURLの処理を修正
+    const callbackUrl = process.env.LINE_CALLBACK_URL!
+    console.log('Using callback URL:', callbackUrl)
+
     // LINEトークンの取得
     const tokenResponse = await fetch('https://api.line.me/oauth2/v2.1/token', {
       method: 'POST',
@@ -42,7 +46,7 @@ export async function GET(request: NextRequest) {
       body: new URLSearchParams({
         grant_type: 'authorization_code',
         code: code,
-        redirect_uri: baseCallbackUrl,
+        redirect_uri: callbackUrl,
         client_id: process.env.LINE_CLIENT_ID!,
         client_secret: process.env.LINE_CLIENT_SECRET!,
       }).toString(),
