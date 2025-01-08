@@ -145,11 +145,65 @@ export async function GET(request: NextRequest) {
     })
     if (signInErr) throw signInErr
 
+    // セッションの確認
+    console.log('Session created:', signInData.session)
+
+    // ゲストユーザーデータの移行
+    if (returnUrl?.includes('purchase-complete')) {
+      const guestUserId = searchParams.get('guest_user_id')
+      if (guestUserId) {
+        console.log('Migrating guest user data:', { guestUserId, newUserId: user!.id })
+        
+        // vendor_ordersの更新
+        const { error: orderErr } = await supabase
+          .from('vendor_orders')
+          .update({ user_id: user!.id })
+          .eq('user_id', guestUserId)
+        
+        if (orderErr) {
+          console.error('Failed to update vendor_orders:', orderErr)
+        }
+
+        // consultationsの更新
+        const { error: consultErr } = await supabase
+          .from('consultations')
+          .update({ user_id: user!.id })
+          .eq('user_id', guestUserId)
+        
+        if (consultErr) {
+          console.error('Failed to update consultations:', consultErr)
+        }
+
+        // ゲストユーザーの移行状態を更新
+        const { error: guestErr } = await supabase
+          .from('users')
+          .update({ 
+            migrated_to: user!.id,
+            migrated_at: new Date().toISOString(),
+            migration_status: 'migrated'
+          })
+          .eq('id', guestUserId)
+        
+        if (guestErr) {
+          console.error('Failed to update guest user status:', guestErr)
+        }
+      }
+    }
+
     // リダイレクト先の決定
     const redirectPath = returnUrl || '/mypage'
 
-    // リダイレクト
-    return Response.redirect(new URL(redirectPath, process.env.NEXT_PUBLIC_SITE_URL))
+    // セッションクッキーの設定とリダイレクト
+    const response = Response.redirect(new URL(redirectPath, process.env.NEXT_PUBLIC_SITE_URL))
+    if (signInData.session) {
+      const { data: { session } } = await supabase.auth.setSession(signInData.session)
+      if (session) {
+        response.headers.set('Set-Cookie', `sb-access-token=${session.access_token}; Path=/; HttpOnly; Secure; SameSite=Lax`)
+        response.headers.set('Set-Cookie', `sb-refresh-token=${session.refresh_token}; Path=/; HttpOnly; Secure; SameSite=Lax`)
+      }
+    }
+
+    return response
 
   } catch (error) {
     console.error('Error in callback route:', error)
