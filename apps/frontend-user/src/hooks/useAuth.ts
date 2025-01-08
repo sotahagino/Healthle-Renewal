@@ -235,21 +235,78 @@ export function useAuth(): AuthContextType {
     }
   }
 
+  const migrateGuestData = async (oldUserId: string, newUserId: string) => {
+    try {
+      // vendor_ordersテーブルの更新
+      const { error: ordersError } = await supabase
+        .from('vendor_orders')
+        .update({ user_id: newUserId })
+        .eq('user_id', oldUserId);
+
+      if (ordersError) throw ordersError;
+
+      // consultationsテーブルの更新
+      const { error: consultationsError } = await supabase
+        .from('consultations')
+        .update({ user_id: newUserId })
+        .eq('user_id', oldUserId);
+
+      if (consultationsError) throw consultationsError;
+
+      console.log('Successfully migrated guest data to regular account');
+    } catch (error) {
+      console.error('Error migrating guest data:', error);
+      throw error;
+    }
+  };
+
   const login = async () => {
     try {
+      // ゲストユーザーのIDを保存
+      const currentUserId = user?.id;
+      const wasGuest = user?.is_guest;
+
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'line' as Provider,
         options: {
           redirectTo: `${window.location.origin}/api/auth/line/callback`,
         },
-      })
-      if (error) throw error
-      return data
+      });
+
+      if (error) throw error;
+
+      // ログイン後のコールバックで使用するためにローカルストレージに保存
+      if (wasGuest && currentUserId) {
+        localStorage.setItem('previousGuestId', currentUserId);
+      }
+
+      return data;
     } catch (error) {
-      console.error('Login error:', error)
-      throw error
+      console.error('Login error:', error);
+      throw error;
     }
-  }
+  };
+
+  // LINE認証コールバック後のデータ移行処理
+  useEffect(() => {
+    const migratePreviousGuestData = async () => {
+      const previousGuestId = localStorage.getItem('previousGuestId');
+      
+      if (previousGuestId && user && !user.is_guest) {
+        try {
+          await migrateGuestData(previousGuestId, user.id);
+          localStorage.removeItem('previousGuestId');
+        } catch (error) {
+          console.error('Failed to migrate guest data:', error);
+          setAuthError(error instanceof Error ? error : new Error('ゲストデータの移行に失敗しました'));
+        }
+      }
+    };
+
+    if (user && !loading) {
+      migratePreviousGuestData();
+    }
+  }, [user, loading]);
 
   const logout = async () => {
     try {

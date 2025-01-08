@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import { SiteHeader } from '@/components/site-header'
 import { Footer } from '@/components/footer'
@@ -40,6 +40,7 @@ const ErrorComponent = ({ error, onRetry }: ErrorComponentProps) => (
 );
 
 export default function PurchaseCompletePage() {
+  const router = useRouter()
   const [showLoginModal, setShowLoginModal] = useState(false)
   const { user, loading, isGuestUser, loginAsGuest, authError } = useAuth()
   const searchParams = useSearchParams()
@@ -159,15 +160,9 @@ export default function PurchaseCompletePage() {
     await initializeGuestUser();
   };
 
-  const handleLoginModalClose = () => {
-    console.log('Attempting to close login modal:', {
-      isGuestUser,
-      timestamp: new Date().toISOString()
-    });
-    if (!isGuestUser) {
-      setShowLoginModal(false);
-    }
-  };
+  const handleLogin = () => {
+    router.push('/login')
+  }
 
   if (initializationError) {
     return <ErrorComponent error={initializationError} onRetry={handleRetry} />;
@@ -227,7 +222,7 @@ export default function PurchaseCompletePage() {
             </div>
           </div>
           
-          {isGuestUser && (
+          {(!user || isGuestUser) && (
             <div className="mt-8 p-6 bg-[#E6F3EF] rounded-lg">
               <h2 className="text-xl font-bold text-[#4C9A84] mb-4 text-center">
                 LINEで最新情報をお届け
@@ -250,7 +245,7 @@ export default function PurchaseCompletePage() {
                 </li>
               </ul>
               <Button
-                onClick={() => setShowLoginModal(true)}
+                onClick={handleLogin}
                 className="w-full bg-[#4C9A84] text-white py-3 rounded-lg hover:bg-[#3A8B73] transition-colors flex items-center justify-center space-x-2"
               >
                 <span>LINEで登録する</span>
@@ -261,13 +256,6 @@ export default function PurchaseCompletePage() {
         </div>
       </main>
       <Footer />
-      {showLoginModal && (
-        <LoginModal
-          isOpen={showLoginModal}
-          onClose={handleLoginModalClose}
-          isGuestUser={isGuestUser}
-        />
-      )}
     </div>
   )
 } 
