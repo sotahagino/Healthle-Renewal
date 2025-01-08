@@ -4,20 +4,10 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/button'
-import { LogIn, LogOut, User } from 'lucide-react'
+import { LogIn, User } from 'lucide-react'
 
 export function SiteHeader() {
-  const { user, isGuestUser, logout } = useAuth()
-
-  const handleLogout = async () => {
-    try {
-      console.log('Logging out...');
-      await logout();
-      console.log('Logout successful');
-    } catch (error) {
-      console.error('Logout failed:', error);
-    }
-  };
+  const { user, isGuestUser } = useAuth()
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-100 shadow-sm">
@@ -62,14 +52,6 @@ export function SiteHeader() {
                         <span>マイページ</span>
                       </Button>
                     </Link>
-                    <Button 
-                      variant="ghost" 
-                      onClick={handleLogout}
-                      className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100/80"
-                    >
-                      <LogOut className="h-4 w-4" />
-                      <span className="hidden sm:inline">ログアウト</span>
-                    </Button>
                   </div>
                 )}
               </>

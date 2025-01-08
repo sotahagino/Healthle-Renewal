@@ -1,10 +1,7 @@
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
-import { Provider, User as SupabaseUser, Session, WeakPassword } from '@supabase/supabase-js'
-
-// シングルトンインスタンスを作成
-const supabase = createClientComponentClient()
+import { Provider, User as SupabaseUser } from '@supabase/supabase-js'
+import { getSupabaseClient } from '@/lib/supabase'
 
 interface CustomUser extends SupabaseUser {
   is_guest: boolean;
@@ -29,20 +26,65 @@ export function useAuth(): AuthContextType {
   const [isGuest, setIsGuest] = useState(false)
   const [authError, setAuthError] = useState<Error | null>(null)
   const router = useRouter()
+  const supabase = getSupabaseClient()
 
   useEffect(() => {
     let mounted = true
     let authSubscription: { unsubscribe: () => void } | null = null
 
+    const getProjectRef = () => {
+      const url = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+      const match = url.match(/(?:https:\/\/)?([^.]+)/)
+      return match ? match[1] : ''
+    }
+
     const initializeAuth = async () => {
       try {
         console.log('Initializing auth...')
+        
+        // ローカルストレージからセッションを確認
+        const projectRef = getProjectRef()
+        const storedSession = localStorage.getItem(`sb-${projectRef}-auth-token`)
+        console.log('Stored session:', storedSession ? 'Found' : 'Not found')
+
+        // まずストアされたセッションを試す
+        if (storedSession) {
+          try {
+            const parsedSession = JSON.parse(storedSession)
+            const { data: { session: restoredSession }, error: restoreError } = await supabase.auth.setSession({
+              access_token: parsedSession.access_token,
+              refresh_token: parsedSession.refresh_token
+            })
+            
+            if (restoredSession?.user && !restoreError) {
+              const { data: userData } = await supabase
+                .from('users')
+                .select('*')
+                .eq('id', restoredSession.user.id)
+                .single()
+              
+              if (userData) {
+                console.log('Restored session and user data')
+                setUser(userData)
+                setLoading(false)
+                return
+              }
+            }
+          } catch (error) {
+            console.error('Failed to restore session:', error)
+            localStorage.removeItem(`sb-${projectRef}-auth-token`)
+          }
+        }
+
+        // セッションの取得を試みる
         const { data: { session }, error: sessionError } = await supabase.auth.getSession()
         
         if (sessionError) {
           console.error('Session error:', sessionError)
           throw sessionError
         }
+
+        if (!mounted) return
 
         console.log('Session status:', session ? 'Found' : 'Not found')
         console.log('Session data:', session)
@@ -57,16 +99,32 @@ export function useAuth(): AuthContextType {
 
           if (userError) {
             console.error('User data error:', userError)
-            throw userError
+            setUser(session.user as CustomUser)
+            setLoading(false)
+            return
           }
 
-          console.log('Fetched user data:', userData)
+          if (!mounted) return
 
-          if (mounted) {
-            console.log('Setting user data:', userData)
-            setUser(userData)
+          console.log('Setting initial user data:', userData)
+          setUser(userData)
+          
+          // セッションの再確認と更新
+          const { data: refreshedSession } = await supabase.auth.refreshSession()
+          if (refreshedSession?.session) {
+            console.log('Session refreshed successfully')
+            // セッションをローカルストレージに保存
+            const sessionData = {
+              access_token: refreshedSession.session.access_token,
+              refresh_token: refreshedSession.session.refresh_token,
+              expires_at: Math.floor(Date.now() / 1000) + refreshedSession.session.expires_in,
+              expires_in: refreshedSession.session.expires_in,
+              token_type: 'bearer',
+              user: refreshedSession.session.user
+            }
+            localStorage.setItem(`sb-${projectRef}-auth-token`, JSON.stringify(sessionData))
           }
-        } else if (mounted) {
+        } else {
           console.log('No session found, setting user to null')
           setUser(null)
         }
@@ -87,13 +145,12 @@ export function useAuth(): AuthContextType {
     const setupAuthSubscription = () => {
       const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
         console.log('Auth state changed:', event, session?.user?.id)
-        console.log('Full session data:', session)
         
         if (!mounted) return
 
         if (session?.user) {
           try {
-            console.log('Fetching updated user data for ID:', session.user.id)
+            console.log('Fetching user data on auth state change for ID:', session.user.id)
             const { data: userData, error: userError } = await supabase
               .from('users')
               .select('*')
@@ -102,29 +159,43 @@ export function useAuth(): AuthContextType {
 
             if (userError) {
               console.error('User data error on state change:', userError)
+              setUser(session.user as CustomUser)
+              setLoading(false)
               return
             }
 
-            console.log('Updated user data:', userData)
+            if (!mounted) return
 
-            if (mounted) {
-              console.log('Setting updated user data:', userData)
-              setUser(userData)
-            }
+            console.log('Setting updated user data from subscription:', userData)
+            setUser(userData)
+            setLoading(false)
           } catch (error) {
             console.error('Error updating user data:', error)
+            setLoading(false)
           }
-        } else if (mounted) {
+        } else {
           console.log('No session in state change, setting user to null')
           setUser(null)
+          setLoading(false)
         }
       })
 
       authSubscription = subscription
     }
 
-    initializeAuth()
-    setupAuthSubscription()
+    const initialize = async () => {
+      try {
+        await initializeAuth()
+        if (mounted) {
+          setupAuthSubscription()
+        }
+      } catch (error) {
+        console.error('Initialization error:', error)
+        setLoading(false)
+      }
+    }
+
+    initialize()
 
     return () => {
       mounted = false

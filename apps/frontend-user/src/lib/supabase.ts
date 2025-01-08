@@ -1,10 +1,16 @@
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { Database } from '@/types/supabase'
 
-let supabaseInstance: ReturnType<typeof createClientComponentClient> | null = null
+// シングルトンインスタンスとして保持
+let supabaseInstance: ReturnType<typeof createClientComponentClient<Database>> | null = null
 
-export function getSupabaseClient() {
+export const getSupabaseClient = () => {
   if (!supabaseInstance) {
-    supabaseInstance = createClientComponentClient()
+    supabaseInstance = createClientComponentClient<Database>()
   }
   return supabaseInstance
+}
+
+export const clearSupabaseInstance = () => {
+  supabaseInstance = null
 } 

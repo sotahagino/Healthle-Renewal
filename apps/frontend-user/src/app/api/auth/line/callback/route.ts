@@ -146,45 +146,76 @@ export async function GET(request: NextRequest) {
           </head>
           <body>
             <script>
-              const session = ${JSON.stringify(signInData.session)};
-              const projectRef = '${process.env.NEXT_PUBLIC_SUPABASE_URL!.match(/(?:https:\/\/)?([^.]+)/)?.[1] ?? ''}';
-              localStorage.setItem(\`sb-\${projectRef}-auth-token\`, JSON.stringify({
-                access_token: session.access_token,
-                refresh_token: session.refresh_token,
-                expires_at: Math.floor(Date.now() / 1000) + ${60 * 60 * 24 * 7},
-                expires_in: ${60 * 60 * 24 * 7},
-                token_type: 'bearer',
-                user: session.user
-              }));
-
-              // 購入フロー情報の更新
-              const purchaseFlow = localStorage.getItem('purchaseFlow');
-              if (purchaseFlow) {
+              (async function() {
                 try {
-                  const { consultation_id } = JSON.parse(purchaseFlow);
-                  fetch('/api/orders/update-user', {
-                    method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                      user_id: '${user.id}',
-                      consultation_id
-                    })
-                  }).then(() => {
-                    localStorage.removeItem('purchaseFlow');
+                  const session = ${JSON.stringify(signInData.session)};
+                  const projectRef = '${process.env.NEXT_PUBLIC_SUPABASE_URL!.match(/(?:https:\/\/)?([^.]+)/)?.[1] ?? ''}';
+                  
+                  // セッションデータの保存を確実に行う
+                  const sessionData = {
+                    access_token: session.access_token,
+                    refresh_token: session.refresh_token,
+                    expires_at: Math.floor(Date.now() / 1000) + ${60 * 60 * 24 * 7},
+                    expires_in: ${60 * 60 * 24 * 7},
+                    token_type: 'bearer',
+                    user: session.user,
+                    provider_token: session.provider_token,
+                    provider_refresh_token: session.provider_refresh_token
+                  };
+
+                  // セッションデータを保存
+                  localStorage.setItem(\`sb-\${projectRef}-auth-token\`, JSON.stringify(sessionData));
+
+                  // セッションの有効性を確認
+                  const storedSession = localStorage.getItem(\`sb-\${projectRef}-auth-token\`);
+                  if (!storedSession) {
+                    console.error('Session storage failed');
+                    window.location.href = '/login?error=session_storage_failed';
+                    return;
+                  }
+
+                  // �ッションが正しく保存されたことを確認
+                  try {
+                    const parsedSession = JSON.parse(storedSession);
+                    if (!parsedSession.access_token || !parsedSession.user) {
+                      throw new Error('Invalid session data');
+                    }
+                  } catch (error) {
+                    console.error('Session validation failed:', error);
+                    window.location.href = '/login?error=session_validation_failed';
+                    return;
+                  }
+
+                  // 購入フロー情報の更新
+                  const purchaseFlow = localStorage.getItem('purchaseFlow');
+                  if (purchaseFlow) {
+                    try {
+                      const { consultation_id } = JSON.parse(purchaseFlow);
+                      await fetch('/api/orders/update-user', {
+                        method: 'POST',
+                        headers: {
+                          'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                          user_id: '${user.id}',
+                          consultation_id
+                        })
+                      });
+                      localStorage.removeItem('purchaseFlow');
+                    } catch (error) {
+                      console.error('Error processing purchase flow:', error);
+                    }
+                  }
+
+                  // 最後にリダイレクト（少し遅延を入れてセッションの設定を確実にする）
+                  setTimeout(() => {
                     window.location.href = '${redirectUrl}';
-                  }).catch(error => {
-                    console.error('Error updating purchase flow:', error);
-                    window.location.href = '${redirectUrl}';
-                  });
+                  }, 500);
                 } catch (error) {
-                  console.error('Error processing purchase flow:', error);
-                  window.location.href = '${redirectUrl}';
+                  console.error('Error during authentication process:', error);
+                  window.location.href = '/login?error=auth_process_failed';
                 }
-              } else {
-                window.location.href = '${redirectUrl}';
-              }
+              })();
             </script>
             <p>認証処理中...</p>
             <p>自動的にリダイレクトされない場合は<a href="${redirectUrl}">こちら</a>をクリックしてください。</p>
