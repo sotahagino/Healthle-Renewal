@@ -8,8 +8,6 @@ interface LoginModalProps {
 }
 
 export function LoginModal({ isOpen, onClose }: LoginModalProps) {
-  const { migrateGuestToRegular } = useAuth();
-
   const handleLineLogin = () => {
     try {
       const lineLoginUrl = process.env.NEXT_PUBLIC_LINE_LOGIN_URL;

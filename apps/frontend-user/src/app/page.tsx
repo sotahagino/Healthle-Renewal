@@ -36,7 +36,14 @@ export default function Home() {
       // ユーザーが未ログインの場合、ゲストログインを実行
       if (!currentUser) {
         const guestData = await loginAsGuest()
-        currentUser = guestData?.user
+        if (!guestData?.user) {
+          throw new Error("ゲストログインに失敗しました")
+        }
+        currentUser = guestData.user
+      }
+
+      if (!currentUser?.id) {
+        throw new Error("ユーザー情報の取得に失敗しました")
       }
 
       // 相談内容をDBに保存
