@@ -138,124 +138,19 @@ export async function GET(request: NextRequest) {
 
     // セッション作成（新規・既存共通）
     const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
-      email: user.email!,
+      email: user!.email!,
       password: `line_${line_user_id}`
     })
     if (signInErr) throw signInErr
 
     // リダイレクト先の決定
-    const returnUrl = searchParams.get('return_url')
     const redirectPath = returnUrl || '/mypage'
 
-    try {
-      // セッショントークンをlocalStorageに保存するHTML
-      const html = `
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <meta charset="UTF-8">
-            <title>認証処理中...</title>
-            <script>
-              function handleAuthSuccess() {
-                try {
-                  const session = ${JSON.stringify(signInData.session)};
-                  const projectRef = '${process.env.NEXT_PUBLIC_SUPABASE_URL!.split('//')[1].split('.')[0]}';
-                  
-                  // セッション情報を保存
-                  localStorage.setItem(\`sb-\${projectRef}-auth-token\`, JSON.stringify({
-                    access_token: session.access_token,
-                    refresh_token: session.refresh_token,
-                    expires_at: Math.floor(Date.now() / 1000) + ${60 * 60 * 24 * 7},
-                    expires_in: ${60 * 60 * 24 * 7},
-                    token_type: 'bearer',
-                    user: session.user
-                  }));
-
-                  // purchaseFlowの処理
-                  const purchaseFlow = localStorage.getItem('purchaseFlow');
-                  if (purchaseFlow) {
-                    const purchaseFlowData = JSON.parse(purchaseFlow);
-                    const { order_id, timestamp } = purchaseFlowData;
-                    
-                    // タイムスタンプの検証（24時間以内）
-                    const isValid = timestamp && (Date.now() - timestamp) < 24 * 60 * 60 * 1000;
-                    
-                    if (!isValid) {
-                      console.error('Purchase flow data has expired');
-                      localStorage.removeItem('purchaseFlow');
-                      window.location.replace('${redirectPath}');
-                      return;
-                    }
-
-                    if (!order_id) {
-                      console.error('No order_id found in purchase flow');
-                      localStorage.removeItem('purchaseFlow');
-                      window.location.replace('${redirectPath}');
-                      return;
-                    }
-
-                    // ユーザーIDを更新
-                    fetch('/api/orders/update-user', {
-                      method: 'POST',
-                      headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': \`Bearer \${session.access_token}\`
-                      },
-                      body: JSON.stringify({
-                        user_id: session.user.id,
-                        order_id: order_id
-                      })
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                      if (!data.success) {
-                        throw new Error(data.error || 'Update failed');
-                      }
-                      localStorage.removeItem('purchaseFlow');
-                      window.location.replace('${redirectPath}');
-                    })
-                    .catch(error => {
-                      console.error('Update failed:', error);
-                      localStorage.removeItem('purchaseFlow');
-                      window.location.replace('${redirectPath}');
-                    });
-                  } else {
-                    window.location.replace('${redirectPath}');
-                  }
-                } catch (error) {
-                  console.error('Error in auth success handler:', error);
-                  window.location.replace('/login?error=auth_failed');
-                }
-              }
-
-              // DOMContentLoadedイベントで認証処理を開始
-              document.addEventListener('DOMContentLoaded', handleAuthSuccess);
-            </script>
-          </head>
-          <body>
-            <div style="display: flex; justify-content: center; align-items: center; height: 100vh;">
-              <p style="text-align: center;">認証処理中です。しばらくお待ちください...</p>
-            </div>
-          </body>
-        </html>
-      `;
-
-      return new NextResponse(html, {
-        headers: { 
-          'Content-Type': 'text/html',
-          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0'
-        }
-      });
-
-    } catch (error) {
-      console.error('Error in callback process:', error)
-      return NextResponse.redirect(new URL('/login?error=callback_failed', request.url))
-    }
+    // リダイレクト
+    return Response.redirect(new URL(redirectPath, process.env.NEXT_PUBLIC_SITE_URL))
 
   } catch (error) {
-    console.error('Callback error:', error)
-    return NextResponse.redirect(new URL('/login?error=auth_failed', request.url))
+    console.error('Error in callback route:', error)
+    return new Response('Error in callback route', { status: 500 })
   }
 }
