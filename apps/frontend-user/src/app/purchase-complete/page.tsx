@@ -146,8 +146,8 @@ export default function PurchaseCompletePage() {
       timestamp: new Date().toISOString()
     });
 
-    if (!loading && !pageLoading && user && isGuestUser && !showLoginModal) {
-      console.log('Showing login modal for guest user');
+    if (!loading && !pageLoading && (!user || isGuestUser) && !showLoginModal && orderStatus.status === 'paid') {
+      console.log('Showing login modal for guest/non-logged-in user');
       setShowLoginModal(true);
     }
   }, [loading, pageLoading, user, isGuestUser, sessionId, showLoginModal, initializationError, retryCount, orderStatus]);
@@ -261,12 +261,13 @@ export default function PurchaseCompletePage() {
         </div>
       </main>
       <Footer />
-      
-      <LoginModal
-        isOpen={showLoginModal}
-        onClose={handleLoginModalClose}
-        isGuestUser={isGuestUser}
-      />
+      {showLoginModal && (
+        <LoginModal
+          isOpen={showLoginModal}
+          onClose={handleLoginModalClose}
+          isGuestUser={isGuestUser}
+        />
+      )}
     </div>
   )
 } 
