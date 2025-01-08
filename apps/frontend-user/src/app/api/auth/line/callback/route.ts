@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     const code = searchParams.get('code')
     
     if (!code) {
-      throw new Error('認証コードが提供されていません')
+      throw new Error('No code provided')
     }
 
     console.log('Getting LINE token with code:', code)
@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
     console.log('LINE token data:', tokenData)
 
     if (!tokenData.id_token) {
-      throw new Error('LINE IDトークンの取得に失敗しました')
+      throw new Error('Failed to get LINE id_token')
     }
 
     // id_tokenの検証とデコード
@@ -87,7 +87,7 @@ export async function GET(request: NextRequest) {
         }
         
         if (!newUser || !newUser.user) {
-          throw new Error('認証ユーザーの作成に失敗しました')
+          throw new Error('Failed to create auth user')
         }
         
         user = newUser.user
@@ -135,57 +135,19 @@ export async function GET(request: NextRequest) {
 
     // vendor_ordersテーブルのuser_idを更新
     try {
-      // ローカルストレージから購入情報を取得するためのスクリプトを追加
-      const purchaseFlowScript = `
-        const purchaseFlow = localStorage.getItem('purchaseFlow');
-        if (purchaseFlow) {
-          try {
-            const { consultation_id } = JSON.parse(purchaseFlow);
-            console.log('Updating user_id for consultation:', consultation_id);
-            fetch('/api/orders/update-user', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                user_id: '${user.id}',
-                consultation_id
-              })
-            })
-            .then(response => response.json())
-            .then(data => {
-              console.log('Update response:', data);
-              if (data.error) {
-                console.error('Update failed:', data.error);
-              }
-            })
-            .catch(error => {
-              console.error('Update request failed:', error);
-            });
-          } catch (error) {
-            console.error('Error processing purchaseFlow:', error);
-          }
-          localStorage.removeItem('purchaseFlow');
-        } else {
-          console.log('No purchaseFlow found in localStorage');
-        }
-      `;
-
       const redirectUrl = new URL(redirectPath, request.url)
 
-      // セッショントークンをlocalStorageに保存し、即座にリダイレクトするスクリプトを返す
+      // セッショントークンをlocalStorageに保存し、vendor_ordersの更新を行うスクリプトを返す
       const html = `
         <!DOCTYPE html>
         <html>
           <head>
-            <title>Redirecting...</title>
+            <title>認証処理中...</title>
           </head>
           <body>
             <script>
               const session = ${JSON.stringify(signInData.session)};
               const projectRef = '${process.env.NEXT_PUBLIC_SUPABASE_URL!.match(/(?:https:\/\/)?([^.]+)/)?.[1] ?? ''}';
-              
-              // セッション情報を保存
               localStorage.setItem(\`sb-\${projectRef}-auth-token\`, JSON.stringify({
                 access_token: session.access_token,
                 refresh_token: session.refresh_token,
@@ -206,23 +168,22 @@ export async function GET(request: NextRequest) {
                       'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                      user_id: '${signInData.session.user.id}',
+                      user_id: '${user.id}',
                       consultation_id
                     })
                   }).then(() => {
                     localStorage.removeItem('purchaseFlow');
-                    window.location.replace('${redirectUrl}');
+                    window.location.href = '${redirectUrl}';
                   }).catch(error => {
                     console.error('Error updating purchase flow:', error);
-                    window.location.replace('${redirectUrl}');
+                    window.location.href = '${redirectUrl}';
                   });
                 } catch (error) {
                   console.error('Error processing purchase flow:', error);
-                  window.location.replace('${redirectUrl}');
+                  window.location.href = '${redirectUrl}';
                 }
               } else {
-                // 購入フローがない場合は直接リダイレクト
-                window.location.replace('${redirectUrl}');
+                window.location.href = '${redirectUrl}';
               }
             </script>
             <p>認証処理中...</p>
