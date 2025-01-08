@@ -15,10 +15,11 @@ export default function Login() {
   const { user, loading } = useAuth()
 
   useEffect(() => {
-    if (user) {
-      window.location.href = '/mypage'
+    if (!loading && user) {
+      console.log('Redirecting to mypage...')
+      window.location.replace('/mypage')
     }
-  }, [user])
+  }, [user, loading])
 
   const handleLogin = () => {
     if (lineLoginUrl) {
@@ -29,7 +30,17 @@ export default function Login() {
   }
 
   if (loading) {
-    return <div>Loading...</div>
+    return (
+      <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#E6F3EF] to-white">
+        <SiteHeader />
+        <main className="flex-grow container mx-auto px-4 py-12 mt-16 flex items-center justify-center">
+          <div className="text-center">
+            <p className="text-[#4C9A84]">読み込み中...</p>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    )
   }
 
   if (user) {
