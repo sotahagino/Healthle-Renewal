@@ -25,21 +25,26 @@ export default function LoginModal({
   isGuestUser = false
 }: LoginModalProps) {
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const { user, initiateLineLogin } = useAuth()
 
   // ゲストユーザーの場合、ESCキーとクリックでの閉じる操作を無効化
   const handleClose = () => {
     if (!isGuestUser) {
+      setError(null)
       onClose()
     }
   }
 
   const handleLineLogin = async () => {
+    setError(null)
     setIsLoading(true)
     try {
       await initiateLineLogin()
     } catch (error) {
       console.error('LINE login error:', error)
+      setError('LINEログインに失敗しました。しばらく時間をおいて再度お試しください。')
+    } finally {
       setIsLoading(false)
     }
   }
@@ -57,6 +62,12 @@ export default function LoginModal({
         </DialogHeader>
 
         <div className="py-6">
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
+              <p className="text-sm text-red-600">{error}</p>
+            </div>
+          )}
+
           <div className="space-y-6 mb-8">
             <div className="flex items-start">
               <Package className="w-6 h-6 text-[#4C9A84] mr-4 flex-shrink-0" />
@@ -84,7 +95,7 @@ export default function LoginModal({
           <Button
             onClick={handleLineLogin}
             disabled={isLoading}
-            className="w-full bg-[#00B900] hover:bg-[#00A000] text-white py-6 font-bold rounded-lg shadow-md transition-all duration-300 ease-in-out transform hover:translate-y-[-2px] hover:shadow-lg"
+            className="w-full bg-[#00B900] hover:bg-[#00A000] text-white py-6 font-bold rounded-lg shadow-md transition-all duration-300 ease-in-out transform hover:translate-y-[-2px] hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
           >
             {isLoading ? (
               <>

@@ -200,7 +200,7 @@ export async function GET(request: NextRequest) {
               if (purchaseFlow) {
                 try {
                   const { consultation_id } = JSON.parse(purchaseFlow);
-                  fetch('/api/orders/update-user', {
+                  await fetch('/api/orders/update-user', {
                     method: 'POST',
                     headers: {
                       'Content-Type': 'application/json',
@@ -209,20 +209,34 @@ export async function GET(request: NextRequest) {
                       user_id: '${signInData.session.user.id}',
                       consultation_id
                     })
-                  }).then(() => {
-                    localStorage.removeItem('purchaseFlow');
-                    window.location.href = '${redirectUrl}';
-                  }).catch(() => {
-                    window.location.href = '${redirectUrl}';
                   });
+                  localStorage.removeItem('purchaseFlow');
                 } catch (error) {
-                  window.location.href = '${redirectUrl}';
+                  console.error('Error updating purchase flow:', error);
                 }
-              } else {
+              }
+
+              // セッションの初期化を確認
+              try {
+                await new Promise((resolve) => {
+                  const checkSession = () => {
+                    const storedSession = localStorage.getItem(\`sb-\${projectRef}-auth-token\`);
+                    if (storedSession) {
+                      resolve(true);
+                    } else {
+                      setTimeout(checkSession, 100);
+                    }
+                  };
+                  checkSession();
+                });
                 window.location.href = '${redirectUrl}';
+              } catch (error) {
+                console.error('Session initialization error:', error);
+                window.location.href = '/login?error=session_failed';
               }
             </script>
-            <p>リダイレクト中...</p>
+            <p>認証処理中...</p>
+            <p>自動的にリダイレクトされない場合は<a href="${redirectUrl}">こちら</a>をクリックしてください。</p>
           </body>
         </html>
       `
@@ -233,12 +247,17 @@ export async function GET(request: NextRequest) {
 
     } catch (error) {
       console.error('Error updating vendor_orders:', error)
-      // エラーが発生しても認証自体は成功しているので、リダイレクトは続行
-      return NextResponse.redirect(new URL(redirectPath, request.url))
+      // エラーメッセージを含めてリダイレクト
+      const errorUrl = new URL('/login', request.url)
+      errorUrl.searchParams.set('error', 'update_failed')
+      return NextResponse.redirect(errorUrl)
     }
 
   } catch (error) {
     console.error('Callback error:', error)
-    return NextResponse.redirect(new URL('/login?error=auth_failed', request.url))
+    const errorUrl = new URL('/login', request.url)
+    errorUrl.searchParams.set('error', 'auth_failed')
+    errorUrl.searchParams.set('message', (error as Error).message || '認証に失敗しました')
+    return NextResponse.redirect(errorUrl)
   }
 }

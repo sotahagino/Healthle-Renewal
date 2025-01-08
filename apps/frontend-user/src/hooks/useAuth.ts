@@ -23,13 +23,11 @@ export function useAuth() {
 
   useEffect(() => {
     let mounted = true
-    console.log('Auth hook initialized')
 
     const initializeAuth = async () => {
       if (!mounted) return
 
       try {
-        console.log('Checking session...')
         const { data: { session }, error } = await supabase.auth.getSession()
 
         if (error) {
@@ -38,7 +36,6 @@ export function useAuth() {
         }
 
         if (!session?.user) {
-          console.log('No active session')
           if (mounted) {
             setUser(null)
             setIsGuestUser(false)
@@ -47,31 +44,14 @@ export function useAuth() {
           return
         }
 
-        console.log('Session found:', session.user.id)
-
         const { data: userData, error: userError } = await supabase
           .from('users')
           .select('*')
           .eq('id', session.user.id)
           .single()
 
-        if (userError) {
-          console.error('User data error:', userError)
-          if (userError.code === 'PGRST116') {
-            const { error: insertError } = await supabase
-              .from('users')
-              .insert([{
-                id: session.user.id,
-                email: session.user.email,
-                created_at: new Date().toISOString()
-              }])
-
-            if (insertError) {
-              throw insertError
-            }
-          } else {
-            throw userError
-          }
+        if (userError && userError.code !== 'PGRST116') {
+          throw userError
         }
 
         if (mounted) {
@@ -92,10 +72,8 @@ export function useAuth() {
       }
     }
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth state changed:', event, session?.user?.id)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!mounted) return
       
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         await initializeAuth()
@@ -115,7 +93,7 @@ export function useAuth() {
       mounted = false
       subscription.unsubscribe()
     }
-  }, [router])
+  }, [])
 
   const login = async (email: string, password: string) => {
     try {
