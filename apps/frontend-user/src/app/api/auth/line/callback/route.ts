@@ -211,24 +211,19 @@ export async function GET(request: NextRequest) {
                     })
                   }).then(() => {
                     localStorage.removeItem('purchaseFlow');
+                    window.location.replace('${redirectUrl}');
                   }).catch(error => {
                     console.error('Error updating purchase flow:', error);
+                    window.location.replace('${redirectUrl}');
                   });
                 } catch (error) {
                   console.error('Error processing purchase flow:', error);
+                  window.location.replace('${redirectUrl}');
                 }
+              } else {
+                // 購入フローがない場合は直接リダイレクト
+                window.location.replace('${redirectUrl}');
               }
-
-              // セッションの初期化を確認
-              const checkSession = () => {
-                const storedSession = localStorage.getItem(\`sb-\${projectRef}-auth-token\`);
-                if (storedSession) {
-                  window.location.href = '${redirectUrl}';
-                } else {
-                  setTimeout(checkSession, 100);
-                }
-              };
-              checkSession();
             </script>
             <p>認証処理中...</p>
             <p>自動的にリダイレクトされない場合は<a href="${redirectUrl}">こちら</a>をクリックしてください。</p>
