@@ -8,16 +8,17 @@ import { useState } from 'react';
 interface LoginModalProps {
   isOpen: boolean;
   onClose: () => void;
+  isGuestUser?: boolean;
 }
 
-export function LoginModal({ isOpen, onClose }: LoginModalProps) {
+export function LoginModal({ isOpen, onClose, isGuestUser = false }: LoginModalProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { user, login } = useAuth();
 
   // ゲストユーザーの場合、ESCキーとクリックでの閉じる操作を無効化
   const handleClose = () => {
-    if (!user?.is_guest) {
+    if (!isGuestUser) {
       onClose();
     }
   };
@@ -43,8 +44,11 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
       <DialogContent className="sm:max-w-md">
         <LoginContent
           onLogin={handleLogin}
-          title="ログインが必要です"
-          message="LINEアカウントでログインして続けましょう"
+          title={isGuestUser ? "アカウントの連携" : "ログインが必要です"}
+          message={isGuestUser 
+            ? "LINEアカウントと連携して、より便利にご利用いただけます"
+            : "LINEアカウントでログインして続けましょう"
+          }
         />
       </DialogContent>
     </Dialog>
