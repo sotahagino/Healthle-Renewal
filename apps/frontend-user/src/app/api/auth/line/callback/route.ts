@@ -149,44 +149,24 @@ export async function GET(request: NextRequest) {
     console.log('Session created:', signInData.session)
 
     // ゲストユーザーデータの移行
-    if (returnUrl?.includes('purchase-complete')) {
-      const guestUserId = searchParams.get('guest_user_id')
-      if (guestUserId) {
-        console.log('Migrating guest user data:', { guestUserId, newUserId: user!.id })
-        
-        // vendor_ordersの更新
-        const { error: orderErr } = await supabase
-          .from('vendor_orders')
-          .update({ user_id: user!.id })
-          .eq('user_id', guestUserId)
-        
-        if (orderErr) {
-          console.error('Failed to update vendor_orders:', orderErr)
-        }
+    const guestUser = searchParams.get('guest_user_id') || 
+      (typeof window !== 'undefined' ? 
+        JSON.parse(localStorage.getItem('healthle_guest_user') || '{}').id : 
+        null)
 
-        // consultationsの更新
-        const { error: consultErr } = await supabase
-          .from('consultations')
-          .update({ user_id: user!.id })
-          .eq('user_id', guestUserId)
-        
-        if (consultErr) {
-          console.error('Failed to update consultations:', consultErr)
-        }
-
-        // ゲストユーザーの移行状態を更新
-        const { error: guestErr } = await supabase
-          .from('users')
-          .update({ 
-            migrated_to: user!.id,
-            migrated_at: new Date().toISOString(),
-            migration_status: 'migrated'
-          })
-          .eq('id', guestUserId)
-        
-        if (guestErr) {
-          console.error('Failed to update guest user status:', guestErr)
-        }
+    if (guestUser) {
+      console.log('Migrating guest user data:', { guestUser, newUserId: user!.id })
+      
+      // トランザクションの開始
+      const { error: trxErr } = await supabase.rpc('migrate_guest_user_data', {
+        p_guest_user_id: guestUser,
+        p_new_user_id: user!.id
+      })
+      
+      if (trxErr) {
+        console.error('Failed to migrate guest user data:', trxErr)
+      } else {
+        console.log('Guest user data migration completed')
       }
     }
 
@@ -195,20 +175,25 @@ export async function GET(request: NextRequest) {
 
     // セッションクッキーの設定とリダイレクト
     if (signInData.session) {
-      const { data: { session } } = await supabase.auth.setSession(signInData.session)
-      if (session) {
-        const headers = new Headers()
-        headers.append('Set-Cookie', `sb-access-token=${session.access_token}; Path=/; HttpOnly; Secure; SameSite=Lax`)
-        headers.append('Set-Cookie', `sb-refresh-token=${session.refresh_token}; Path=/; HttpOnly; Secure; SameSite=Lax`)
-        
-        return new Response(null, {
-          status: 302,
-          headers: {
-            ...headers,
-            Location: new URL(redirectPath, process.env.NEXT_PUBLIC_SITE_URL).toString()
-          }
-        })
+      const cookieOptions = {
+        path: '/',
+        httpOnly: true,
+        secure: true,
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 7 // 7 days
       }
+
+      const headers = new Headers()
+      headers.append('Set-Cookie', `sb-access-token=${signInData.session.access_token}; ${Object.entries(cookieOptions).map(([key, value]) => `${key}=${value}`).join('; ')}`)
+      headers.append('Set-Cookie', `sb-refresh-token=${signInData.session.refresh_token}; ${Object.entries(cookieOptions).map(([key, value]) => `${key}=${value}`).join('; ')}`)
+      
+      return new Response(null, {
+        status: 302,
+        headers: {
+          ...Object.fromEntries(headers.entries()),
+          Location: new URL(redirectPath, process.env.NEXT_PUBLIC_SITE_URL).toString()
+        }
+      })
     }
 
     return Response.redirect(new URL(redirectPath, process.env.NEXT_PUBLIC_SITE_URL))
