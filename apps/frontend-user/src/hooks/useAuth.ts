@@ -1,7 +1,7 @@
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
-import { Provider, User as SupabaseUser } from '@supabase/supabase-js'
+import { Provider, User as SupabaseUser, Session, WeakPassword } from '@supabase/supabase-js'
 
 // シングルトンインスタンスを作成
 const supabase = createClientComponentClient()
