@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
         queryParams: {
           prompt: 'consent',
           bot_prompt: 'normal',
-          state: redirectTo ? encodeURIComponent(redirectTo) : undefined
+          state: redirectTo ? encodeURIComponent(redirectTo) : ''
         },
         skipBrowserRedirect: true // 自動リダイレクトを無効化
       }
