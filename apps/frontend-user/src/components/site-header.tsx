@@ -5,7 +5,7 @@ import Image from 'next/image'
 import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/button'
 import { LogIn, User } from 'lucide-react'
-import { LoadingSpinner } from '@/components/ui/loading-spinner'
+import { LoadingSpinner } from './ui/loading-spinner'
 
 export function SiteHeader() {
   const { user, isGuestUser, loading } = useAuth()
