@@ -5,9 +5,10 @@ import Image from 'next/image'
 import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/button'
 import { LogIn, User } from 'lucide-react'
+import { LoadingSpinner } from '@/components/ui/loading-spinner'
 
 export function SiteHeader() {
-  const { user, isGuestUser } = useAuth()
+  const { user, isGuestUser, loading } = useAuth()
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-100 shadow-sm">
@@ -27,7 +28,9 @@ export function SiteHeader() {
           </Link>
 
           <nav className="flex items-center space-x-3">
-            {user ? (
+            {loading ? (
+              <LoadingSpinner className="w-6 h-6 text-[#4C9A84]" />
+            ) : user ? (
               <>
                 {isGuestUser ? (
                   <div className="flex items-center space-x-3">

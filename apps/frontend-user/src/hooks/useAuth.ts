@@ -18,6 +18,7 @@ export type AuthContextType = {
   isGuestUser: boolean;
   authError: Error | null;
   migrateGuestToRegular: () => Promise<void>;
+  refreshUserData: () => Promise<void>;
 };
 
 export function useAuth(): AuthContextType {
@@ -25,122 +26,101 @@ export function useAuth(): AuthContextType {
   const [loading, setLoading] = useState(true)
   const [isGuest, setIsGuest] = useState(false)
   const [authError, setAuthError] = useState<Error | null>(null)
+  const [isInitialized, setIsInitialized] = useState(false)
   const router = useRouter()
   const supabase = getSupabaseClient()
+
+  const refreshUserData = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.user) {
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', session.user.id)
+          .single()
+
+        if (userError) throw userError
+        if (userData) {
+          console.log('Refreshed user data:', userData)
+          setUser(userData)
+        }
+      }
+    } catch (error) {
+      console.error('Error refreshing user data:', error)
+      setAuthError(error instanceof Error ? error : new Error('ユーザーデータの更新に失敗しました'))
+    }
+  }
+
+  const getProjectRef = () => {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+    const match = url.match(/(?:https:\/\/)?([^.]+)/)
+    return match ? match[1] : ''
+  }
+
+  const initializeAuth = async () => {
+    try {
+      setLoading(true)
+      console.log('Initializing auth...')
+      
+      const projectRef = getProjectRef()
+      const storedSession = localStorage.getItem(`sb-${projectRef}-auth-token`)
+      console.log('Stored session:', storedSession ? 'Found' : 'Not found')
+
+      if (storedSession) {
+        try {
+          const parsedSession = JSON.parse(storedSession)
+          const { data: { session: restoredSession }, error: restoreError } = await supabase.auth.setSession({
+            access_token: parsedSession.access_token,
+            refresh_token: parsedSession.refresh_token
+          })
+          
+          if (restoredSession?.user && !restoreError) {
+            await refreshUserData()
+            return
+          }
+        } catch (error) {
+          console.error('Failed to restore session:', error)
+          localStorage.removeItem(`sb-${projectRef}-auth-token`)
+        }
+      }
+
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+      
+      if (sessionError) throw sessionError
+
+      if (session?.user) {
+        await refreshUserData()
+        
+        const { data: refreshedSession } = await supabase.auth.refreshSession()
+        if (refreshedSession?.session) {
+          console.log('Session refreshed successfully')
+          const sessionData = {
+            access_token: refreshedSession.session.access_token,
+            refresh_token: refreshedSession.session.refresh_token,
+            expires_at: Math.floor(Date.now() / 1000) + refreshedSession.session.expires_in,
+            expires_in: refreshedSession.session.expires_in,
+            token_type: 'bearer',
+            user: refreshedSession.session.user
+          }
+          localStorage.setItem(`sb-${projectRef}-auth-token`, JSON.stringify(sessionData))
+        }
+      } else {
+        setUser(null)
+      }
+    } catch (error) {
+      console.error('Auth initialization error:', error)
+      setUser(null)
+      setAuthError(error instanceof Error ? error : new Error('認証の初期化に失敗しました'))
+    } finally {
+      setLoading(false)
+      setIsInitialized(true)
+    }
+  }
 
   useEffect(() => {
     let mounted = true
     let authSubscription: { unsubscribe: () => void } | null = null
-
-    const getProjectRef = () => {
-      const url = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
-      const match = url.match(/(?:https:\/\/)?([^.]+)/)
-      return match ? match[1] : ''
-    }
-
-    const initializeAuth = async () => {
-      try {
-        console.log('Initializing auth...')
-        
-        // ローカルストレージからセッションを確認
-        const projectRef = getProjectRef()
-        const storedSession = localStorage.getItem(`sb-${projectRef}-auth-token`)
-        console.log('Stored session:', storedSession ? 'Found' : 'Not found')
-
-        // まずストアされたセッションを試す
-        if (storedSession) {
-          try {
-            const parsedSession = JSON.parse(storedSession)
-            const { data: { session: restoredSession }, error: restoreError } = await supabase.auth.setSession({
-              access_token: parsedSession.access_token,
-              refresh_token: parsedSession.refresh_token
-            })
-            
-            if (restoredSession?.user && !restoreError) {
-              const { data: userData } = await supabase
-                .from('users')
-                .select('*')
-                .eq('id', restoredSession.user.id)
-                .single()
-              
-              if (userData) {
-                console.log('Restored session and user data')
-                setUser(userData)
-                setLoading(false)
-                return
-              }
-            }
-          } catch (error) {
-            console.error('Failed to restore session:', error)
-            localStorage.removeItem(`sb-${projectRef}-auth-token`)
-          }
-        }
-
-        // セッションの取得を試みる
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-        
-        if (sessionError) {
-          console.error('Session error:', sessionError)
-          throw sessionError
-        }
-
-        if (!mounted) return
-
-        console.log('Session status:', session ? 'Found' : 'Not found')
-        console.log('Session data:', session)
-        
-        if (session?.user) {
-          console.log('Fetching user data for ID:', session.user.id)
-          const { data: userData, error: userError } = await supabase
-            .from('users')
-            .select('*')
-            .eq('id', session.user.id)
-            .single()
-
-          if (userError) {
-            console.error('User data error:', userError)
-            setUser(session.user as CustomUser)
-            setLoading(false)
-            return
-          }
-
-          if (!mounted) return
-
-          console.log('Setting initial user data:', userData)
-          setUser(userData)
-          
-          // セッションの再確認と更新
-          const { data: refreshedSession } = await supabase.auth.refreshSession()
-          if (refreshedSession?.session) {
-            console.log('Session refreshed successfully')
-            // セッションをローカルストレージに保存
-            const sessionData = {
-              access_token: refreshedSession.session.access_token,
-              refresh_token: refreshedSession.session.refresh_token,
-              expires_at: Math.floor(Date.now() / 1000) + refreshedSession.session.expires_in,
-              expires_in: refreshedSession.session.expires_in,
-              token_type: 'bearer',
-              user: refreshedSession.session.user
-            }
-            localStorage.setItem(`sb-${projectRef}-auth-token`, JSON.stringify(sessionData))
-          }
-        } else {
-          console.log('No session found, setting user to null')
-          setUser(null)
-        }
-      } catch (error) {
-        console.error('Auth initialization error:', error)
-        if (mounted) {
-          setUser(null)
-          setAuthError(error instanceof Error ? error : new Error('認証の初期化に失敗しました'))
-        }
-      } finally {
-        if (mounted) {
-          console.log('Auth initialization completed')
-          setLoading(false)
-        }
-      }
-    }
 
     const setupAuthSubscription = () => {
       const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -149,34 +129,9 @@ export function useAuth(): AuthContextType {
         if (!mounted) return
 
         if (session?.user) {
-          try {
-            console.log('Fetching user data on auth state change for ID:', session.user.id)
-            const { data: userData, error: userError } = await supabase
-              .from('users')
-              .select('*')
-              .eq('id', session.user.id)
-              .single()
-
-            if (userError) {
-              console.error('User data error on state change:', userError)
-              setUser(session.user as CustomUser)
-              setLoading(false)
-              return
-            }
-
-            if (!mounted) return
-
-            console.log('Setting updated user data from subscription:', userData)
-            setUser(userData)
-            setLoading(false)
-          } catch (error) {
-            console.error('Error updating user data:', error)
-            setLoading(false)
-          }
+          await refreshUserData()
         } else {
-          console.log('No session in state change, setting user to null')
           setUser(null)
-          setLoading(false)
         }
       })
 
@@ -184,14 +139,11 @@ export function useAuth(): AuthContextType {
     }
 
     const initialize = async () => {
-      try {
+      if (!isInitialized) {
         await initializeAuth()
         if (mounted) {
           setupAuthSubscription()
         }
-      } catch (error) {
-        console.error('Initialization error:', error)
-        setLoading(false)
       }
     }
 
@@ -204,7 +156,7 @@ export function useAuth(): AuthContextType {
         authSubscription.unsubscribe()
       }
     }
-  }, [])
+  }, [isInitialized])
 
   const loginAsGuest = async () => {
     try {
@@ -347,5 +299,6 @@ export function useAuth(): AuthContextType {
     isGuestUser: user?.is_guest ?? false,
     authError,
     migrateGuestToRegular,
+    refreshUserData,
   }
 } 
