@@ -2,6 +2,7 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { Provider } from '@supabase/supabase-js'
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,7 +15,7 @@ export async function GET(request: NextRequest) {
 
     // PKCE認証用のURLを生成
     const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: 'line',
+      provider: 'line' as Provider,
       options: {
         redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/api/auth/line/callback`,
         queryParams: {
