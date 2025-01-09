@@ -30,6 +30,24 @@ export function useAuth(): AuthContextType {
   const router = useRouter()
   const supabase = getSupabaseClient()
 
+  // ゲストユーザー情報の永続化
+  const GUEST_USER_KEY = 'healthle_guest_user'
+  const PREVIOUS_GUEST_ID_KEY = 'healthle_previous_guest_id'
+
+  const saveGuestUser = (guestUser: CustomUser) => {
+    localStorage.setItem(GUEST_USER_KEY, JSON.stringify(guestUser))
+  }
+
+  const getStoredGuestUser = (): CustomUser | null => {
+    const stored = localStorage.getItem(GUEST_USER_KEY)
+    return stored ? JSON.parse(stored) : null
+  }
+
+  const clearGuestUser = () => {
+    localStorage.removeItem(GUEST_USER_KEY)
+    localStorage.removeItem(PREVIOUS_GUEST_ID_KEY)
+  }
+
   const refreshUserData = async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession()
@@ -44,6 +62,10 @@ export function useAuth(): AuthContextType {
         if (userData) {
           console.log('Refreshed user data:', userData)
           setUser(userData)
+          // ゲストユーザーの場合は情報を永続化
+          if (userData.is_guest) {
+            saveGuestUser(userData)
+          }
         }
       }
     } catch (error) {
@@ -62,6 +84,15 @@ export function useAuth(): AuthContextType {
     try {
       setLoading(true)
       console.log('Initializing auth...')
+      
+      // 既存のゲストユーザー情報を確認
+      const storedGuest = getStoredGuestUser()
+      if (storedGuest) {
+        setUser(storedGuest)
+        setIsGuest(true)
+        setLoading(false)
+        return
+      }
       
       const projectRef = getProjectRef()
       const storedSession = localStorage.getItem(`sb-${projectRef}-auth-token`)
@@ -160,9 +191,35 @@ export function useAuth(): AuthContextType {
 
   const loginAsGuest = async () => {
     try {
+      // 既存のゲストユーザー情報を確認
+      const storedGuest = getStoredGuestUser()
+      if (storedGuest) {
+        try {
+          // 既存のゲストユーザーでログイン試行
+          const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+            email: storedGuest.email ?? '',
+            password: `guest_${storedGuest.id ?? 'default'}`,
+          })
+
+          if (!signInError && signInData.user) {
+            setUser(storedGuest)
+            setIsGuest(true)
+            return { user: storedGuest }
+          }
+        } catch (error) {
+          console.error('Failed to restore guest session:', error)
+          clearGuestUser()
+        }
+      }
+
+      // 新規ゲストユーザーの作成
+      const timestamp = Date.now()
+      const guestEmail = `guest_${timestamp}@example.com`
+      const guestPassword = `guest_${timestamp}_${Math.random().toString(36).substring(7)}`
+
       const { data: { user: authUser }, error: signUpError } = await supabase.auth.signUp({
-        email: `guest_${Date.now()}@example.com`,
-        password: `guest_${Date.now()}_${Math.random().toString(36).substring(7)}`,
+        email: guestEmail,
+        password: guestPassword,
       })
 
       if (signUpError) throw signUpError
@@ -172,13 +229,19 @@ export function useAuth(): AuthContextType {
           .from('users')
           .insert([{
             id: authUser.id,
+            email: guestEmail,
             is_guest: true,
+            created_at: new Date().toISOString(),
           }])
           .select()
           .single()
 
         if (insertError) throw insertError
+
+        // ゲストユーザー情報を永続化
+        saveGuestUser(userData)
         setUser(userData)
+        setIsGuest(true)
         return { user: userData }
       }
     } catch (error) {
@@ -189,82 +252,104 @@ export function useAuth(): AuthContextType {
 
   const migrateGuestData = async (oldUserId: string, newUserId: string) => {
     try {
-      // vendor_ordersテーブルの更新
+      console.log('Migrating guest data:', { oldUserId, newUserId })
+
+      // vendor_ordersの更新
       const { error: ordersError } = await supabase
         .from('vendor_orders')
         .update({ user_id: newUserId })
-        .eq('user_id', oldUserId);
+        .eq('user_id', oldUserId)
 
-      if (ordersError) throw ordersError;
+      if (ordersError) {
+        console.error('Error updating vendor_orders:', ordersError)
+        throw ordersError
+      }
 
-      // consultationsテーブルの更新
+      // consultationsの更新
       const { error: consultationsError } = await supabase
         .from('consultations')
         .update({ user_id: newUserId })
-        .eq('user_id', oldUserId);
+        .eq('user_id', oldUserId)
 
-      if (consultationsError) throw consultationsError;
+      if (consultationsError) {
+        console.error('Error updating consultations:', consultationsError)
+        throw consultationsError
+      }
 
-      console.log('Successfully migrated guest data to regular account');
+      // ゲストユーザー情報の更新
+      const { error: userUpdateError } = await supabase
+        .from('users')
+        .update({
+          migrated_to: newUserId,
+          migrated_at: new Date().toISOString(),
+          migration_status: 'completed'
+        })
+        .eq('id', oldUserId)
+
+      if (userUpdateError) {
+        console.error('Error updating user migration status:', userUpdateError)
+        throw userUpdateError
+      }
+
+      console.log('Successfully migrated guest data to regular account')
+      clearGuestUser()
     } catch (error) {
-      console.error('Error migrating guest data:', error);
-      throw error;
+      console.error('Error migrating guest data:', error)
+      throw error
     }
-  };
+  }
 
   const login = async () => {
     try {
-      // ゲストユーザーのIDを保存
-      const currentUserId = user?.id;
-      const wasGuest = user?.is_guest;
+      // 現在のゲストユーザー情報を保存
+      const currentUser = user || getStoredGuestUser()
+      if (currentUser?.is_guest) {
+        localStorage.setItem(PREVIOUS_GUEST_ID_KEY, currentUser.id)
+      }
 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'line' as Provider,
         options: {
           redirectTo: `${window.location.origin}/api/auth/line/callback`,
         },
-      });
+      })
 
-      if (error) throw error;
-
-      // ログイン後のコールバックで使用するためにローカルストレージに保存
-      if (wasGuest && currentUserId) {
-        localStorage.setItem('previousGuestId', currentUserId);
-      }
-
-      return data;
+      if (error) throw error
+      return data
     } catch (error) {
-      console.error('Login error:', error);
-      throw error;
+      console.error('Login error:', error)
+      throw error
     }
-  };
+  }
 
   // LINE認証コールバック後のデータ移行処理
   useEffect(() => {
     const migratePreviousGuestData = async () => {
-      const previousGuestId = localStorage.getItem('previousGuestId');
+      const previousGuestId = localStorage.getItem(PREVIOUS_GUEST_ID_KEY)
       
       if (previousGuestId && user && !user.is_guest) {
         try {
-          await migrateGuestData(previousGuestId, user.id);
-          localStorage.removeItem('previousGuestId');
+          await migrateGuestData(previousGuestId, user.id)
+          localStorage.removeItem(PREVIOUS_GUEST_ID_KEY)
         } catch (error) {
-          console.error('Failed to migrate guest data:', error);
-          setAuthError(error instanceof Error ? error : new Error('ゲストデータの移行に失敗しました'));
+          console.error('Failed to migrate guest data:', error)
+          setAuthError(error instanceof Error ? error : new Error('ゲストデータの移行に失敗しました'))
         }
       }
-    };
+    }
 
     if (user && !loading) {
-      migratePreviousGuestData();
+      migratePreviousGuestData()
     }
-  }, [user, loading]);
+  }, [user, loading])
 
   const logout = async () => {
     try {
       const { error } = await supabase.auth.signOut()
       if (error) throw error
+      clearGuestUser()
       setUser(null)
+      setIsGuest(false)
       router.push('/')
     } catch (error) {
       console.error('Logout error:', error)
@@ -274,20 +359,26 @@ export function useAuth(): AuthContextType {
 
   const migrateGuestToRegular = async () => {
     try {
-      if (!user || !user.is_guest) return;
+      if (!user?.is_guest) return
+
       const { data, error } = await supabase
         .from('users')
         .update({ is_guest: false })
-        .eq('id', user.id);
-      
-      if (error) throw error;
-      
-      setUser(prev => prev ? { ...prev, is_guest: false } : null);
+        .eq('id', user.id)
+        .select()
+        .single()
+
+      if (error) throw error
+      if (data) {
+        setUser(data)
+        setIsGuest(false)
+        clearGuestUser()
+      }
     } catch (error) {
-      console.error('Error migrating guest to regular user:', error);
-      setAuthError(error instanceof Error ? error : new Error('Failed to migrate user'));
+      console.error('Error migrating guest to regular:', error)
+      throw error
     }
-  };
+  }
 
   return {
     user,
