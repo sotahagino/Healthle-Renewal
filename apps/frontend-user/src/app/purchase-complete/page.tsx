@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -11,7 +11,34 @@ export default function PurchaseCompletePage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const [orderId, setOrderId] = useState('')
   const supabase = createClientComponentClient()
+
+  useEffect(() => {
+    const fetchOrderDetails = async () => {
+      try {
+        const sessionId = searchParams.get('session_id')
+        if (!sessionId) return
+
+        const { data: order, error } = await supabase
+          .from('vendor_orders')
+          .select('*')
+          .eq('stripe_session_id', sessionId)
+          .single()
+
+        if (error) throw error
+
+        if (order) {
+          setEmail(order.customer_email || '')
+          setOrderId(order.order_id || '')
+        }
+      } catch (error) {
+        console.error('Error fetching order details:', error)
+      }
+    }
+
+    fetchOrderDetails()
+  }, [searchParams])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -62,7 +89,9 @@ export default function PurchaseCompletePage() {
       <div className="container mx-auto px-4 max-w-lg">
         <h1 className="text-2xl font-bold text-[#2D3748] mb-8">ご購入ありがとうございます</h1>
         <p className="text-[#4A5568] mb-4">ご注文の確認メールをお送りしましたので、ご確認ください。</p>
-        <p className="text-[#4A5568] mb-8">注文番号: {searchParams.get('order_id')}</p>
+        {orderId && (
+          <p className="text-[#4A5568] mb-8">注文番号: {orderId}</p>
+        )}
 
         <div className="bg-white rounded-xl shadow-sm p-6 mb-8">
           <h2 className="text-xl font-semibold text-[#2D3748] mb-6">アカウント登録のご案内</h2>
