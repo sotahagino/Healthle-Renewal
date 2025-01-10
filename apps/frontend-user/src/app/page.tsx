@@ -10,6 +10,18 @@ import { Footer } from '@/components/footer'
 import { Clock, Clipboard, ShieldCheck, CheckCircle, MessageCircle, History } from 'lucide-react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
+interface QuestionOption {
+  id: string;
+  text: string;
+}
+
+interface Question {
+  id: string;
+  text: string;
+  type: string;
+  options?: QuestionOption[];
+}
+
 export default function Home() {
   const router = useRouter()
   const [symptomText, setSymptomText] = useState('')
@@ -89,25 +101,24 @@ export default function Home() {
         }
 
         // 質問データの正規化
-        questions = questions.map(q => ({
-          ...q,
+        const normalizedQuestions = questions.map((q: any) => ({
           id: q.id.trim(),
           text: q.text.trim(),
           type: q.type.trim(),
-          options: Array.isArray(q.options) ? q.options.map(opt => ({
+          options: Array.isArray(q.options) ? q.options.map((opt: QuestionOption) => ({
             id: opt.id.trim(),
             text: opt.text.trim()
           })) : []
-        }))
+        }));
 
-        console.log('Normalized questions:', questions)
+        console.log('Normalized questions:', normalizedQuestions)
       } catch (parseError) {
         console.error('JSON parse error:', parseError)
         throw new Error('質問データの解析に失敗しました')
       }
 
       // 質問票画面に遷移
-      const encodedData = encodeURIComponent(JSON.stringify(questions))
+      const encodedData = encodeURIComponent(JSON.stringify(normalizedQuestions))
       router.push(`/questionnaire?interview_id=${interview_id}&data=${encodedData}`)
 
     } catch (error) {
