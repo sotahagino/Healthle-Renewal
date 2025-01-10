@@ -94,14 +94,14 @@ export default function Home() {
           .replace(/\s+(?=(?:[^"]*"[^"]*")*[^"]*$)/g, '') // 不要な空白を削除（文字列内は除く）
         
         const parsedData = JSON.parse(jsonContent)
-        questions = parsedData.questions
+        const parsedQuestions = parsedData.questions
 
-        if (!Array.isArray(questions)) {
+        if (!Array.isArray(parsedQuestions)) {
           throw new Error('質問データが配列ではありません')
         }
 
         // 質問データの正規化
-        const normalizedQuestions = questions.map((q: any) => ({
+        questions = parsedQuestions.map((q: any) => ({
           id: q.id.trim(),
           text: q.text.trim(),
           type: q.type.trim(),
@@ -111,14 +111,14 @@ export default function Home() {
           })) : []
         }));
 
-        console.log('Normalized questions:', normalizedQuestions)
+        console.log('Normalized questions:', questions)
       } catch (parseError) {
         console.error('JSON parse error:', parseError)
         throw new Error('質問データの解析に失敗しました')
       }
 
       // 質問票画面に遷移
-      const encodedData = encodeURIComponent(JSON.stringify(normalizedQuestions))
+      const encodedData = encodeURIComponent(JSON.stringify(questions))
       router.push(`/questionnaire?interview_id=${interview_id}&data=${encodedData}`)
 
     } catch (error) {
