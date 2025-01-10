@@ -181,6 +181,46 @@ export default function ResultPage() {
     fetchData()
   }, [searchParams])
 
+  useEffect(() => {
+    const saveInterview = async () => {
+      try {
+        const tempUid = !user ? crypto.randomUUID() : user.id;
+        
+        // 相談情報をDBに保存
+        const response = await fetch('/api/interviews/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_id: tempUid,
+            consultation_text: consultationText,
+            questions: questions.map(q => ({
+              question: q.question,
+              answer: q.answer || ''
+            }))
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error('相談情報の保存に失敗しました');
+        }
+
+        const data = await response.json();
+        setInterviewId(data.id);
+
+        // 未ログインの場合、temp_uidを保存
+        if (!user) {
+          localStorage.setItem('temp_uid', tempUid);
+        }
+      } catch (error) {
+        console.error('Error saving interview:', error);
+      }
+    };
+
+    if (consultationText && questions.length > 0) {
+      saveInterview();
+    }
+  }, [consultationText, questions, user]);
+
   const handleStreamingAnswer = async (symptomText: string, answers: Record<string, string>) => {
     try {
       setIsStreaming(true)
