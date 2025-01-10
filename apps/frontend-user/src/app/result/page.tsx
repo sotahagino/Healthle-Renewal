@@ -88,7 +88,7 @@ export default function ResultPage() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               user_id: tempUid,
-              consultation_text: searchParams.get('symptom_text') || '',
+              symptom_text: searchParams.get('symptom_text') || '',
               questions: []
             })
           })
@@ -99,6 +99,7 @@ export default function ResultPage() {
 
           const data = await response.json()
           setInterviewId(data.id)
+          setConsultationText(searchParams.get('symptom_text') || '')
           return
         }
 
@@ -112,7 +113,7 @@ export default function ResultPage() {
         if (error) throw error
 
         // 相談情報をステートに設定
-        setConsultationText(interviewData.consultation_text || '')
+        setConsultationText(interviewData.symptom_text || '')
         setQuestions(interviewData.questions_and_answers || [])
         setInterviewId(interviewData.id)
 
@@ -661,7 +662,7 @@ export default function ResultPage() {
                   </h2>
                 </div>
                 <div className="prose prose-lg max-w-none text-[#4A5568] leading-relaxed">
-                  <ReactMarkdown>{consultationText}</ReactMarkdown>
+                  {consultationText}
                 </div>
               </div>
             </CardContent>

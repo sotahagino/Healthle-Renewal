@@ -1,6 +1,12 @@
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
+
+const serviceClient = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
 
 export async function POST(req: Request) {
   try {
@@ -18,7 +24,7 @@ export async function POST(req: Request) {
 
     console.log('Updating user_id for order:', { user_id, order_id })
 
-    const { data: updateData, error: updateError } = await supabase
+    const { data: updateData, error: updateError } = await serviceClient
       .from('vendor_orders')
       .update({ 
         user_id,
@@ -26,6 +32,7 @@ export async function POST(req: Request) {
       })
       .eq('order_id', order_id)
       .select()
+      .single()
 
     if (updateError) {
       console.error('Update error:', updateError)
@@ -35,7 +42,7 @@ export async function POST(req: Request) {
       )
     }
 
-    if (!updateData || updateData.length === 0) {
+    if (!updateData) {
       return NextResponse.json(
         { error: 'Order not found' },
         { status: 404 }
@@ -46,7 +53,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       success: true,
-      data: updateData[0]
+      data: updateData
     })
 
   } catch (error) {

@@ -53,25 +53,44 @@ export default function QuestionnairePage() {
       const decodedData = decodeURIComponent(data)
       console.log('Decoded data:', decodedData)
 
-      const parsedData = typeof decodedData === 'string' 
-        ? JSON.parse(decodedData)
-        : decodedData
+      let parsedQuestions
+      try {
+        parsedQuestions = JSON.parse(decodedData)
+      } catch (parseError) {
+        console.error('JSON parse error:', parseError)
+        throw new Error('質問データの形式が不正です')
+      }
 
-      const questionData = Array.isArray(parsedData) 
-        ? parsedData 
-        : parsedData.questions || []
+      // 質問データの検証
+      if (!Array.isArray(parsedQuestions)) {
+        throw new Error('質問データが配列ではありません')
+      }
 
-      setQuestions(questionData)
+      // 必須フィールドの検証
+      parsedQuestions.forEach((question, index) => {
+        if (!question.id || !question.text || !question.type) {
+          throw new Error(`質問${index + 1}に必須フィールドが不足しています`)
+        }
+        if (question.type !== '自由記述' && (!Array.isArray(question.options) || question.options.length === 0)) {
+          throw new Error(`質問${index + 1}の選択肢が不正です`)
+        }
+      })
+
+      setQuestions(parsedQuestions)
       
+      // 回答の初期化
       const initialAnswers: { [key: string]: string | string[] } = {}
-      questionData.forEach((q: Question) => {
+      parsedQuestions.forEach((q: Question) => {
         initialAnswers[q.id] = q.type === '複数選択' ? [] : ''
       })
       setAnswers(initialAnswers)
 
     } catch (err) {
       console.error('質問データ解析エラー:', err)
-      setError('質問データの読み込みに失敗しました')
+      setError(err instanceof Error ? err.message : '質問データの読み込みに失敗しました')
+      if (errorRef.current) {
+        errorRef.current.scrollIntoView({ behavior: 'smooth' })
+      }
     }
   }, [searchParams])
 

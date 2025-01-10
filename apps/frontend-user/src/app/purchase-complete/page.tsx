@@ -53,20 +53,13 @@ export default function PurchaseCompletePage() {
       // セッションIDを取得
       const sessionId = searchParams.get('session_id')
       
-      // メールアドレスを保存
-      if (sessionId) {
-        await fetch('/api/orders/update-email', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            session_id: sessionId,
-            email: email 
-          })
-        })
+      if (!sessionId) {
+        setError('セッションIDが見つかりません')
+        return
       }
 
       // アカウント作成
-      const { error: signUpError } = await supabase.auth.signUp({
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -75,6 +68,36 @@ export default function PurchaseCompletePage() {
       })
 
       if (signUpError) throw signUpError
+
+      // メールアドレスを保存
+      const response = await fetch('/api/orders/update-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          session_id: sessionId,
+          email: email 
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('メールアドレスの保存に失敗しました')
+      }
+
+      // ユーザーIDを更新
+      if (signUpData.user) {
+        const updateResponse = await fetch('/api/orders/update-user', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_id: signUpData.user.id,
+            order_id: orderId
+          })
+        })
+
+        if (!updateResponse.ok) {
+          throw new Error('ユーザーIDの更新に失敗しました')
+        }
+      }
 
       // 成功メッセージを表示
       alert('アカウントが作成されました。確認メールをご確認ください。')

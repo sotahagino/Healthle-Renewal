@@ -46,7 +46,7 @@ export async function POST(request: Request) {
         .from('vendor_orders')
         .update({
           status: 'paid',
-          customer_email: session.customer_details?.email,
+          customer_email: session.customer_details?.email || session.customer_email,
           shipping_address: formatAddress(session.shipping_details?.address),
           shipping_name: session.shipping_details?.name,
           shipping_phone: session.customer_details?.phone,
@@ -63,6 +63,11 @@ export async function POST(request: Request) {
           { status: 500 }
         )
       }
+
+      console.log('Order updated successfully:', {
+        session_id: session.id,
+        customer_email: session.customer_details?.email || session.customer_email
+      })
     }
 
     return NextResponse.json({ message: 'Processed successfully' })

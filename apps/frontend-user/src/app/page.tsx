@@ -69,7 +69,7 @@ export default function Home() {
       const difyData = await difyRes.json()
       console.log('Dify API response:', difyData)
 
-      // Markdown形式の回答からJSONを抽出
+      // Markdown形式の回答からJSONを抽出して正規化
       const jsonMatch = difyData.answer.match(/```json\n([\s\S]*?)\n```/)
       if (!jsonMatch) {
         throw new Error('質問データの形式が不正です')
@@ -77,13 +77,30 @@ export default function Home() {
 
       let questions
       try {
-        const jsonContent = jsonMatch[1].trim()
+        const jsonContent = jsonMatch[1]
+          .trim()
+          .replace(/\s+(?=(?:[^"]*"[^"]*")*[^"]*$)/g, '') // 不要な空白を削除（文字列内は除く）
+        
         const parsedData = JSON.parse(jsonContent)
         questions = parsedData.questions
+
         if (!Array.isArray(questions)) {
           throw new Error('質問データが配列ではありません')
         }
-        console.log('Parsed questions:', questions)
+
+        // 質問データの正規化
+        questions = questions.map(q => ({
+          ...q,
+          id: q.id.trim(),
+          text: q.text.trim(),
+          type: q.type.trim(),
+          options: Array.isArray(q.options) ? q.options.map(opt => ({
+            id: opt.id.trim(),
+            text: opt.text.trim()
+          })) : []
+        }))
+
+        console.log('Normalized questions:', questions)
       } catch (parseError) {
         console.error('JSON parse error:', parseError)
         throw new Error('質問データの解析に失敗しました')
