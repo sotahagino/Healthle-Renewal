@@ -74,29 +74,47 @@ export default function ResultPage() {
 
   useEffect(() => {
     const fetchData = async () => {
-      const interview_id = searchParams.get('interview_id')
-      
-      if (!interview_id) {
-        setError('問診IDが見つかりません')
-        return
-      }
-
       try {
-        // medical_interviewsからデータを取得
-        const { data: interviewData, error: interviewError } = await supabase
-          .from('medical_interviews')
-          .select('*, interview_conversations(*)')
-          .eq('id', interview_id)
-          .single()
+        const interviewId = searchParams.get('interview_id')
+        if (!interviewId) {
+          // 相談情報がない場合は新規作成
+          const tempUid = !user ? crypto.randomUUID() : user.id
+          if (!user) {
+            localStorage.setItem('temp_uid', tempUid)
+          }
 
-        if (interviewError) throw interviewError
+          const response = await fetch('/api/interviews/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              user_id: tempUid,
+              consultation_text: searchParams.get('symptom_text') || '',
+              questions: []
+            })
+          })
 
-        if (!interviewData) {
-          throw new Error('問診データが見つかりません')
+          if (!response.ok) {
+            throw new Error('相談情報の保存に失敗しました')
+          }
+
+          const data = await response.json()
+          setInterviewId(data.id)
+          return
         }
 
-        // 相談内容を設定
-        setConsultationText(interviewData.symptom_text || '')
+        // 既存の相談情報を取得
+        const { data: interviewData, error } = await supabase
+          .from('medical_interviews')
+          .select('*')
+          .eq('id', interviewId)
+          .single()
+
+        if (error) throw error
+
+        // 相談情報をステートに設定
+        setConsultationText(interviewData.consultation_text || '')
+        setQuestions(interviewData.questions_and_answers || [])
+        setInterviewId(interviewData.id)
 
         // チャット履歴の初期化
         const initialHistory: ChatMessage[] = []
@@ -146,7 +164,7 @@ export default function ResultPage() {
 
           // レコメンド結果を保存
           if (products && products.length > 0) {
-            await saveRecommendations(interview_id, products)
+            await saveRecommendations(interviewId, products)
           }
         } catch (error) {
           console.error('Error in product recommendations:', error)
@@ -179,47 +197,7 @@ export default function ResultPage() {
     }
 
     fetchData()
-  }, [searchParams])
-
-  useEffect(() => {
-    const saveInterview = async () => {
-      try {
-        const tempUid = !user ? crypto.randomUUID() : user.id;
-        
-        // 相談情報をDBに保存
-        const response = await fetch('/api/interviews/create', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            user_id: tempUid,
-            consultation_text: consultationText,
-            questions: questions.map(q => ({
-              question: q.question,
-              answer: q.answer || ''
-            }))
-          })
-        });
-
-        if (!response.ok) {
-          throw new Error('相談情報の保存に失敗しました');
-        }
-
-        const data = await response.json();
-        setInterviewId(data.id);
-
-        // 未ログインの場合、temp_uidを保存
-        if (!user) {
-          localStorage.setItem('temp_uid', tempUid);
-        }
-      } catch (error) {
-        console.error('Error saving interview:', error);
-      }
-    };
-
-    if (consultationText && questions.length > 0) {
-      saveInterview();
-    }
-  }, [consultationText, questions, user]);
+  }, [searchParams, user])
 
   const handleStreamingAnswer = async (symptomText: string, answers: Record<string, string>) => {
     try {
