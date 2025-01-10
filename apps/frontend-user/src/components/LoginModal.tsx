@@ -7,24 +7,6 @@ interface LoginModalProps {
   onClose: () => void;
 }
 
-interface LoginContentProps {
-  onLogin: () => void;
-  returnTo: string;
-  title: string;
-  message: string;
-  additionalMessage: React.ReactElement;
-}
-
-const LoginContent: React.FC<LoginContentProps> = ({
-  onLogin,
-  returnTo,
-  title,
-  message,
-  additionalMessage
-}) => {
-  // ... existing code ...
-};
-
 export function LoginModal({ isOpen, onClose }: LoginModalProps) {
   const handleLineLogin = () => {
     try {

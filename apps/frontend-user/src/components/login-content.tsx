@@ -1,48 +1,34 @@
 "use client"
 
-import { useState } from 'react'
-import { useAuth } from '@/providers/auth-provider'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import React from 'react';
+import { Button } from '@/components/ui/button';
 
-export function LoginContent() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const { signIn, error } = useAuth()
+interface LoginContentProps {
+  onLogin: () => void;
+  returnTo: string;
+  title: string;
+  message: string;
+  additionalMessage: React.ReactElement;
+}
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    try {
-      await signIn(email, password)
-    } catch (error) {
-      console.error('Login error:', error)
-    }
-  }
-
+export const LoginContent: React.FC<LoginContentProps> = ({
+  onLogin,
+  returnTo,
+  title,
+  message,
+  additionalMessage
+}) => {
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <Input
-          type="email"
-          placeholder="メールアドレス"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-        />
-      </div>
-      <div>
-        <Input
-          type="password"
-          placeholder="パスワード"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-        />
-      </div>
-      {error && <p className="text-red-500 text-sm">{error}</p>}
-      <Button type="submit" className="w-full">
-        ログイン
+    <div className="p-6">
+      <h2 className="text-2xl font-bold text-[#4C9A84] mb-4">{title}</h2>
+      <p className="text-[#666666] mb-6">{message}</p>
+      {additionalMessage}
+      <Button
+        onClick={onLogin}
+        className="w-full bg-[#4C9A84] hover:bg-[#3A8B73] text-white mt-6"
+      >
+        LINEで連携する
       </Button>
-    </form>
-  )
-} 
+    </div>
+  );
+}; 
