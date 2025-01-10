@@ -1,13 +1,11 @@
 'use client'
 
-import { Inter } from "next/font/google"
+import type { Metadata } from 'next'
+import { Inter } from 'next/font/google'
 import "./globals.css"
 import { AuthProvider } from '@/providers/auth-provider'
 
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
-})
+const inter = Inter({ subsets: ['latin'] })
 
 export default function RootLayout({
   children,
@@ -15,8 +13,8 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="ja">
-      <body className={`${inter.variable} font-sans antialiased`}>
+    <html lang="ja" className={inter.className}>
+      <body className="font-sans antialiased">
         <AuthProvider>
           {children}
         </AuthProvider>

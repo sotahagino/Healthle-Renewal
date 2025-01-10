@@ -8,7 +8,7 @@ const supabase = createClient(
 
 export async function POST(request: NextRequest) {
   try {
-    const { symptom_text, consultation_id } = await request.json()
+    const { symptom_text } = await request.json()
 
     if (!symptom_text) {
       return NextResponse.json(
@@ -16,6 +16,8 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
+
+    console.log('Sending request to Dify API with symptom:', symptom_text)
 
     // Dify APIを使用して質問を生成
     const difyResponse = await fetch(`${process.env.NEXT_PUBLIC_DIFY_API_URL}/completion-messages`, {
@@ -27,17 +29,19 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify({
         inputs: { symptom: symptom_text },
         response_mode: "blocking",
-        user: consultation_id
+        user: "anonymous"
       })
     })
 
+    const responseText = await difyResponse.text()
+    console.log('Dify API raw response:', responseText)
+
     if (!difyResponse.ok) {
-      console.error('Dify API error:', await difyResponse.text())
-      throw new Error('質問生成に失敗しまし���')
+      throw new Error(`Dify API error: ${responseText}`)
     }
 
-    const difyData = await difyResponse.json()
-    console.log('Dify API response:', difyData)
+    const difyData = JSON.parse(responseText)
+    console.log('Parsed Dify response:', difyData)
 
     // 質問データを整形
     let questions
@@ -47,12 +51,16 @@ export async function POST(request: NextRequest) {
         .replace(/\s+/g, ' ')             // 複数の空白を単一の空白に
         .trim()                           // 前後の空白を削除
       
+      console.log('Cleaned answer:', cleanedAnswer)
+      
       const parsedData = JSON.parse(cleanedAnswer)
       questions = parsedData.questions
       
       if (!Array.isArray(questions)) {
         throw new Error('質問データの形式が不正です')
       }
+
+      console.log('Parsed questions:', questions)
     } catch (error) {
       console.error('Failed to parse questions:', error)
       throw new Error('質問データの解析に失敗しました')

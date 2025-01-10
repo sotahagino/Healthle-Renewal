@@ -48,7 +48,7 @@ export async function POST(req: Request) {
           order_id: orderNumber,
           user_id: user_id,
           product_id: product_id,
-          vendor_id: product.vendor_id,
+          vendor_id: product.vendor_id || '00000000-0000-0000-0000-000000000000',
           total_amount: product.price,
           status: 'pending',
           created_at: new Date().toISOString(),
@@ -61,7 +61,7 @@ export async function POST(req: Request) {
     if (orderError) {
       console.error('Order creation error:', orderError)
       return NextResponse.json(
-        { error: '注文の作成に失敗しました' },
+        { error: `注文の作成に失敗しました: ${orderError.message}` },
         { status: 500 }
       )
     }
@@ -137,12 +137,16 @@ export async function POST(req: Request) {
       // エラーはログに残すが、ユーザーフローは継続
     }
 
-    return NextResponse.json({ url: session.url })
+    return NextResponse.json({ 
+      url: session.url,
+      order_id: orderNumber
+    })
 
   } catch (error) {
     console.error('Error in create order API:', error)
+    const errorMessage = error instanceof Error ? error.message : '注文処理中にエラーが発生しました'
     return NextResponse.json(
-      { error: '注文処理中にエラーが発生しました' },
+      { error: errorMessage },
       { status: 500 }
     )
   }

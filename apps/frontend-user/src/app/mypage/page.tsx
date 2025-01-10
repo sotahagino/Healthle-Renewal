@@ -1,107 +1,153 @@
 "use client"
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import { useAuth } from '@/providers/auth-provider'
+import { Header } from '@/components/header'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { useRouter } from 'next/navigation'
-import { useAuthContext } from '@/providers/auth-provider'
-import { LoadingSpinner } from '@/components/ui/loading-spinner'
-import { SiteHeader } from '@/components/site-header'
-import { Footer } from '@/components/footer'
+import { Icons } from '@/components/ui/icons'
+import { Badge } from '@/components/ui/badge'
+
+interface Order {
+  id: string
+  created_at: string
+  status: string
+  total_amount: number
+  product_name: string
+}
+
+const statusMap: Record<string, { label: string; variant: 'default' | 'secondary' | 'success' }> = {
+  pending: { label: '処理中', variant: 'secondary' },
+  completed: { label: '完了', variant: 'success' },
+  default: { label: '未定義', variant: 'default' },
+}
 
 export default function MyPage() {
+  const { user, signOut } = useAuth()
   const router = useRouter()
-  const { user, loading, isAuthenticated, refreshUserData, logout } = useAuthContext()
+  const [orders, setOrders] = useState<Order[]>([])
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const initializePage = async () => {
-      if (!loading && !isAuthenticated) {
-        router.push('/login')
-        return
-      }
+    if (!user) {
+      router.push('/login')
+      return
+    }
 
-      if (isAuthenticated) {
-        await refreshUserData()
+    const fetchOrders = async () => {
+      try {
+        const response = await fetch('/api/orders/list')
+        if (!response.ok) throw new Error('Failed to fetch orders')
+        const data = await response.json()
+        setOrders(data)
+      } catch (error) {
+        console.error('Error fetching orders:', error)
+      } finally {
+        setLoading(false)
       }
     }
 
-    initializePage()
-  }, [loading, isAuthenticated, router, refreshUserData])
+    fetchOrders()
+  }, [user, router])
 
-  const handleLogout = async () => {
-    try {
-      await logout()
-      router.push('/')
-    } catch (error) {
-      console.error('Logout error:', error)
-    }
+  const handleSignOut = async () => {
+    await signOut()
+    router.push('/')
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <LoadingSpinner />
+      <div className="min-h-screen bg-gradient-to-b from-[#F8FBFA] to-white">
+        <Header />
+        <main className="container mx-auto px-4 py-8">
+          <div className="flex justify-center items-center h-64">
+            <Icons.spinner className="h-8 w-8 animate-spin text-[#4C9A84]" />
+          </div>
+        </main>
       </div>
     )
   }
 
-  if (!user) {
-    return null
-  }
-
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#E6F3EF] to-white">
-      <SiteHeader />
-      <main className="flex-grow container mx-auto px-4 py-12 mt-16">
-        <h1 className="text-2xl font-bold mb-4">マイページ</h1>
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="space-y-4">
-            <p className="text-lg">ようこそ {user.name || user.email || 'ゲスト'} さん</p>
-            <div className="border-t pt-4">
-              <h2 className="text-xl font-semibold mb-2">アカウント情報</h2>
-              <dl className="space-y-2">
-                <div>
-                  <dt className="text-gray-600">メールアドレス</dt>
-                  <dd>{user.email || '未設定'}</dd>
+    <div className="min-h-screen bg-gradient-to-b from-[#F8FBFA] to-white">
+      <Header />
+      <main className="container mx-auto px-4 py-12 max-w-4xl">
+        <div className="space-y-8">
+          <Card className="border-0 shadow-lg">
+            <CardHeader className="space-y-2">
+              <CardTitle className="text-2xl font-bold text-[#4C9A84]">
+                アカウント情報
+              </CardTitle>
+              <CardDescription>
+                アカウントの基本情報を確認できます
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                <div className="grid gap-1">
+                  <p className="text-sm font-medium text-gray-500">メールアドレス</p>
+                  <p className="text-base">{user?.email}</p>
                 </div>
-                <div>
-                  <dt className="text-gray-600">アカウントタイプ</dt>
-                  <dd>{user.is_guest ? 'ゲストユーザー' : '正規ユーザー'}</dd>
+                <Button
+                  onClick={handleSignOut}
+                  variant="outline"
+                  className="w-full sm:w-auto text-[#4C9A84] border-[#4C9A84] hover:bg-[#4C9A84] hover:text-white"
+                >
+                  ログアウト
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-0 shadow-lg">
+            <CardHeader className="space-y-2">
+              <CardTitle className="text-2xl font-bold text-[#4C9A84]">
+                購入履歴
+              </CardTitle>
+              <CardDescription>
+                過去の購入履歴を確認できます
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {orders.length === 0 ? (
+                <div className="text-center py-12">
+                  <Icons.inbox className="mx-auto h-12 w-12 text-gray-400" />
+                  <p className="mt-4 text-gray-500">購入履歴はありません</p>
                 </div>
-                <div>
-                  <dt className="text-gray-600">名前</dt>
-                  <dd>{user.name || '未設定'}</dd>
+              ) : (
+                <div className="space-y-4">
+                  {orders.map((order) => (
+                    <div
+                      key={order.id}
+                      className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+                    >
+                      <div className="space-y-1 mb-2 sm:mb-0">
+                        <h3 className="font-medium">{order.product_name}</h3>
+                        <p className="text-sm text-gray-500">
+                          {new Date(order.created_at).toLocaleDateString('ja-JP', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                          })}
+                        </p>
+                      </div>
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4">
+                        <Badge variant={statusMap[order.status]?.variant || 'default'}>
+                          {statusMap[order.status]?.label || order.status}
+                        </Badge>
+                        <span className="font-medium whitespace-nowrap">
+                          ¥{order.total_amount.toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                <div>
-                  <dt className="text-gray-600">電話番号</dt>
-                  <dd>{user.phone_number || '未設定'}</dd>
-                </div>
-                <div>
-                  <dt className="text-gray-600">住所</dt>
-                  <dd>
-                    {user.postal_code && user.prefecture && user.city && user.address_line
-                      ? `〒${user.postal_code} ${user.prefecture}${user.city}${user.address_line}`
-                      : '未設定'}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-gray-600">生年月日</dt>
-                  <dd>{user.birthdate || '未設定'}</dd>
-                </div>
-              </dl>
-            </div>
-          </div>
-        </div>
-        
-        {/* ログアウトボタン */}
-        <div className="mt-8 text-center">
-          <button
-            onClick={handleLogout}
-            className="px-6 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors duration-200"
-          >
-            ログアウト
-          </button>
+              )}
+            </CardContent>
+          </Card>
         </div>
       </main>
-      <Footer />
     </div>
   )
 }

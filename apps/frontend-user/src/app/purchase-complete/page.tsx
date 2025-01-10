@@ -1,261 +1,188 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useSearchParams, useRouter } from 'next/navigation'
-import { useAuth } from '@/hooks/useAuth'
-import { SiteHeader } from '@/components/site-header'
-import { Footer } from '@/components/footer'
-import { LoginModal } from '@/components/login-modal'
-import { CheckCircle, Package, ArrowRight, AlertCircle } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { useAuth } from '@/providers/auth-provider'
+import { Header } from '@/components/header'
 import { Button } from '@/components/ui/button'
-import { getGuestUserInfo } from '@/utils/guest-utils'
-
-interface OrderStatus {
-  orderId: string | null;
-  status: 'pending' | 'paid' | 'error';
-  error?: string;
-}
-
-interface ErrorComponentProps {
-  error: Error;
-  onRetry: () => void;
-}
-
-const ErrorComponent = ({ error, onRetry }: ErrorComponentProps) => (
-  <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#E6F3EF] to-white">
-    <SiteHeader />
-    <main className="flex-grow container mx-auto px-4 py-8 mt-16">
-      <div className="max-w-2xl mx-auto bg-white p-8 rounded-lg shadow-md">
-        <div className="flex flex-col items-center justify-center space-y-4">
-          <AlertCircle className="w-12 h-12 text-red-500" />
-          <p className="text-lg text-gray-600">{error.message}</p>
-          <Button onClick={onRetry} className="bg-[#4C9A84] text-white">
-            再試行
-          </Button>
-        </div>
-      </div>
-    </main>
-    <Footer />
-  </div>
-);
+import { Input } from '@/components/ui/input'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Label } from '@/components/ui/label'
+import { Icons } from '@/components/ui/icons'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 
 export default function PurchaseCompletePage() {
   const router = useRouter()
-  const [showLoginModal, setShowLoginModal] = useState(false)
-  const { user, loading, isGuestUser, loginAsGuest, authError } = useAuth()
-  const searchParams = useSearchParams()
-  const sessionId = searchParams.get('session_id')
-  const [pageLoading, setPageLoading] = useState(true)
-  const [initializationError, setInitializationError] = useState<Error | null>(null)
-  const [retryCount, setRetryCount] = useState(0)
-  const [orderStatus, setOrderStatus] = useState<OrderStatus>({
+  const { user } = useAuth()
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [orderStatus, setOrderStatus] = useState<{
+    orderId: string | null;
+    status: 'pending' | 'paid' | 'error';
+  }>({
     orderId: null,
     status: 'pending'
   })
 
-  const checkOrderStatus = async (sessionId: string) => {
-    try {
-      const response = await fetch(`/api/orders/check-session?session_id=${sessionId}`);
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || '注文情報の取得に失敗しました');
-      }
-
-      return data;
-    } catch (error) {
-      console.error('Error checking order status:', error);
-      throw error;
-    }
-  };
-
-  const initializeGuestUser = async () => {
-    try {
-      setInitializationError(null);
-      const guestInfo = getGuestUserInfo();
-      if (!user && guestInfo) {
-        console.log('Found guest info, attempting to restore session');
-        await loginAsGuest();
-      }
-
-      if (sessionId) {
-        const orderData = await checkOrderStatus(sessionId);
-        setOrderStatus({
-          orderId: orderData.order_id,
-          status: 'paid'
-        });
-      }
-    } catch (error) {
-      console.error('Failed to initialize guest user or check order:', error);
-      setInitializationError(error as Error);
-      setOrderStatus(prev => ({
-        ...prev,
-        status: 'error',
-        error: error instanceof Error ? error.message : '初期化に失敗しました'
-      }));
-    } finally {
-      setPageLoading(false);
-    }
-  };
-
   useEffect(() => {
-    let mounted = true;
-    let timeoutId: NodeJS.Timeout;
-    
-    const initialize = async () => {
-      if (!loading && mounted) {
+    const searchParams = new URLSearchParams(window.location.search)
+    const sessionId = searchParams.get('session_id')
+
+    if (sessionId && !user) {
+      const fetchSessionDetails = async () => {
         try {
-          await initializeGuestUser();
-        } catch (error) {
-          if (mounted && retryCount < 3) {
-            timeoutId = setTimeout(() => {
-              setRetryCount(prev => prev + 1);
-              initialize();
-            }, Math.min(1000 * Math.pow(2, retryCount), 8000));
+          const response = await fetch(`/api/orders/check-session?session_id=${sessionId}`)
+          const data = await response.json()
+          
+          if (!response.ok) throw new Error(data.error || '注文情報の取得に失敗しました')
+          
+          setOrderStatus({
+            orderId: data.order_id,
+            status: 'paid'
+          })
+          
+          if (data.customer_email) {
+            setEmail(data.customer_email)
           }
+        } catch (error) {
+          console.error('Error fetching session details:', error)
+          setOrderStatus(prev => ({
+            ...prev,
+            status: 'error'
+          }))
+        } finally {
+          setLoading(false)
         }
       }
-    };
 
-    initialize();
+      fetchSessionDetails()
+    } else {
+      setLoading(false)
+    }
+  }, [user])
 
-    return () => {
-      mounted = false;
-      if (timeoutId) {
-        clearTimeout(timeoutId);
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError(null)
+    
+    try {
+      const tempUid = localStorage.getItem('temp_uid')
+      const response = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          password,
+          temp_uid: tempUid
+        })
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'アカウント登録に失敗しました')
       }
-    };
-  }, [loading, user, loginAsGuest, sessionId, retryCount]);
 
-  useEffect(() => {
-    if (authError) {
-      setInitializationError(authError);
+      // 登録成功後、temp_uidを削除
+      localStorage.removeItem('temp_uid')
+      router.push('/mypage')
+    } catch (error) {
+      console.error('Signup error:', error)
+      setError(error instanceof Error ? error.message : 'アカウント登録に失敗しました')
     }
-  }, [authError]);
-
-  useEffect(() => {
-    console.log('Purchase complete page state:', {
-      loading,
-      pageLoading,
-      user,
-      isGuestUser,
-      sessionId,
-      showLoginModal,
-      initializationError,
-      retryCount,
-      orderStatus,
-      timestamp: new Date().toISOString()
-    });
-
-    if (!loading && !pageLoading && (!user || isGuestUser) && !showLoginModal && orderStatus.status === 'paid') {
-      console.log('Showing login modal for guest/non-logged-in user');
-      setShowLoginModal(true);
-    }
-  }, [loading, pageLoading, user, isGuestUser, sessionId, showLoginModal, initializationError, retryCount, orderStatus]);
-
-  const handleRetry = async () => {
-    setRetryCount(prev => prev + 1);
-    setPageLoading(true);
-    setOrderStatus({ orderId: null, status: 'pending' });
-    await initializeGuestUser();
-  };
-
-  const handleLogin = () => {
-    router.push('/login')
   }
 
-  if (initializationError) {
-    return <ErrorComponent error={initializationError} onRetry={handleRetry} />;
-  }
-
-  if (loading || pageLoading || orderStatus.status === 'pending') {
+  if (loading) {
     return (
-      <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#E6F3EF] to-white">
-        <SiteHeader />
-        <main className="flex-grow container mx-auto px-4 py-8 mt-16">
-          <div className="max-w-2xl mx-auto bg-white p-8 rounded-lg shadow-md">
-            <div className="flex flex-col items-center justify-center space-y-4">
-              <div className="animate-spin rounded-full h-12 w-12 border-4 border-[#4C9A84] border-t-transparent" />
-              <p className="text-lg text-gray-600">注文情報を確認中...</p>
-            </div>
+      <div className="min-h-screen bg-gradient-to-b from-[#F8FBFA] to-white">
+        <Header />
+        <main className="container mx-auto px-4 py-8">
+          <div className="flex justify-center items-center h-64">
+            <Icons.spinner className="h-8 w-8 animate-spin text-[#4C9A84]" />
           </div>
         </main>
-        <Footer />
       </div>
     )
   }
 
-  if (orderStatus.status === 'error') {
-    return <ErrorComponent 
-      error={new Error(orderStatus.error || '注文情報の取得に失敗しました')} 
-      onRetry={handleRetry} 
-    />;
-  }
-
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#E6F3EF] to-white">
-      <SiteHeader />
-      <main className="flex-grow container mx-auto px-4 py-8 mt-16">
-        <div className="max-w-2xl mx-auto bg-white p-8 rounded-lg shadow-md">
-          <div className="text-center mb-8">
-            <CheckCircle className="w-16 h-16 text-[#4C9A84] mx-auto mb-4" />
-            <h1 className="text-2xl font-bold mb-4 text-[#4C9A84]">
+    <div className="min-h-screen bg-gradient-to-b from-[#F8FBFA] to-white">
+      <Header />
+      <main className="container mx-auto px-4 py-12 max-w-4xl">
+        <Card className="border-0 shadow-lg">
+          <CardHeader>
+            <CardTitle className="text-2xl font-bold text-[#4C9A84]">
               ご購入ありがとうございます
-            </h1>
-            <p className="text-gray-600 mb-2">
+            </CardTitle>
+            <CardDescription>
               ご注文の確認メールをお送りしましたので、ご確認ください。
-            </p>
+            </CardDescription>
             {orderStatus.orderId && (
               <p className="text-sm text-gray-500">
                 注文番号: {orderStatus.orderId}
               </p>
             )}
-          </div>
-          
-          <div className="space-y-6 mb-8">
-            <div className="flex items-start p-4 bg-[#F0F8F5] rounded-lg">
-              <Package className="w-6 h-6 text-[#4C9A84] mr-4 flex-shrink-0" />
-              <div>
-                <h3 className="font-semibold text-[#333333]">商品の発送について</h3>
-                <p className="text-gray-600">商品の発送準備が整い次第、発送状況をお知らせいたします。</p>
+          </CardHeader>
+          <CardContent>
+            {!user && orderStatus.status === 'paid' && (
+              <div className="mt-8">
+                <div className="bg-[#F8FBFA] p-6 rounded-lg mb-6">
+                  <h2 className="text-xl font-bold text-[#4C9A84] mb-4">
+                    アカウント登録のご案内
+                  </h2>
+                  <p className="text-gray-600 mb-4">
+                    アカウントを登録すると、以下のサービスがご利用いただけます：
+                  </p>
+                  <ul className="space-y-2 text-gray-600 mb-6">
+                    <li>• 注文履歴の確認</li>
+                    <li>• 配送状況の追跡</li>
+                    <li>• 過去の相談内容の確認</li>
+                  </ul>
+                </div>
+
+                <form onSubmit={handleSignUp} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="email">メールアドレス</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      disabled
+                      className="bg-gray-50"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="password">パスワード</Label>
+                    <Input
+                      id="password"
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="8文字以上の英数字"
+                      required
+                    />
+                  </div>
+
+                  {error && (
+                    <Alert variant="destructive">
+                      <AlertDescription>{error}</AlertDescription>
+                    </Alert>
+                  )}
+
+                  <Button
+                    type="submit"
+                    className="w-full bg-[#4C9A84] hover:bg-[#3A8B73] text-white"
+                  >
+                    アカウントを作成
+                  </Button>
+                </form>
               </div>
-            </div>
-          </div>
-          
-          {(!user || isGuestUser) && (
-            <div className="mt-8 p-6 bg-[#E6F3EF] rounded-lg">
-              <h2 className="text-xl font-bold text-[#4C9A84] mb-4 text-center">
-                LINEで最新情報をお届け
-              </h2>
-              <p className="text-center text-gray-600 mb-6">
-                LINEアカウントと連携すると、以下のサービスがご利用いただけます：
-              </p>
-              <ul className="space-y-3 mb-6 text-gray-600">
-                <li className="flex items-center">
-                  <CheckCircle className="w-5 h-5 text-[#4C9A84] mr-2" />
-                  商品の発送状況をリアルタイムでお知らせ
-                </li>
-                <li className="flex items-center">
-                  <CheckCircle className="w-5 h-5 text-[#4C9A84] mr-2" />
-                  お得なクーポンや最新情報をお届け
-                </li>
-                <li className="flex items-center">
-                  <CheckCircle className="w-5 h-5 text-[#4C9A84] mr-2" />
-                  注文履歴の確認や再注文が簡単に
-                </li>
-              </ul>
-              <Button
-                onClick={handleLogin}
-                className="w-full bg-[#4C9A84] text-white py-3 rounded-lg hover:bg-[#3A8B73] transition-colors flex items-center justify-center space-x-2"
-              >
-                <span>LINEで登録する</span>
-                <ArrowRight className="w-5 h-5" />
-              </Button>
-            </div>
-          )}
-        </div>
+            )}
+          </CardContent>
+        </Card>
       </main>
-      <Footer />
     </div>
   )
 } 

@@ -13,4 +13,7 @@ export const getSupabaseClient = () => {
 
 export const clearSupabaseInstance = () => {
   supabaseInstance = null
-} 
+}
+
+// 直接のクライアントインスタンスもエクスポート
+export const supabase = getSupabaseClient() 

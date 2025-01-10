@@ -8,8 +8,6 @@ import { Card, CardContent } from "@/components/ui/card"
 import { SiteHeader } from '@/components/site-header'
 import { Footer } from '@/components/footer'
 import { Clock, Clipboard, ShieldCheck, CheckCircle, MessageCircle, History } from 'lucide-react'
-import { v4 as uuidv4 } from 'uuid'
-import { useAuth } from '@/hooks/useAuth'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
 export default function Home() {
@@ -17,7 +15,6 @@ export default function Home() {
   const [symptomText, setSymptomText] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const { user, loginAsGuest } = useAuth()
   const supabase = createClientComponentClient()
 
   const handleStartConsultation = async () => {
@@ -31,109 +28,76 @@ export default function Home() {
     }
 
     try {
-      let currentUser = user
+      // 問診データを作成
+      const res = await fetch('/api/interviews', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          symptom_text: symptomText,
+        }),
+      })
 
-      // ユーザーが未ログインの場合、ゲストログインを実行
-      if (!currentUser) {
-        const guestData = await loginAsGuest()
-        if (!guestData?.user) {
-          throw new Error("ゲストログインに失敗しました")
+      if (!res.ok) {
+        const errorData = await res.json()
+        throw new Error(errorData.error || '問診の開始に失敗しました')
+      }
+
+      const { interview_id } = await res.json()
+
+      // 質問生成APIを呼び出し
+      const difyRes = await fetch(`${process.env.NEXT_PUBLIC_DIFY_API_URL}/completion-messages`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_DIFY_QUESTION_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          inputs: {
+            symptom: symptomText
+          },
+          response_mode: "blocking",
+          user: "anonymous"
+        })
+      })
+
+      if (!difyRes.ok) {
+        throw new Error('質問の生成に失敗しました')
+      }
+
+      const difyData = await difyRes.json()
+      console.log('Dify API response:', difyData)
+
+      // Markdown形式の回答からJSONを抽出
+      const jsonMatch = difyData.answer.match(/```json\n([\s\S]*?)\n```/)
+      if (!jsonMatch) {
+        throw new Error('質問データの形式が不正です')
+      }
+
+      let questions
+      try {
+        const jsonContent = jsonMatch[1].trim()
+        const parsedData = JSON.parse(jsonContent)
+        questions = parsedData.questions
+        if (!Array.isArray(questions)) {
+          throw new Error('質問データが配列ではありません')
         }
-        currentUser = guestData.user
+        console.log('Parsed questions:', questions)
+      } catch (parseError) {
+        console.error('JSON parse error:', parseError)
+        throw new Error('質問データの解析に失敗しました')
       }
 
-      if (!currentUser?.id) {
-        throw new Error("ユーザー情報の取得に失敗しました")
-      }
-
-      // 相談内容をDBに保存
-      const consultationRes = await fetch("/api/consultations", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        credentials: 'include',
-        body: JSON.stringify({ 
-          symptom_text: symptomText,
-          user_id: currentUser.id
-        })
-      })
-
-      if (!consultationRes.ok) {
-        const errorData = await consultationRes.json()
-        console.error('Consultation error:', {
-          status: consultationRes.status,
-          statusText: consultationRes.statusText,
-          error: errorData
-        })
-        throw new Error(errorData.error || "相談の保存に失敗しました")
-      }
-
-      const { consultation_id } = await consultationRes.json()
-
-      // 質問票の生成
-      const questionRes = await fetch("/api/question", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        credentials: 'include',
-        body: JSON.stringify({ 
-          symptom_text: symptomText,
-          consultation_id,
-          user_id: currentUser.id
-        })
-      })
-
-      if (!questionRes.ok) {
-        const errorData = await questionRes.json()
-        console.error("Question API error:", {
-          status: questionRes.status,
-          statusText: questionRes.statusText,
-          error: errorData
-        })
-        throw new Error(errorData.error || "質問票の生成に失敗しました")
-      }
-
-      const { questions } = await questionRes.json()
-      
-      // 質問票画面への遷移
-      const queryString = encodeURIComponent(JSON.stringify(questions))
-      router.push(`/questionnaire?data=${queryString}&consultation_id=${consultation_id}`)
+      // 質問票画面に遷移
+      const encodedData = encodeURIComponent(JSON.stringify(questions))
+      router.push(`/questionnaire?interview_id=${interview_id}&data=${encodedData}`)
 
     } catch (error) {
       console.error('Error in handleStartConsultation:', error)
       setError(error instanceof Error ? error.message : "予期せぬエラーが発生しました")
     } finally {
       setLoading(false)
-    }
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    try {
-      const response = await fetch('/api/consultations', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          symptom_text: symptomText,
-          questions: []
-        })
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to submit consultation')
-      }
-
-      const data = await response.json()
-      console.log('Consultation created:', data)
-
-    } catch (error) {
-      console.error('Error submitting consultation:', error)
     }
   }
 

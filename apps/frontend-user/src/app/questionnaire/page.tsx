@@ -8,7 +8,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
 import { ArrowLeft } from 'lucide-react'
 import { Textarea } from "@/components/ui/textarea"
-import { useAuth } from '@/hooks/useAuth'
+import { getSupabaseClient } from "@/lib/supabase"
 
 // APIから返される質問の型定義
 interface Option {
@@ -26,45 +26,43 @@ interface Question {
 export default function QuestionnairePage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [consultationId, setConsultationId] = useState<string | null>(null)
+  const [interviewId, setInterviewId] = useState<string | null>(null)
   const [questions, setQuestions] = useState<Question[]>([])
   const [answers, setAnswers] = useState<{ [key: string]: string | string[] }>({})
   const [error, setError] = useState<string | null>(null)
   const errorRef = useRef<HTMLDivElement>(null)
-  const { user, isGuestUser, loginAsGuest } = useAuth()
   const [isLoading, setIsLoading] = useState(false)
+  const [symptomText, setSymptomText] = useState<string>('')
 
   useEffect(() => {
-    const consultation_id = searchParams.get('consultation_id')
-    if (consultation_id) {
-      setConsultationId(consultation_id)
+    const interview_id = searchParams.get('interview_id')
+    if (interview_id) {
+      setInterviewId(interview_id)
+    } else {
+      setError('問診IDが見つかりません')
+      return
     }
-  }, [searchParams])
 
-  useEffect(() => {
+    const data = searchParams.get('data')
+    if (!data) {
+      setError('質問データが見つかりません')
+      return
+    }
+
     try {
-      const data = searchParams.get('data')
-      if (!data) {
-        setError('質問データが見つかりません')
-        return
-      }
-
       const decodedData = decodeURIComponent(data)
       console.log('Decoded data:', decodedData)
 
-      // JSONデータをパースする前に文字列であることを確認
       const parsedData = typeof decodedData === 'string' 
         ? JSON.parse(decodedData)
         : decodedData
 
-      // questionsデータの取得方法を修正
       const questionData = Array.isArray(parsedData) 
         ? parsedData 
         : parsedData.questions || []
 
       setQuestions(questionData)
       
-      // 回答の初期状態を設定
       const initialAnswers: { [key: string]: string | string[] } = {}
       questionData.forEach((q: Question) => {
         initialAnswers[q.id] = q.type === '複数選択' ? [] : ''
@@ -78,29 +76,17 @@ export default function QuestionnairePage() {
   }, [searchParams])
 
   useEffect(() => {
+    const symptom = searchParams.get('symptom_text')
+    if (symptom) {
+      setSymptomText(decodeURIComponent(symptom))
+    }
+  }, [searchParams])
+
+  useEffect(() => {
     if (error) {
       errorRef.current?.scrollIntoView({ behavior: 'smooth' })
     }
   }, [error])
-
-  useEffect(() => {
-    const initializeUser = async () => {
-      try {
-        setIsLoading(true)
-        // ユーザーがログインしていない場合、ゲストアカウントを作成
-        if (!user && !isGuestUser) {
-          await loginAsGuest()
-        }
-      } catch (error) {
-        console.error('Error initializing user:', error)
-        alert('エラーが発生しました。もう一度お試しください。')
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    initializeUser()
-  }, [user, isGuestUser])
 
   const handleAnswerChange = (questionId: string, value: string) => {
     setAnswers(prev => {
@@ -126,38 +112,70 @@ export default function QuestionnairePage() {
     })
   }
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    console.log('Submit button clicked')
+    
+    const interview_id = searchParams.get('interview_id')
+    if (!interview_id) {
+      setError('問診IDが見つかりません')
+      return
+    }
+
     try {
+      setIsLoading(true)
       setError(null)
 
-      const res = await fetch('/api/questionnaires', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          consultation_id: consultationId,
-          questions,
-          answers,
-        }),
-      })
-
-      const data = await res.json()
-
-      if (!res.ok) {
-        if (res.status === 409) {
-          setError('既に回答済みの質問票です')
-          return
+      // 回答データを整形
+      const answersArray = questions.map((q, index) => {
+        const answer = answers[q.id]
+        const answerText = answer ? 
+          (Array.isArray(answer) ? answer.join(',') : answer.toString()) 
+          : null
+        
+        // 選択肢の場合、選択されたoptionのtextを保存
+        let displayAnswer = answerText
+        if (q.type === '単一選択' || q.type === '複数選択' || q.type === 'スケール') {
+          const selectedOptions = q.options
+            .filter(opt => answerText?.includes(opt.id))
+            .map(opt => opt.text)
+          displayAnswer = selectedOptions.join(',')
         }
-        throw new Error(data.error || '回答の保存に失敗しました')
+
+        return {
+          [`question_${index + 1}`]: q.text,
+          [`answer_${index + 1}`]: displayAnswer
+        }
+      }).reduce((acc, curr) => ({ ...acc, ...curr }), {})
+
+      console.log('Saving answers:', answersArray)
+      
+      // 回答をDBに保存
+      const supabaseClient = getSupabaseClient()
+      const { data, error: updateError } = await supabaseClient
+        .from('medical_interviews')
+        .update({
+          ...answersArray,
+          status: 'completed',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', interview_id)
+        .select()
+
+      if (updateError) {
+        console.error('DB update error:', updateError)
+        throw updateError
       }
 
-      // 結果画面への遷移
-      router.push(`/result?consultation_id=${consultationId}`)
+      console.log('Save response:', data)
 
-    } catch (err) {
-      console.error('回答送信エラーの詳細:', err)
-      setError(err instanceof Error ? err.message : '回答の送信に失敗しました')
+      // 結果画面へ遷移
+      const encodedAnswers = encodeURIComponent(JSON.stringify(answersArray))
+      router.push(`/result?interview_id=${interview_id}&answers=${encodedAnswers}`)
+    } catch (error) {
+      console.error('Error saving answers:', error)
+      setError('回答の保存に失敗しました')
+      setIsLoading(false)
     }
   }
 
@@ -228,57 +246,46 @@ export default function QuestionnairePage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA]">
-      <main className="container mx-auto px-4 py-8">
-        <div className="max-w-4xl mx-auto">
-          <div className="flex items-center mb-6">
-            <Button
-              variant="ghost"
-              onClick={() => router.back()}
-              className="mr-4"
-            >
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              戻る
-            </Button>
-            <h1 className="text-2xl font-bold">質問票</h1>
-          </div>
+    <div className="container mx-auto px-4 py-8">
+      <Button
+        variant="ghost"
+        className="mb-4"
+        onClick={() => router.back()}
+      >
+        <ArrowLeft className="mr-2 h-4 w-4" />
+        戻る
+      </Button>
 
-          {error && (
-            <div 
-              ref={errorRef}
-              className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6"
-            >
-              {error}
-            </div>
-          )}
-
-          <div className="space-y-8">
-            {questions.map((question, index) => (
-              <Card key={question.id} className="shadow-sm">
-                <CardContent className="p-6">
-                  <div className="mb-4">
-                    <h3 className="text-lg font-semibold mb-4">
-                      Q{index + 1}. {question.text}
-                    </h3>
-                    {renderQuestionInput(question, index)}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-
-            {questions.length > 0 && (
-              <div className="flex justify-end mt-8">
-                <Button
-                  onClick={handleSubmit}
-                  className="bg-[#3A8B73] hover:bg-[#2E7A62] text-white px-8 py-2"
-                >
-                  回答を送信
-                </Button>
+      <form onSubmit={handleSubmit} className="space-y-8">
+        {questions.map((question, index) => (
+          <Card key={question.id} className="w-full">
+            <CardContent className="pt-6">
+              <div className="mb-4">
+                <h3 className="text-lg font-semibold mb-2">
+                  {`${index + 1}. ${question.text}`}
+                </h3>
+                {renderQuestionInput(question, index)}
               </div>
-            )}
-          </div>
+            </CardContent>
+          </Card>
+        ))}
+
+        <div className="flex justify-center">
+          <Button
+            type="submit"
+            className="w-full max-w-md"
+            disabled={isLoading}
+          >
+            {isLoading ? '送信中...' : '回答を送信'}
+          </Button>
         </div>
-      </main>
+      </form>
+
+      {error && (
+        <div className="mt-4 p-4 bg-red-100 text-red-700 rounded">
+          {error}
+        </div>
+      )}
     </div>
   )
 }

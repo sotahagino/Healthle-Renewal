@@ -9,61 +9,41 @@ export type Json =
 export interface Database {
   public: {
     Tables: {
-      users: {
+      medical_interviews: {
         Row: {
           id: string
-          email: string
-          is_guest: boolean
-          created_at: string
-          updated_at?: string
-        }
-        Insert: {
-          id: string
-          email: string
-          is_guest?: boolean
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          email?: string
-          is_guest?: boolean
-          created_at?: string
-          updated_at?: string
-        }
-      }
-      consultations: {
-        Row: {
-          id: string
-          user_id: string
-          symptom_text: string
-          created_at: string
-          updated_at?: string
+          user_id: string | null
+          symptom_text: string | null
+          questions: any | null
+          answers: any | null
+          ai_response_text: string | null
+          status: string | null
+          created_at: string | null
+          updated_at: string | null
         }
         Insert: {
           id?: string
-          user_id: string
-          symptom_text: string
-          created_at?: string
-          updated_at?: string
+          user_id?: string | null
+          symptom_text?: string | null
+          questions?: any | null
+          answers?: any | null
+          ai_response_text?: string | null
+          status?: string | null
+          created_at?: string | null
+          updated_at?: string | null
         }
         Update: {
           id?: string
-          user_id?: string
-          symptom_text?: string
-          created_at?: string
-          updated_at?: string
+          user_id?: string | null
+          symptom_text?: string | null
+          questions?: any | null
+          answers?: any | null
+          ai_response_text?: string | null
+          status?: string | null
+          created_at?: string | null
+          updated_at?: string | null
         }
       }
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      [_ in never]: never
-    }
-    Enums: {
-      [_ in never]: never
     }
   }
 } 

@@ -123,3 +123,23 @@ DROP CONSTRAINT IF EXISTS consultations_user_id_fkey;
 
 -- user_idにインデックスを追加（パフォーマンス向上のため）
 CREATE INDEX IF NOT EXISTS idx_consultations_user_id ON consultations(user_id); 
+
+-- vendor_ordersテーブルのuser_id外部キー制約を削除
+ALTER TABLE vendor_orders
+DROP CONSTRAINT IF EXISTS vendor_orders_user_id_fkey;
+
+-- vendor_ordersテーブルにuser_idカラムを追加（外部キー制約なし）
+ALTER TABLE vendor_orders
+ADD COLUMN IF NOT EXISTS user_id UUID;
+
+-- productsテーブルのvendor_idを必須に変更し、デフォルト値を設定
+ALTER TABLE products
+ALTER COLUMN vendor_id SET NOT NULL,
+ALTER COLUMN vendor_id SET DEFAULT '00000000-0000-0000-0000-000000000000'; 
+
+-- medical_interviewsテーブルにguest_user_idカラムを追加
+ALTER TABLE medical_interviews
+ADD COLUMN IF NOT EXISTS guest_user_id UUID;
+
+-- guest_user_idにインデックスを追加（検索パフォーマンス向上のため）
+CREATE INDEX IF NOT EXISTS idx_medical_interviews_guest_user_id ON medical_interviews(guest_user_id); 
