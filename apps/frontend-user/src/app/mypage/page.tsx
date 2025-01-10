@@ -17,10 +17,12 @@ interface Order {
   product_name: string
 }
 
-const statusMap: Record<string, { label: string; variant: 'default' | 'secondary' | 'success' }> = {
+const statusMap: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
   pending: { label: '処理中', variant: 'secondary' },
-  completed: { label: '完了', variant: 'success' },
-  default: { label: '未定義', variant: 'default' },
+  paid: { label: '支払い完了', variant: 'default' },
+  cancelled: { label: 'キャンセル', variant: 'destructive' },
+  completed: { label: '完了', variant: 'default' },
+  default: { label: '未定義', variant: 'default' }
 }
 
 export default function MyPage() {
