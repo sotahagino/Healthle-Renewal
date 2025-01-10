@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useAuthContext } from '@/providers/auth-provider'
+import { useAuth } from '@/providers/auth-provider'
 import { AuthUser } from '@/types/auth'
 
 interface UserProfileProps {
@@ -10,11 +10,11 @@ interface UserProfileProps {
 
 export function UserProfile({ user }: UserProfileProps) {
   const router = useRouter()
-  const { logout } = useAuthContext()
+  const { signOut } = useAuth()
 
   const handleLogout = async () => {
     try {
-      await logout()
+      await signOut()
       router.push('/')
     } catch (error) {
       console.error('Logout error:', error)
