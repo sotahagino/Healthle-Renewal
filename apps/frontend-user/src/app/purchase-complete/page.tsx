@@ -1,188 +1,121 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { useAuth } from '@/providers/auth-provider'
-import { Header } from '@/components/header'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { Label } from '@/components/ui/label'
-import { Icons } from '@/components/ui/icons'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import { useState } from 'react'
+import { useSearchParams } from 'next/navigation'
+import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
 export default function PurchaseCompletePage() {
-  const router = useRouter()
-  const { user } = useAuth()
+  const searchParams = useSearchParams()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [orderStatus, setOrderStatus] = useState<{
-    orderId: string | null;
-    status: 'pending' | 'paid' | 'error';
-  }>({
-    orderId: null,
-    status: 'pending'
-  })
+  const [error, setError] = useState('')
+  const supabase = createClientComponentClient()
 
-  useEffect(() => {
-    const searchParams = new URLSearchParams(window.location.search)
-    const sessionId = searchParams.get('session_id')
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
 
-    if (sessionId && !user) {
-      const fetchSessionDetails = async () => {
-        try {
-          const response = await fetch(`/api/orders/check-session?session_id=${sessionId}`)
-          const data = await response.json()
-          
-          if (!response.ok) throw new Error(data.error || '注文情報の取得に失敗しました')
-          
-          setOrderStatus({
-            orderId: data.order_id,
-            status: 'paid'
+    if (!email || !password) {
+      setError('メールアドレスとパスワードは必須です')
+      return
+    }
+
+    try {
+      // セッションIDを取得
+      const sessionId = searchParams.get('session_id')
+      
+      // メールアドレスを保存
+      if (sessionId) {
+        await fetch('/api/orders/update-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            session_id: sessionId,
+            email: email 
           })
-          
-          if (data.customer_email) {
-            setEmail(data.customer_email)
-          }
-        } catch (error) {
-          console.error('Error fetching session details:', error)
-          setOrderStatus(prev => ({
-            ...prev,
-            status: 'error'
-          }))
-        } finally {
-          setLoading(false)
-        }
+        })
       }
 
-      fetchSessionDetails()
-    } else {
-      setLoading(false)
-    }
-  }, [user])
-
-  const handleSignUp = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError(null)
-    
-    try {
-      const tempUid = localStorage.getItem('temp_uid')
-      const response = await fetch('/api/auth/signup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email,
-          password,
-          temp_uid: tempUid
-        })
+      // アカウント作成
+      const { error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`
+        }
       })
 
-      if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || 'アカウント登録に失敗しました')
-      }
+      if (signUpError) throw signUpError
 
-      // 登録成功後、temp_uidを削除
-      localStorage.removeItem('temp_uid')
-      router.push('/mypage')
+      // 成功メッセージを表示
+      alert('アカウントが作成されました。確認メールをご確認ください。')
     } catch (error) {
       console.error('Signup error:', error)
-      setError(error instanceof Error ? error.message : 'アカウント登録に失敗しました')
+      setError(error instanceof Error ? error.message : 'アカウント作成に失敗しました')
     }
-  }
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-[#F8FBFA] to-white">
-        <Header />
-        <main className="container mx-auto px-4 py-8">
-          <div className="flex justify-center items-center h-64">
-            <Icons.spinner className="h-8 w-8 animate-spin text-[#4C9A84]" />
-          </div>
-        </main>
-      </div>
-    )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#F8FBFA] to-white">
-      <Header />
-      <main className="container mx-auto px-4 py-12 max-w-4xl">
-        <Card className="border-0 shadow-lg">
-          <CardHeader>
-            <CardTitle className="text-2xl font-bold text-[#4C9A84]">
-              ご購入ありがとうございます
-            </CardTitle>
-            <CardDescription>
-              ご注文の確認メールをお送りしましたので、ご確認ください。
-            </CardDescription>
-            {orderStatus.orderId && (
-              <p className="text-sm text-gray-500">
-                注文番号: {orderStatus.orderId}
-              </p>
-            )}
-          </CardHeader>
-          <CardContent>
-            {!user && orderStatus.status === 'paid' && (
-              <div className="mt-8">
-                <div className="bg-[#F8FBFA] p-6 rounded-lg mb-6">
-                  <h2 className="text-xl font-bold text-[#4C9A84] mb-4">
-                    アカウント登録のご案内
-                  </h2>
-                  <p className="text-gray-600 mb-4">
-                    アカウントを登録すると、以下のサービスがご利用いただけます：
-                  </p>
-                  <ul className="space-y-2 text-gray-600 mb-6">
-                    <li>• 注文履歴の確認</li>
-                    <li>• 配送状況の追跡</li>
-                    <li>• 過去の相談内容の確認</li>
-                  </ul>
-                </div>
+    <div className="min-h-screen bg-gradient-to-b from-[#F8FBFA] via-white to-[#F8FBFA] py-12">
+      <div className="container mx-auto px-4 max-w-lg">
+        <h1 className="text-2xl font-bold text-[#2D3748] mb-8">ご購入ありがとうございます</h1>
+        <p className="text-[#4A5568] mb-4">ご注文の確認メールをお送りしましたので、ご確認ください。</p>
+        <p className="text-[#4A5568] mb-8">注文番号: {searchParams.get('order_id')}</p>
 
-                <form onSubmit={handleSignUp} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="email">メールアドレス</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      disabled
-                      className="bg-gray-50"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="password">パスワード</Label>
-                    <Input
-                      id="password"
-                      type="password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="8文字以上の英数字"
-                      required
-                    />
-                  </div>
+        <div className="bg-white rounded-xl shadow-sm p-6 mb-8">
+          <h2 className="text-xl font-semibold text-[#2D3748] mb-6">アカウント登録のご案内</h2>
+          <p className="text-[#4A5568] mb-4">アカウントを登録すると、以下のサービスがご利用いただけます：</p>
+          <ul className="list-disc list-inside text-[#4A5568] mb-6">
+            <li>注文履歴の確認</li>
+            <li>配送状況の追跡</li>
+            <li>過去の相談内容等の確認</li>
+          </ul>
 
-                  {error && (
-                    <Alert variant="destructive">
-                      <AlertDescription>{error}</AlertDescription>
-                    </Alert>
-                  )}
-
-                  <Button
-                    type="submit"
-                    className="w-full bg-[#4C9A84] hover:bg-[#3A8B73] text-white"
-                  >
-                    アカウントを作成
-                  </Button>
-                </form>
+          <form onSubmit={handleSubmit}>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-[#4A5568] mb-1">
+                  メールアドレス
+                </label>
+                <Input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full"
+                  required
+                />
               </div>
-            )}
-          </CardContent>
-        </Card>
-      </main>
+
+              <div>
+                <label className="block text-sm font-medium text-[#4A5568] mb-1">
+                  パスワード
+                </label>
+                <Input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full"
+                  placeholder="8文字以上の英数字"
+                  required
+                />
+              </div>
+
+              {error && (
+                <p className="text-red-500 text-sm">{error}</p>
+              )}
+
+              <Button
+                type="submit"
+                className="w-full bg-[#4C9A84] hover:bg-[#3A8B73] text-white"
+              >
+                アカウントを作成
+              </Button>
+            </div>
+          </form>
+        </div>
+      </div>
     </div>
   )
 } 
