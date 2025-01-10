@@ -122,7 +122,6 @@ export async function POST(req: Request) {
         },
       ],
       customer_email: metadata.email,
-      collect_shipping_address: true,
     })
 
     // 注文レコードを更新してStripeセッションIDを保存
