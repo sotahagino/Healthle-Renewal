@@ -31,6 +31,8 @@ const ORDER_STATUS = {
 } as const;
 
 export async function POST(request: Request) {
+  let webhookLogId: string | null = null;
+  
   try {
     const body = await request.text()
     const sig = request.headers.get('stripe-signature')
@@ -48,46 +50,56 @@ export async function POST(request: Request) {
       process.env.STRIPE_WEBHOOK_SECRET
     )
 
-    // webhookログを保存
-    const { data: logData, error: logError } = await supabase
-      .from('webhook_logs')
-      .insert({
-        stripe_event_id: event.id,
-        event_type: event.type,
-        status: 'processing',
-        raw_event: event,
-        created_at: new Date().toISOString()
-      })
-      .select()
-      .single()
+    console.log('Received Stripe event:', {
+      id: event.id,
+      type: event.type,
+      api_version: event.api_version
+    });
 
-    if (logError) {
-      console.error('Webhook log creation error:', logError)
+    // webhookログを保存
+    try {
+      const { data: logData, error: logError } = await supabase
+        .from('webhook_logs')
+        .insert({
+          stripe_event_id: event.id,
+          event_type: event.type,
+          status: 'processing',
+          processed_at: new Date().toISOString(),
+          processed_data: null,
+          error_message: null
+        })
+        .select()
+        .single()
+
+      if (logError) {
+        console.error('Webhook log creation error:', {
+          error: logError,
+          details: logError.details,
+          message: logError.message
+        });
+      } else {
+        webhookLogId = logData.id;
+        console.log('Created webhook log:', logData);
+      }
+    } catch (logError) {
+      console.error('Failed to create webhook log:', logError);
     }
 
     if (event.type === 'checkout.session.completed') {
-      const session = event.data.object as Stripe.Checkout.Session
-
-      console.log('Processing checkout.session.completed:', {
-        session_id: session.id,
-        metadata: session.metadata,
-        client_reference_id: session.client_reference_id,
-        customer_details: session.customer_details,
-        shipping_details: session.shipping_details
-      })
-
-      // 配送情報の取得
-      const shippingInfo = {
-        name: session.shipping_details?.name || '',
-        postal_code: session.shipping_details?.address?.postal_code || '',
-        prefecture: session.shipping_details?.address?.state || '',
-        city: session.shipping_details?.address?.city || '',
-        address: `${session.shipping_details?.address?.line1 || ''}${session.shipping_details?.address?.line2 ? ' ' + session.shipping_details.address.line2 : ''}`,
-        phone: session.shipping_details?.phone || '',
-      };
-      console.log('Shipping info:', shippingInfo);
+      const session = event.data.object as Stripe.Checkout.Session;
 
       try {
+        // 配送情報の取得
+        const shippingInfo = {
+          name: session.shipping_details?.name || '',
+          postal_code: session.shipping_details?.address?.postal_code || '',
+          prefecture: session.shipping_details?.address?.state || '',
+          city: session.shipping_details?.address?.city || '',
+          address: `${session.shipping_details?.address?.line1 || ''}${session.shipping_details?.address?.line2 ? ' ' + session.shipping_details.address.line2 : ''}`,
+          phone: session.shipping_details?.phone || '',
+        };
+        console.log('Shipping info:', shippingInfo);
+
         // 商品情報を取得
         const { data: product, error: productError } = await supabase
           .from('products')
@@ -154,44 +166,72 @@ export async function POST(request: Request) {
         }
 
         // 処理成功をログに記録
-        await supabase
-          .from('webhook_logs')
-          .update({
-            status: 'completed',
-            processed_data: {
-              order_before: currentOrder,
-              order_after: updatedOrder,
-              shipping_info: shippingInfo,
-              product: product
-            },
-            updated_at: new Date().toISOString()
-          })
-          .eq('stripe_event_id', event.id);
+        if (webhookLogId) {
+          const { error: updateError } = await supabase
+            .from('webhook_logs')
+            .update({
+              status: 'success',
+              processed_data: {
+                order_before: currentOrder,
+                order_after: updatedOrder,
+                shipping_info: shippingInfo,
+                product: product
+              },
+              processed_at: new Date().toISOString()
+            })
+            .eq('id', webhookLogId);
 
+          if (updateError) {
+            console.error('Failed to update webhook log status:', updateError);
+          }
+        }
+
+        return NextResponse.json({ message: 'Processed successfully' });
       } catch (error) {
-        console.error('Processing error:', error);
-
         // エラー情報をログに記録
-        await supabase
-          .from('webhook_logs')
-          .update({
-            status: 'error',
-            error_message: error instanceof Error ? error.message : '不明なエラー',
-            updated_at: new Date().toISOString()
-          })
-          .eq('stripe_event_id', event.id);
+        if (webhookLogId) {
+          try {
+            await supabase
+              .from('webhook_logs')
+              .update({
+                status: 'failed',
+                error_message: error instanceof Error ? error.message : '不明なエラー',
+                processed_at: new Date().toISOString()
+              })
+              .eq('id', webhookLogId);
+          } catch (logError) {
+            console.error('Failed to update webhook log with error:', logError);
+          }
+        }
 
         throw error;
       }
     }
 
-    return NextResponse.json({ message: 'Processed successfully' })
+    return NextResponse.json({ message: 'Processed successfully' });
   } catch (error) {
-    console.error('Webhook error:', error)
+    console.error('Webhook error:', error);
+
+    // エラー情報をログに記録
+    if (webhookLogId) {
+      try {
+        await supabase
+          .from('webhook_logs')
+          .update({
+            status: 'failed',
+            error_message: error instanceof Error ? error.message : '不明なエラー',
+            processed_at: new Date().toISOString()
+          })
+          .eq('id', webhookLogId);
+      } catch (logError) {
+        console.error('Failed to update webhook log with error:', logError);
+      }
+    }
+
     return NextResponse.json(
       { error: 'Webhook処理に失敗しました' },
       { status: 500 }
-    )
+    );
   }
 }
 
