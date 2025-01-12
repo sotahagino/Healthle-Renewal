@@ -41,33 +41,43 @@ export async function POST(request: Request) {
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object as Stripe.Checkout.Session
 
+      console.log('Processing checkout.session.completed:', {
+        session_id: session.id,
+        customer_email: session.customer_details?.email,
+        shipping_details: session.shipping_details
+      })
+
       // 注文情報を更新
       const { error: updateError } = await supabase
         .from('vendor_orders')
         .update({
           status: 'paid',
-          customer_email: session.customer_details?.email || session.customer_email,
-          shipping_address: formatAddress(session.shipping_details?.address),
-          shipping_name: session.shipping_details?.name,
-          shipping_phone: session.customer_details?.phone,
-          total_amount: session.amount_total,
-          order_id: generateOrderId(),
+          customer_email: session.customer_details?.email || null,
+          shipping_address: session.shipping_details?.address ? formatAddress(session.shipping_details.address) : null,
+          shipping_name: session.shipping_details?.name || null,
+          shipping_phone: session.customer_details?.phone || null,
+          total_amount: session.amount_total || null,
           updated_at: new Date().toISOString()
         })
         .eq('stripe_session_id', session.id)
 
       if (updateError) {
         console.error('Order update error:', updateError)
-        return NextResponse.json(
-          { error: '注文情報の更新に失敗しました' },
-          { status: 500 }
-        )
+        throw new Error(`注文情報の更新に失敗しました: ${updateError.message}`)
       }
 
-      console.log('Order updated successfully:', {
-        session_id: session.id,
-        customer_email: session.customer_details?.email || session.customer_email
-      })
+      // 更新された注文情報を取得して確認
+      const { data: updatedOrder, error: fetchError } = await supabase
+        .from('vendor_orders')
+        .select('*')
+        .eq('stripe_session_id', session.id)
+        .single()
+
+      if (fetchError) {
+        console.error('Order fetch error:', fetchError)
+      } else {
+        console.log('Updated order:', updatedOrder)
+      }
     }
 
     return NextResponse.json({ message: 'Processed successfully' })
