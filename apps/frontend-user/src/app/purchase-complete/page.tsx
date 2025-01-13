@@ -1,173 +1,96 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { useRouter } from 'next/navigation'
+import { Loader2 } from 'lucide-react'
 
-export default function PurchaseCompletePage() {
+export default function PurchaseComplete() {
+  const router = useRouter()
   const searchParams = useSearchParams()
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
-  const [orderId, setOrderId] = useState('')
-  const supabase = createClientComponentClient()
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const fetchOrderDetails = async () => {
-      try {
-        const sessionId = searchParams.get('session_id')
-        if (!sessionId) return
-
-        const { data: order, error } = await supabase
-          .from('vendor_orders')
-          .select('*')
-          .eq('stripe_session_id', sessionId)
-          .single()
-
-        if (error) throw error
-
-        if (order) {
-          setEmail(order.customer_email || '')
-          setOrderId(order.order_id || '')
-        }
-      } catch (error) {
-        console.error('Error fetching order details:', error)
-      }
-    }
-
-    fetchOrderDetails()
-  }, [searchParams])
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError('')
-
-    if (!email || !password) {
-      setError('メールアドレスとパスワードは必須です')
-      return
-    }
-
-    try {
-      // セッションIDを取得
+    const checkSession = async () => {
       const sessionId = searchParams.get('session_id')
-      
       if (!sessionId) {
         setError('セッションIDが見つかりません')
+        setIsLoading(false)
         return
       }
 
-      // アカウント作成
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`
+      try {
+        const response = await fetch(`/api/checkout/check-session?session_id=${sessionId}`)
+        const data = await response.json()
+
+        if (!response.ok) {
+          throw new Error(data.error || '注文の確認に失敗しました')
         }
-      })
 
-      if (signUpError) throw signUpError
-
-      // メールアドレスを保存
-      const response = await fetch('/api/orders/update-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          session_id: sessionId,
-          email: email 
-        })
-      })
-
-      if (!response.ok) {
-        throw new Error('メールアドレスの保存に失敗しました')
+        // 成功時の処理
+        setIsLoading(false)
+      } catch (error) {
+        console.error('Session check error:', error)
+        setError(error instanceof Error ? error.message : '注文の確認中にエラーが発生しました')
+        setIsLoading(false)
       }
-
-      // ユーザーIDを更新
-      if (signUpData.user) {
-        const updateResponse = await fetch('/api/orders/update-user', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            user_id: signUpData.user.id,
-            order_id: orderId
-          })
-        })
-
-        if (!updateResponse.ok) {
-          throw new Error('ユーザーIDの更新に失敗しました')
-        }
-      }
-
-      // 成功メッセージを表示
-      alert('アカウントが作成されました。確認メールをご確認ください。')
-    } catch (error) {
-      console.error('Signup error:', error)
-      setError(error instanceof Error ? error.message : 'アカウント作成に失敗しました')
     }
+
+    checkSession()
+  }, [searchParams])
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <p>注文を確認中...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <Card className="max-w-md w-full">
+          <CardContent className="p-6">
+            <h1 className="text-2xl font-bold text-red-600 mb-4">エラーが発生しました</h1>
+            <p className="text-gray-600 mb-6">{error}</p>
+            <Button onClick={() => router.push('/')} className="w-full">
+              トップページに戻る
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#F8FBFA] via-white to-[#F8FBFA] py-12">
-      <div className="container mx-auto px-4 max-w-lg">
-        <h1 className="text-2xl font-bold text-[#2D3748] mb-8">ご購入ありがとうございます</h1>
-        <p className="text-[#4A5568] mb-4">ご注文の確認メールをお送りしましたので、ご確認ください。</p>
-        {orderId && (
-          <p className="text-[#4A5568] mb-8">注文番号: {orderId}</p>
-        )}
-
-        <div className="bg-white rounded-xl shadow-sm p-6 mb-8">
-          <h2 className="text-xl font-semibold text-[#2D3748] mb-6">アカウント登録のご案内</h2>
-          <p className="text-[#4A5568] mb-4">アカウントを登録すると、以下のサービスがご利用いただけます：</p>
-          <ul className="list-disc list-inside text-[#4A5568] mb-6">
-            <li>注文履歴の確認</li>
-            <li>配送状況の追跡</li>
-            <li>過去の相談内容等の確認</li>
-          </ul>
-
-          <form onSubmit={handleSubmit}>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-[#4A5568] mb-1">
-                  メールアドレス
-                </label>
-                <Input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-[#4A5568] mb-1">
-                  パスワード
-                </label>
-                <Input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full"
-                  placeholder="8文字以上の英数字"
-                  required
-                />
-              </div>
-
-              {error && (
-                <p className="text-red-500 text-sm">{error}</p>
-              )}
-
-              <Button
-                type="submit"
-                className="w-full bg-[#4C9A84] hover:bg-[#3A8B73] text-white"
-              >
-                アカウントを作成
-              </Button>
-            </div>
-          </form>
-        </div>
-      </div>
+    <div className="min-h-screen flex items-center justify-center p-4">
+      <Card className="max-w-md w-full">
+        <CardContent className="p-6">
+          <h1 className="text-2xl font-bold text-green-600 mb-4">ご注文ありがとうございます</h1>
+          <p className="text-gray-600 mb-6">
+            ご注文の確認が完了しました。商品の発送準備に入らせていただきます。
+          </p>
+          <div className="space-y-4">
+            <Button onClick={() => router.push('/orders')} className="w-full">
+              注文履歴を確認する
+            </Button>
+            <Button
+              onClick={() => router.push('/')}
+              variant="outline"
+              className="w-full"
+            >
+              トップページに戻る
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 } 

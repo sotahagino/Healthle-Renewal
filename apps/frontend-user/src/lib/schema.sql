@@ -143,3 +143,25 @@ ADD COLUMN IF NOT EXISTS guest_user_id UUID;
 
 -- guest_user_idにインデックスを追加（検索パフォーマンス向上のため）
 CREATE INDEX IF NOT EXISTS idx_medical_interviews_guest_user_id ON medical_interviews(guest_user_id); 
+
+-- vendor_ordersテーブルの制約を修正
+DROP INDEX IF EXISTS idx_unique_pending_order;
+DROP INDEX IF EXISTS idx_vendor_orders_stripe_session_id;
+DROP INDEX IF EXISTS idx_vendor_orders_stripe_payment_intent_id;
+
+-- 複合ユニーク制約の作成
+CREATE UNIQUE INDEX idx_unique_pending_order
+ON vendor_orders (product_id, user_id)
+WHERE status = 'pending';
+
+-- 支払い情報のインデックス
+CREATE INDEX idx_vendor_orders_payment_info
+ON vendor_orders (stripe_session_id, stripe_payment_intent_id);
+
+-- NOT NULL制約の設定
+ALTER TABLE vendor_orders
+ALTER COLUMN user_id SET NOT NULL,
+ALTER COLUMN product_id SET NOT NULL,
+ALTER COLUMN status SET NOT NULL,
+ALTER COLUMN total_amount SET NOT NULL,
+ALTER COLUMN stripe_session_id SET NOT NULL; 

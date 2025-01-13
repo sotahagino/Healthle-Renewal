@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Provider } from '@supabase/supabase-js'
 import { useAuth } from '@/providers/auth-provider'
+import { ProductPurchaseButton } from '@/components/ProductPurchaseButton'
 
 // Supabaseクライアントの初期化
 const supabase = createClientComponentClient()
@@ -563,43 +564,6 @@ export default function ResultPage() {
     }
   }
 
-  const handlePurchaseClick = async (product: RecommendedProduct) => {
-    try {
-      setSelectedProduct(product)
-      if (!interviewId) {
-        throw new Error('相談情報が見つかりません')
-      }
-
-      // 仮のUIDを生成（未ログインの場合）
-      const tempUid = !user ? crypto.randomUUID() : user.id
-      
-      // 未ログインの場合、仮UIDをローカルストレージに保存
-      if (!user) {
-        localStorage.setItem('temp_uid', tempUid)
-      }
-
-      const response = await fetch('/api/orders/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          product_id: product.id,
-          user_id: tempUid,
-          medical_interview_id: interviewId
-        })
-      })
-
-      if (!response.ok) {
-        throw new Error('注文の作成に失敗しました')
-      }
-
-      const { url } = await response.json()
-      window.location.href = url
-    } catch (error) {
-      console.error('Purchase error:', error)
-      setProductError(error instanceof Error ? error.message : '注文処理中にエラーが発生しました')
-    }
-  }
-
   const handleLogin = () => {
     try {
       // 現在のURLをローカルストレージに保存（ログイン後に戻ってこれるように）
@@ -736,14 +700,10 @@ export default function ResultPage() {
                     <p className="text-[#4A5568] mb-4 line-clamp-2 text-base leading-relaxed">{product.description}</p>
                     <div className="space-y-4">
                       <p className="text-2xl font-bold text-[#2D3748]">¥{product.price.toLocaleString()}</p>
-                      <Button
-                        onClick={() => handlePurchaseClick(product)}
-                        className="w-full bg-gradient-to-r from-[#FF9900] to-[#FF8C00] hover:from-[#FF8C00] hover:to-[#FF7A00] text-white px-6 py-4 rounded-xl transition-all duration-300 ease-in-out transform hover:-translate-y-1 hover:shadow-lg font-bold text-lg flex items-center justify-center space-x-2"
-                        aria-label={`${product.name}を今すぐ購入`}
-                      >
-                        <span>今すぐ購入</span>
-                        <ArrowRight className="w-5 h-5" aria-hidden="true" />
-                      </Button>
+                      <ProductPurchaseButton
+                        product={product}
+                        interviewId={interviewId}
+                      />
                     </div>
                   </div>
                 </div>
