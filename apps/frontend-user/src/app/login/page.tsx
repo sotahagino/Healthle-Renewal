@@ -13,6 +13,9 @@ import { Icons } from '@/components/ui/icons'
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isSignUp, setIsSignUp] = useState(false)
   const [loading, setLoading] = useState(false)
   const { signIn, signUp, error } = useAuth()
@@ -23,6 +26,9 @@ export default function LoginPage() {
 
     try {
       if (isSignUp) {
+        if (password !== confirmPassword) {
+          throw new Error('パスワードが一致しません')
+        }
         await signUp(email, password)
       } else {
         await signIn(email, password)
@@ -78,16 +84,59 @@ export default function LoginPage() {
                   <Label htmlFor="password" className="text-sm font-medium">
                     パスワード
                   </Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="8文字以上の英数字"
-                    className="h-11"
-                    required
-                  />
+                  <div className="relative">
+                    <Input
+                      id="password"
+                      type={showPassword ? "text" : "password"}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="8文字以上の英数字"
+                      className="h-11 pr-10"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                    >
+                      {showPassword ? (
+                        <Icons.eyeOff className="h-5 w-5" />
+                      ) : (
+                        <Icons.eye className="h-5 w-5" />
+                      )}
+                    </button>
+                  </div>
                 </div>
+
+                {isSignUp && (
+                  <div className="space-y-2">
+                    <Label htmlFor="confirmPassword" className="text-sm font-medium">
+                      パスワード（確認）
+                    </Label>
+                    <div className="relative">
+                      <Input
+                        id="confirmPassword"
+                        type={showConfirmPassword ? "text" : "password"}
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        placeholder="パスワードを再入力"
+                        className="h-11 pr-10"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                      >
+                        {showConfirmPassword ? (
+                          <Icons.eyeOff className="h-5 w-5" />
+                        ) : (
+                          <Icons.eye className="h-5 w-5" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {error && (
