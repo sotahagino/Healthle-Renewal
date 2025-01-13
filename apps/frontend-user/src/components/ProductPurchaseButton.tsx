@@ -50,7 +50,7 @@ export const ProductPurchaseButton = ({ product, interviewId }: ProductPurchaseB
             <PaymentFormWrapper
               productId={product.id}
               amount={product.price}
-              interviewId={interviewId || undefined}
+              medical_interview_id={interviewId || undefined}
             />
           </div>
         </DialogContent>
