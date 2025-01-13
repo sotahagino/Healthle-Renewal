@@ -1,4 +1,4 @@
-import { PaymentFormWrapper } from '@/components/PaymentForm';
+import { PaymentFormWrapper } from '@/components/PaymentFormWrapper';
 
 export default function TestPaymentPage() {
   return (
