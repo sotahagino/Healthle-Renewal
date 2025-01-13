@@ -141,6 +141,15 @@ export default function MyPage() {
                         <span className="font-medium whitespace-nowrap">
                           ¥{order.total_amount.toLocaleString()}
                         </span>
+                        <Button
+                          onClick={() => router.push(`/mypage/orders/${order.id}`)}
+                          variant="outline"
+                          size="sm"
+                          className="text-[#4C9A84] border-[#4C9A84] hover:bg-[#4C9A84] hover:text-white"
+                        >
+                          <Icons.chevronRight className="h-4 w-4 mr-1" />
+                          詳細を見る
+                        </Button>
                       </div>
                     </div>
                   ))}
