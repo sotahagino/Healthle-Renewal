@@ -13,6 +13,7 @@ interface OrderInfo {
 export default function CompletePage() {
   const searchParams = useSearchParams();
   const paymentIntentId = searchParams.get('payment_intent');
+  const interviewId = searchParams.get('interview_id');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [orderInfo, setOrderInfo] = useState<OrderInfo | null>(null);
@@ -62,18 +63,34 @@ export default function CompletePage() {
   const updateOrderUserId = async (userId: string) => {
     try {
       // 注文情報を更新
-      const { error: updateError } = await supabase
+      const { error: orderError } = await supabase
         .from('vendor_orders')
-        .update({ user_id: userId })
+        .update({ user_id: userId, updated_at: new Date().toISOString() })
         .eq('stripe_session_id', paymentIntentId);
 
-      if (updateError) {
-        console.error('Error updating order user_id:', updateError);
-        throw updateError;
+      if (orderError) {
+        console.error('Error updating order:', orderError);
+        throw orderError;
       }
-    } catch (err) {
-      console.error('Error in updateOrderUserId:', err);
-      throw err;
+
+      // medical_interviewsテーブルの更新
+      if (interviewId) {
+        const { error: interviewError } = await supabase
+          .from('medical_interviews')
+          .update({ 
+            user_id: userId,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', interviewId);
+
+        if (interviewError) {
+          console.error('Error updating medical interview:', interviewError);
+          throw interviewError;
+        }
+      }
+    } catch (error) {
+      console.error('Error in updateOrderUserId:', error);
+      throw error;
     }
   };
 

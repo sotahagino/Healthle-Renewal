@@ -96,7 +96,10 @@ export function PaymentFormWrapper({ productId, amount, medical_interview_id }: 
 
   return (
     <Elements stripe={stripePromise} options={{ clientSecret }}>
-      <PaymentForm clientSecret={clientSecret} />
+      <PaymentForm 
+        clientSecret={clientSecret}
+        interviewId={medical_interview_id}
+      />
     </Elements>
   );
 } 

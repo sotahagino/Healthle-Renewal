@@ -51,6 +51,9 @@ export const ProductPurchaseButton = ({ product, interviewId }: ProductPurchaseB
               productId={product.id}
               amount={product.price}
               medical_interview_id={interviewId || undefined}
+              metadata={{
+                medical_interview_id: interviewId || undefined
+              }}
             />
           </div>
         </DialogContent>

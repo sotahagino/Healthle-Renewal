@@ -118,6 +118,7 @@ export async function GET(request: Request) {
         user_id: session?.user?.id || null,
         product_id: product.id,
         vendor_id: product.vendor_id,
+        interview_id: paymentIntent.metadata.medical_interview_id || null,
         total_amount: paymentIntent.amount,
         status: 'paid',
         stripe_session_id: paymentIntentId,
@@ -131,6 +132,7 @@ export async function GET(request: Request) {
         updated_at: new Date().toISOString()
       };
 
+      console.log('PaymentIntent metadata:', paymentIntent.metadata);
       console.log('Inserting order data:', orderData);
 
       const { error: insertError } = await supabase

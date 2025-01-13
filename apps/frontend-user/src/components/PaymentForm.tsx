@@ -9,6 +9,7 @@ import {
 
 interface PaymentFormProps {
   clientSecret: string;
+  interviewId?: string;
 }
 
 interface ShippingInfo {
@@ -22,7 +23,7 @@ interface ShippingInfo {
   line2: string;
 }
 
-export function PaymentForm({ clientSecret }: PaymentFormProps) {
+export function PaymentForm({ clientSecret, interviewId }: PaymentFormProps) {
   const stripe = useStripe();
   const elements = useElements();
   const [error, setError] = useState<string>();
@@ -50,28 +51,27 @@ export function PaymentForm({ clientSecret }: PaymentFormProps) {
     setIsProcessing(true);
 
     try {
-      const { error: submitError } = await stripe.confirmPayment({
+      const { error: confirmError } = await stripe.confirmPayment({
         elements,
         confirmParams: {
-          return_url: `${window.location.origin}/payment/complete`,
+          return_url: `${window.location.origin}/payment/complete${interviewId ? `?interview_id=${interviewId}` : ''}`,
+          receipt_email: shippingInfo.email,
           shipping: {
             name: shippingInfo.name,
             phone: shippingInfo.phone,
             address: {
-              country: 'JP',
               postal_code: shippingInfo.postalCode,
               state: shippingInfo.prefecture,
               city: shippingInfo.city,
               line1: shippingInfo.line1,
-              line2: shippingInfo.line2
+              line2: shippingInfo.line2 || undefined
             }
-          },
-          receipt_email: shippingInfo.email
-        },
+          }
+        }
       });
 
-      if (submitError) {
-        setError(submitError.message || '決済処理に失敗しました');
+      if (confirmError) {
+        setError(confirmError.message || '決済処理に失敗しました');
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : '決済処理に失敗しました');
