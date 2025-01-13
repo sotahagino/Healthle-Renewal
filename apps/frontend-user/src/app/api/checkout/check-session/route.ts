@@ -106,9 +106,10 @@ export async function GET(request: Request) {
       } : null;
 
       // メールアドレスの取得（PaymentIntentのcustomerから）
-      const customerEmail = typeof paymentIntent.customer === 'object' && paymentIntent.customer ? 
-        paymentIntent.customer.email : 
-        (paymentIntent.receipt_email || null);
+      const customerEmail = paymentIntent.receipt_email || 
+        (typeof paymentIntent.customer === 'string' ? 
+          await stripe.customers.retrieve(paymentIntent.customer).then(customer => customer.email) : 
+          null);
 
       const orderData = {
         order_id: orderId,
