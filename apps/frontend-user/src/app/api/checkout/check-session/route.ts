@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
+import { cookies } from 'next/dist/client/components/headers';
 import { stripe } from '@/lib/stripe';
 import { nanoid } from 'nanoid';
 
@@ -108,7 +108,9 @@ export async function GET(request: Request) {
       // メールアドレスの取得（PaymentIntentのcustomerから）
       const customerEmail = paymentIntent.receipt_email || 
         (typeof paymentIntent.customer === 'string' ? 
-          await stripe.customers.retrieve(paymentIntent.customer).then(customer => customer.email) : 
+          await stripe.customers.retrieve(paymentIntent.customer)
+            .then(customer => 'deleted' in customer ? null : customer.email)
+            .catch(() => null) : 
           null);
 
       const orderData = {
