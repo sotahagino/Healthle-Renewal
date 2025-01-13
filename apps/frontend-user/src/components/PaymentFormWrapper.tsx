@@ -15,9 +15,12 @@ interface PaymentFormWrapperProps {
   productId: string;
   amount: number;
   medical_interview_id?: string;
+  metadata?: {
+    medical_interview_id?: string;
+  };
 }
 
-export function PaymentFormWrapper({ productId, amount, medical_interview_id }: PaymentFormWrapperProps) {
+export function PaymentFormWrapper({ productId, amount, medical_interview_id, metadata }: PaymentFormWrapperProps) {
   const [clientSecret, setClientSecret] = useState<string>();
   const [error, setError] = useState<string>();
   const [isLoading, setIsLoading] = useState(false);
