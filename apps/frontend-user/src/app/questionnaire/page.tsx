@@ -6,9 +6,12 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Loader2, Send, AlertCircle } from 'lucide-react'
 import { Textarea } from "@/components/ui/textarea"
 import { getSupabaseClient } from "@/lib/supabase"
+import { Progress } from "@/components/ui/progress"
+import { Slider } from "@/components/ui/slider"
+import { cn } from "@/lib/utils"
 
 // APIから返される質問の型定義
 interface Option {
@@ -33,6 +36,7 @@ export default function QuestionnairePage() {
   const errorRef = useRef<HTMLDivElement>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [symptomText, setSymptomText] = useState<string>('')
+  const questionRefs = useRef<(HTMLDivElement | null)[]>([])
 
   useEffect(() => {
     const interview_id = searchParams.get('interview_id')
@@ -124,6 +128,18 @@ export default function QuestionnairePage() {
           }
         }
       }
+      
+      // 回答が入力されたら次の質問にスクロール
+      const currentIndex = questions.findIndex(q => q.id === questionId)
+      if (currentIndex < questions.length - 1) {
+        setTimeout(() => {
+          questionRefs.current[currentIndex + 1]?.scrollIntoView({
+            behavior: 'smooth',
+            block: 'center'
+          })
+        }, 300)
+      }
+
       return {
         ...prev,
         [questionId]: value
@@ -198,6 +214,18 @@ export default function QuestionnairePage() {
     }
   }
 
+  // 進捗状況の計算
+  const calculateProgress = () => {
+    const totalQuestions = questions.length
+    if (totalQuestions === 0) return 0
+    
+    const answeredQuestions = Object.values(answers).filter(answer => 
+      Array.isArray(answer) ? answer.length > 0 : answer !== ''
+    ).length
+    
+    return (answeredQuestions / totalQuestions) * 100
+  }
+
   const renderQuestionInput = (question: Question, index: number) => {
     if (!question || typeof question !== 'object') {
       console.error('Invalid question:', question)
@@ -211,28 +239,33 @@ export default function QuestionnairePage() {
             <Textarea
               value={answers[question.id] || ''}
               onChange={(e) => handleAnswerChange(question.id, e.target.value)}
+              onBlur={() => handleAnswerChange(question.id, answers[question.id] as string || '')}
               placeholder="ここに回答を入力してください"
-              className="min-h-[100px] mb-2"
+              className="min-h-[120px] mb-2 text-base border-2 border-[#A7D7C5] focus:border-[#4C9A84] focus:ring-[#4C9A84] transition-all duration-300"
             />
-            <p className="text-sm text-gray-500 italic">
+            <p className="text-sm text-text-secondary italic">
               ※ 未入力の場合は「特になし」として回答されます
             </p>
           </div>
         )
       case '単一選択':
-      case 'スケール':
         return (
           <RadioGroup
             value={answers[question.id] as string || ''}
             onValueChange={(value) => handleAnswerChange(question.id, value)}
+            className="space-y-3"
           >
             {Array.isArray(question.options) && question.options.map((option, optionIndex) => (
-              <div key={optionIndex} className="flex items-center space-x-2">
+              <div key={optionIndex} className="flex items-center space-x-3 p-3 rounded-lg hover:bg-secondary/50 transition-colors">
                 <RadioGroupItem
                   value={option.id}
                   id={`${question.id}-${optionIndex}`}
+                  className="text-accent border-2 border-[#A7D7C5] data-[state=checked]:border-accent data-[state=checked]:text-accent"
                 />
-                <Label htmlFor={`${question.id}-${optionIndex}`}>
+                <Label 
+                  htmlFor={`${question.id}-${optionIndex}`}
+                  className="text-base cursor-pointer"
+                >
                   {option.text}
                 </Label>
               </div>
@@ -242,21 +275,55 @@ export default function QuestionnairePage() {
       case '複数選択':
         const selectedValues = (answers[question.id] as string[]) || []
         return (
-          <div className="space-y-2">
+          <div className="space-y-3">
             {Array.isArray(question.options) && question.options.map((option, optionIndex) => (
-              <div key={optionIndex} className="flex items-center space-x-2">
+              <div key={optionIndex} className="flex items-center space-x-3 p-3 rounded-lg hover:bg-secondary/50 transition-colors">
                 <input
                   type="checkbox"
                   id={`${question.id}-${optionIndex}`}
                   checked={selectedValues.includes(option.id)}
                   onChange={() => handleAnswerChange(question.id, option.id)}
-                  className="h-4 w-4 rounded border-gray-300"
+                  className="w-4 h-4 rounded border-2 border-[#A7D7C5] text-accent focus:ring-accent"
                 />
-                <Label htmlFor={`${question.id}-${optionIndex}`}>
+                <label
+                  htmlFor={`${question.id}-${optionIndex}`}
+                  className="text-base cursor-pointer"
+                >
                   {option.text}
-                </Label>
+                </label>
               </div>
             ))}
+          </div>
+        )
+      case 'スケール':
+        const value = answers[question.id] ? parseInt(answers[question.id] as string) : 5
+        return (
+          <div className="space-y-6">
+            <Slider
+              value={[value]}
+              min={1}
+              max={10}
+              step={1}
+              onValueChange={(values) => handleAnswerChange(question.id, values[0].toString())}
+              className="w-full"
+            />
+            <div className="flex justify-between text-sm text-text-secondary px-2">
+              <span>非常に悪い</span>
+              <span>非常に良い</span>
+            </div>
+            <div className="flex justify-between px-2">
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
+                <span
+                  key={num}
+                  className={cn(
+                    "text-sm",
+                    value === num ? "text-accent font-bold" : "text-text-secondary"
+                  )}
+                >
+                  {num}
+                </span>
+              ))}
+            </div>
           </div>
         )
       default:
@@ -265,46 +332,90 @@ export default function QuestionnairePage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <Button
-        variant="ghost"
-        className="mb-4"
-        onClick={() => router.back()}
-      >
-        <ArrowLeft className="mr-2 h-4 w-4" />
-        戻る
-      </Button>
+    <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#E6F3EF] via-white to-[#F5F9F7]">
+      {/* ヘッダー */}
+      <div className="sticky top-0 z-50 bg-white shadow-sm">
+        <div className="max-w-2xl mx-auto px-4 py-3">
+          <div className="flex items-center justify-between">
+            <button
+              onClick={() => router.back()}
+              className="flex items-center text-text-secondary hover:text-text-primary transition-colors"
+            >
+              <ArrowLeft className="w-5 h-5 mr-1" />
+              <span>戻る</span>
+            </button>
+            <Progress value={calculateProgress()} className="w-32 h-2" />
+          </div>
+        </div>
+      </div>
 
-      <form onSubmit={handleSubmit} className="space-y-8">
-        {questions.map((question, index) => (
-          <Card key={question.id} className="w-full">
-            <CardContent className="pt-6">
-              <div className="mb-4">
-                <h3 className="text-lg font-semibold mb-2">
-                  {`${index + 1}. ${question.text}`}
-                </h3>
-                {renderQuestionInput(question, index)}
+      <main className="flex-grow container max-w-2xl mx-auto px-4 py-6">
+        {error ? (
+          <Card className="mb-6 border-red-200 bg-red-50">
+            <CardContent className="p-4 flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-red-700 font-medium">エラーが発生しました</p>
+                <p className="text-red-600 text-sm mt-1">{error}</p>
               </div>
             </CardContent>
           </Card>
-        ))}
+        ) : null}
 
-        <div className="flex justify-center">
-          <Button
-            type="submit"
-            className="w-full max-w-md"
-            disabled={isLoading}
-          >
-            {isLoading ? '送信中...' : '回答を送信'}
-          </Button>
-        </div>
-      </form>
+        <form onSubmit={handleSubmit} className="space-y-8">
+          {questions.map((question, index) => (
+            <Card 
+              key={question.id} 
+              className="transition-all duration-300 hover:shadow-md"
+              ref={el => questionRefs.current[index] = el}
+            >
+              <CardContent className="p-6">
+                <div className="flex items-start gap-4 mb-6">
+                  <div className="w-8 h-8 rounded-full bg-accent text-white flex items-center justify-center flex-shrink-0">
+                    {index + 1}
+                  </div>
+                  <div className="flex-grow">
+                    <h2 className="text-lg font-bold text-text-primary mb-2">
+                      {question.text}
+                    </h2>
+                    {question.type === '複数選択' && (
+                      <p className="text-sm text-text-secondary">
+                        複数選択可能です
+                      </p>
+                    )}
+                  </div>
+                </div>
 
-      {error && (
-        <div className="mt-4 p-4 bg-red-100 text-red-700 rounded">
-          {error}
-        </div>
-      )}
+                <div className="pl-12">
+                  {renderQuestionInput(question, index)}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+
+          <div className="sticky bottom-6 left-0 right-0 px-4">
+            <div className="max-w-2xl mx-auto">
+              <Button
+                type="submit"
+                disabled={isLoading}
+                className="w-full bg-primary hover:bg-primary-hover text-white py-6 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-all duration-300"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <span>送信中...</span>
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-5 h-5" />
+                    <span>回答を送信する</span>
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </form>
+      </main>
     </div>
   )
 }

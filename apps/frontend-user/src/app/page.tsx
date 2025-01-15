@@ -1,15 +1,26 @@
 "use client"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect } from "react"
+import { useRouter } from 'next/navigation'
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent } from "@/components/ui/card"
 import { SiteHeader } from '@/components/site-header'
 import { Footer } from '@/components/footer'
-import { Clock, Clipboard, ShieldCheck, CheckCircle, MessageCircle, History } from 'lucide-react'
+import { 
+  Clock, 
+  Clipboard, 
+  ShieldCheck, 
+  CheckCircle, 
+  MessageCircle, 
+  Search,
+  ThumbsUp,
+  ArrowRight,
+  ChevronRight
+} from 'lucide-react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
+// インターフェース定義
 interface QuestionOption {
   id: string;
   text: string;
@@ -22,12 +33,51 @@ interface Question {
   options?: QuestionOption[];
 }
 
+// 症状カテゴリーの定義
+const SYMPTOM_CATEGORIES = [
+  { id: 'sleep', name: '睡眠の悩み', example: '寝つきが悪い、夜中に目が覚める' },
+  { id: 'headache', name: '頭痛', example: '慢性的な頭痛、片頭痛' },
+  { id: 'stomach', name: '胃腸の不調', example: '胃痛、消化不良' },
+  { id: 'fatigue', name: '疲労・だるさ', example: '慢性的な疲れ、だるさ' },
+  { id: 'stress', name: 'ストレス', example: '不安、イライラ' },
+  { id: 'other', name: 'その他の症状', example: 'その他の気になる症状' },
+]
+
+// よくある相談例
+const COMMON_SYMPTOMS = [
+  "夜中に何度も目が覚めて困っています",
+  "仕事のストレスで不眠が続いています",
+  "朝起きても疲れが取れません",
+  "頭痛が続いて集中できません",
+]
+
 export default function Home() {
   const router = useRouter()
   const [symptomText, setSymptomText] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showFloatingCTA, setShowFloatingCTA] = useState(false)
   const supabase = createClientComponentClient()
+
+  // スクロールに応じてフローティングCTAを表示
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowFloatingCTA(window.scrollY > 500)
+    }
+    window.addEventListener('scroll', handleScroll)
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
+
+  const handleCategorySelect = (example: string) => {
+    setSymptomText(example)
+    // スムーズスクロール
+    const textarea = document.getElementById('symptom-textarea')
+    textarea?.scrollIntoView({ behavior: 'smooth' })
+  }
+
+  const handleCommonSymptomSelect = (symptom: string) => {
+    setSymptomText(symptom)
+  }
 
   const handleStartConsultation = async () => {
     setLoading(true)
@@ -130,92 +180,238 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#E6F3EF] to-white">
+    <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#E6F3EF] via-white to-[#F5F9F7]">
       <SiteHeader />
-      <main className="flex-grow container mx-auto px-4 py-12 mt-16">
-        <h1 className="text-3xl font-bold text-center mb-6 text-[#333333] leading-tight">
-          あなたの悩みに寄り添い、<br />適切な回答を提供します
-        </h1>
-        <p className="text-center text-[#666666] mb-10">
-          日々の不調に対するセルフケアのお手伝いをします
-        </p>
-
-        <Card className="bg-white shadow-lg mb-8">
-          <CardContent className="p-6">
-            <h2 className="text-xl font-semibold text-[#4C9A84] mb-4 text-center">
-              健康相談を始めましょう
-            </h2>
-            <Textarea
-              placeholder="あなたの健康の悩みを入力してください..."
-              className="min-h-[120px] text-[#333333] border-[#A7D7C5] focus:border-[#4C9A84] focus:ring-[#4C9A84] mb-4"
-              value={symptomText}
-              onChange={(e) => setSymptomText(e.target.value)}
-            />
-
-            {error && (
-              <p className="text-red-500 text-sm mb-4">{error}</p>
-            )}
-
-            <Button 
-              onClick={handleStartConsultation}
-              className="w-full bg-[#3A8B73] hover:bg-[#2E7A62] text-white text-lg py-6 font-bold rounded-lg shadow-md transition-all duration-300 ease-in-out transform hover:translate-y-[-2px] hover:shadow-lg"
-              disabled={loading}
-            >
-              {loading ? "質問票を生成中..." : "無料で相談を始める"}
-            </Button>
-          </CardContent>
-        </Card>
-
-        <div className="grid grid-cols-2 gap-6 mb-12">
-          {[
-            { icon: Clock, text: '24時間いつでも対応' },
-            { icon: Clipboard, text: '丁寧な質問票で根本要因を把握' },
-            { icon: MessageCircle, text: '追加の質問も無制限' },
-            { icon: CheckCircle, text: '的確な情報と一般用医薬品の紹介' }
-          ].map((feature, index) => (
-            <div key={index} className="flex flex-col items-center bg-white p-4 rounded-lg shadow">
-              <feature.icon className="w-10 h-10 text-[#4C9A84] mb-3" />
-              <p className="text-sm font-semibold text-[#333333] text-center">{feature.text}</p>
+      
+      <main className="flex-grow px-5 pt-8 pb-20">
+        <div className="max-w-md mx-auto animate-fade-in">
+          {/* ヒーローセクション - 改善版 */}
+          <div className="text-center mb-8">
+            <h1 className="text-2xl sm:text-3xl font-bold text-[#1A1A1A] mb-4 leading-tight">
+              AIがあなたの健康をサポート
+            </h1>
+            <p className="text-xl font-bold text-accent mb-4">
+              24時間365日、いつでも相談可能
+            </p>
+            <div className="bg-white rounded-lg p-3 mb-6 shadow-sm">
+              <p className="text-accent font-bold mb-2">利用者満足度</p>
+              <div className="flex items-center justify-center gap-2">
+                <ThumbsUp className="w-5 h-5 text-accent" />
+                <span className="text-2xl font-bold text-accent">90%</span>
+              </div>
             </div>
-          ))}
-        </div>
+          </div>
 
-        <Card className="bg-white">
-          <CardContent className="p-8">
-            <h2 className="text-2xl font-bold text-[#4C9A84] mb-8 pb-3 border-b-2 border-[#A7D7C5]">
-              Healthleが選ばれる理由
-            </h2>
-            <ul className="space-y-6 text-[#333333]">
-              {[
-                {
-                  title: '独自のAI問診システム',
-                  description: '独自開発の質問票システムにより、見過ごされがちな症状の背景情報を詳しく把握し、より正確な判断をサポート'
-                },
-                {
-                  title: 'エビデンスに基づいたアドバイス',
-                  description: '最新の医学的知見に基づいた、信頼性の高いセルフケア情報と一般用医薬品の提案を提供'
-                },
-                {
-                  title: '安心のセキュリティ対策',
-                  description: '医療情報の取り扱いに準拠したセキュリティ体制で、プライバシーを確実に保護'
-                },
-                {
-                  title: '24時間365日無料サービス',
-                  description: '急な体調不良でも、いつでもどこでも無料で専門的なアドバイスにアクセス可能'
-                }
-              ].map((feature, index) => (
-                <li key={index} className="flex items-start">
-                  <CheckCircle className="w-6 h-6 text-[#4C9A84] mr-4 flex-shrink-0 mt-1" />
-                  <div>
-                    <span className="font-semibold block mb-1">{feature.title}</span>
-                    <span className="text-sm leading-relaxed text-[#666666]">{feature.description}</span>
+          {/* 3ステップ説明 */}
+          <div className="grid grid-cols-3 gap-2 mb-8">
+            {[
+              { step: 1, text: "症状を入力" },
+              { step: 2, text: "質問票に回答" },
+              { step: 3, text: "対処法を提案" }
+            ].map((item) => (
+              <div key={item.step} className="flex flex-col items-center">
+                <div className="w-8 h-8 rounded-full bg-accent text-white flex items-center justify-center text-sm font-bold mb-2">
+                  {item.step}
+                </div>
+                <p className="text-xs text-center">{item.text}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* メイン相談フォーム */}
+          <Card className="bg-white shadow-lg mb-8">
+            <CardContent className="p-6">
+              <div className="mb-4">
+                <h2 className="text-lg font-bold text-text-primary mb-2">あなたの悩みを教えてください</h2>
+                <p className="text-sm text-text-secondary">具体的に書くほど、より適切なアドバイスができます</p>
+              </div>
+              
+              {/* よくある相談例 */}
+              <div className="mb-4">
+                <p className="text-sm text-text-secondary mb-2">よくある相談例：</p>
+                <div className="flex flex-wrap gap-2">
+                  {COMMON_SYMPTOMS.map((symptom, index) => (
+                    <button
+                      key={index}
+                      onClick={() => handleCommonSymptomSelect(symptom)}
+                      className="text-xs bg-secondary text-accent px-3 py-1 rounded-full hover:bg-accent hover:text-white transition-colors"
+                    >
+                      {symptom}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <Textarea
+                id="symptom-textarea"
+                placeholder="例：最近寝つきが悪く、夜中に何度も目が覚めてしまいます。日中も疲れが取れず、集中力が低下しています..."
+                className="min-h-[120px] text-base border-2 border-[#A7D7C5] focus:border-[#4C9A84] focus:ring-[#4C9A84] mb-2 transition-all duration-300 p-4"
+                value={symptomText}
+                onChange={(e) => setSymptomText(e.target.value)}
+              />
+              
+              <p className="text-xs text-text-secondary mb-4 text-right">
+                {symptomText.length}/1000文字
+              </p>
+
+              {error && (
+                <p className="text-red-500 text-sm mb-4 animate-shake">{error}</p>
+              )}
+
+              <Button 
+                onClick={handleStartConsultation}
+                className="w-full bg-primary hover:bg-primary-hover text-white text-lg py-5 font-bold rounded-xl shadow transition-all duration-300 flex items-center justify-center gap-3"
+                disabled={loading}
+              >
+                {loading ? (
+                  <>
+                    <span className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></span>
+                    <span>質問票を生成中...</span>
+                  </>
+                ) : (
+                  <>
+                    <MessageCircle className="w-5 h-5" />
+                    <span>無料で相談を始める</span>
+                  </>
+                )}
+              </Button>
+
+              {/* ローディング状態の詳細表示 */}
+              {loading && (
+                <div className="mt-4 bg-secondary/30 rounded-lg p-4 animate-pulse">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-sm font-medium text-text-primary">あなたに最適な質問を準備中...</p>
+                    <div className="flex items-center gap-1">
+                      <span className="w-2 h-2 bg-accent rounded-full animate-bounce" style={{ animationDelay: '0s' }}></span>
+                      <span className="w-2 h-2 bg-accent rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></span>
+                      <span className="w-2 h-2 bg-accent rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></span>
+                    </div>
                   </div>
-                </li>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm text-text-secondary">
+                      <CheckCircle className="w-4 h-4 text-accent" />
+                      <span>入力内容を分析中</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-text-secondary">
+                      <CheckCircle className="w-4 h-4 text-accent" />
+                      <span>症状に合わせた質問を選定中</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-text-secondary">
+                      <CheckCircle className="w-4 h-4 text-accent" />
+                      <span>より適切な回答のために質問を最適化中</span>
+                    </div>
+                  </div>
+                  <p className="mt-3 text-xs text-text-secondary text-center">
+                    お客様に最適な質問票を作成しています。しばらくお待ちください。
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* 特徴セクション - スペーシング改善 */}
+          <div className="grid grid-cols-2 gap-4 mb-12 px-1">
+            {[
+              { icon: Clock, text: '24時間対応', subtext: '深夜でも休日でも' },
+              { icon: Clipboard, text: '丁寧な質問', subtext: '症状を正確に把握' },
+              { icon: MessageCircle, text: '追加質問無制限', subtext: '気になることは何でも' },
+              { icon: CheckCircle, text: 'すぐに購入', subtext: '推奨薬をお届け' }
+            ].map((feature, index) => (
+              <div key={index} className="bg-white p-4 rounded-lg shadow-md">
+                <div className="flex flex-col items-center">
+                  <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center mb-3">
+                    <feature.icon className="w-6 h-6 text-accent" />
+                  </div>
+                  <h3 className="text-sm font-bold text-text-primary mb-2 text-center">{feature.text}</h3>
+                  <p className="text-xs text-text-secondary text-center leading-relaxed">{feature.subtext}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* 選ばれる理由セクション - スペーシング改善 */}
+          <Card className="bg-white mb-16">
+            <CardContent className="p-6">
+              <h2 className="text-xl font-bold text-accent mb-8 pb-3 border-b-2 border-secondary">
+                Healthleが選ばれる理由
+              </h2>
+              <div className="space-y-8">
+                {[
+                  {
+                    title: '独自のAI問診システム',
+                    description: '独自開発の質問票システムにより、見過ごされがちな症状の背景情報を詳しく把握',
+                    icon: ShieldCheck
+                  },
+                  {
+                    title: 'エビデンスに基づくアドバイス',
+                    description: '最新の医学的知見に基づいた、信頼性の高いセルフケア情報を提供',
+                    icon: Clipboard
+                  },
+                  {
+                    title: '簡単購入システム',
+                    description: '症状に合わせて提案された医薬品を、その場でワンクリックで購入可能',
+                    icon: CheckCircle
+                  },
+                  {
+                    title: '24時間365日無料',
+                    description: '急な体調不良でも、いつでもどこでも無料で専門的なアドバイスにアクセス可能',
+                    icon: Clock
+                  }
+                ].map((feature, index) => (
+                  <div key={index} className="flex items-start space-x-5">
+                    <div className="w-12 h-12 rounded-full bg-secondary flex-shrink-0 flex items-center justify-center">
+                      <feature.icon className="w-6 h-6 text-accent" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-base mb-2 text-text-primary">{feature.title}</h3>
+                      <p className="text-sm text-text-secondary leading-relaxed">{feature.description}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* 症状カテゴリー */}
+          <div className="mb-8">
+            <h2 className="text-lg font-bold text-text-primary mb-6 flex items-center">
+              <Search className="w-5 h-5 mr-2" />
+              症状から相談
+            </h2>
+            <div className="grid grid-cols-2 gap-3">
+              {SYMPTOM_CATEGORIES.map((category) => (
+                <button
+                  key={category.id}
+                  onClick={() => handleCategorySelect(category.example)}
+                  className="bg-white p-3 rounded-lg shadow-sm hover:shadow transition-shadow text-left"
+                >
+                  <p className="font-bold text-sm mb-1">{category.name}</p>
+                  <p className="text-xs text-text-secondary">{category.example}</p>
+                </button>
               ))}
-            </ul>
-          </CardContent>
-        </Card>
+            </div>
+          </div>
+        </div>
       </main>
+
+      {/* フローティングCTAボタン */}
+      {showFloatingCTA && (
+        <div className="fixed bottom-6 left-0 right-0 px-5 animate-fade-in">
+          <div className="max-w-md mx-auto">
+            <Button
+              onClick={() => {
+                const textarea = document.getElementById('symptom-textarea')
+                textarea?.scrollIntoView({ behavior: 'smooth' })
+              }}
+              className="w-full bg-primary hover:bg-primary-hover text-white py-4 rounded-xl shadow-lg flex items-center justify-center gap-2"
+            >
+              <MessageCircle className="w-5 h-5" />
+              <span>相談を始める</span>
+            </Button>
+          </div>
+        </div>
+      )}
+
       <Footer />
     </div>
   )

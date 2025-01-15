@@ -1,14 +1,14 @@
 "use client"
 
 import { useState, useEffect, useRef } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useRouter as useNavigation } from 'next/navigation'
+import { useSearchParams as useNavigationSearchParams } from 'next/navigation'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { MessageCircle, Send, ShoppingBag, ArrowRight, CheckCircle, Star, HelpCircle, Phone } from 'lucide-react'
+import { MessageCircle, Send, ShoppingBag, ArrowRight, CheckCircle, Star, HelpCircle, Phone, ArrowUp } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
-import { useRouter } from 'next/navigation'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -57,7 +57,7 @@ interface FollowUpData {
 
 export default function ResultPage() {
   const { user } = useAuth()
-  const searchParams = useSearchParams()
+  const searchParams = useNavigationSearchParams()
   const [consultationText, setConsultationText] = useState("")
   const [selectedProduct, setSelectedProduct] = useState<RecommendedProduct | null>(null)
   const [interviewId, setInterviewId] = useState<string | null>(null)
@@ -71,7 +71,7 @@ export default function ResultPage() {
   const [recommendedProducts, setRecommendedProducts] = useState<RecommendedProduct[]>([])
   const [isLoadingProducts, setIsLoadingProducts] = useState(false)
   const [productError, setProductError] = useState<string | null>(null)
-  const router = useRouter()
+  const router = useNavigation()
 
   useEffect(() => {
     const fetchData = async () => {
@@ -578,13 +578,20 @@ export default function ResultPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#F8FBFA] via-white to-[#F8FBFA]">
+    <div className="min-h-screen bg-gradient-to-b from-[#E6F3EF] via-white to-[#F5F9F7]">
       <header className="bg-white border-b border-[#E2E8F0] sticky top-0 z-50 shadow-sm">
-        <div className="container mx-auto px-4 py-4">
+        <div className="container mx-auto px-4 py-3 sm:py-4">
           <div className="flex justify-between items-center">
-            <nav className="text-sm text-[#4A5568] mb-2">
+            <nav className="text-sm text-[#4A5568]">
               <ol className="flex items-center space-x-2">
-                <li><a href="/" className="hover:text-[#4C9A84]">ホーム</a></li>
+                <li>
+                  <a 
+                    href="/" 
+                    className="hover:text-[#4C9A84] active:text-[#3A8B73] touch-manipulation"
+                  >
+                    ホーム
+                  </a>
+                </li>
                 <li className="flex items-center space-x-2">
                   <span>/</span>
                   <span>健康相談結果</span>
@@ -593,7 +600,7 @@ export default function ResultPage() {
             </nav>
             <Button
               onClick={handleLogin}
-              className="bg-[#4C9A84] hover:bg-[#3A8B73] text-white px-6 py-2 rounded-xl transition-all duration-300"
+              className="bg-[#4C9A84] hover:bg-[#3A8B73] active:bg-[#2A7C63] text-white px-4 sm:px-6 py-2 rounded-xl transition-all duration-300 touch-manipulation min-h-[44px] min-w-[88px]"
             >
               ログイン
             </Button>
@@ -601,31 +608,31 @@ export default function ResultPage() {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8 md:py-12 max-w-4xl">
-        <div className="text-center mb-16">
-          <h1 className="text-2xl md:text-3xl font-bold text-[#2D3748] inline-flex items-center justify-center bg-white px-8 py-4 rounded-full shadow-sm">
-            <MessageCircle className="w-7 h-7 md:w-8 md:h-8 mr-4 text-[#4C9A84]" />
+      <main className="container max-w-2xl mx-auto px-4 py-6 sm:py-8">
+        <div className="text-center mb-8 sm:mb-16">
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-[#2D3748] inline-flex items-center justify-center bg-white px-6 sm:px-8 py-3 sm:py-4 rounded-full shadow-sm">
+            <MessageCircle className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 mr-3 sm:mr-4 text-[#4C9A84]" />
             健康相談結果
           </h1>
-          <p className="mt-4 text-[#4A5568] text-center mx-auto max-w-2xl">
-            AIがあなたの健康状態を分析し、<br />
+          <p className="mt-3 sm:mt-4 text-sm sm:text-base text-[#4A5568] text-center mx-auto max-w-2xl">
+            AIがあなたの健康状態を分析し、<br className="sm:hidden" />
             最適なアドバイスをお届けします
           </p>
         </div>
 
-        <section className="mb-12 md:mb-16">
-          <Card className="bg-white shadow-lg hover:shadow-xl transition-all duration-300 border-none rounded-2xl overflow-hidden w-full">
-            <CardContent className="p-6 md:p-8">
+        <section className="mb-8 sm:mb-12 md:mb-16">
+          <Card className="bg-white shadow-lg hover:shadow-xl transition-all duration-300 border-none rounded-xl sm:rounded-2xl overflow-hidden w-full">
+            <CardContent className="p-4 sm:p-6 md:p-8">
               <div className="flex flex-col">
                 <div className="flex items-center mb-4">
-                  <div className="w-12 h-12 rounded-full bg-[#E6F3EF] flex items-center justify-center">
-                    <MessageCircle className="w-7 h-7 text-[#4C9A84]" aria-hidden="true" />
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-[#E6F3EF] flex items-center justify-center">
+                    <MessageCircle className="w-6 h-6 sm:w-7 sm:h-7 text-[#4C9A84]" />
                   </div>
-                  <h2 className="text-xl font-bold ml-4 text-[#2D3748]">
+                  <h2 className="text-lg sm:text-xl font-bold ml-3 sm:ml-4 text-[#2D3748]">
                     相談内容
                   </h2>
                 </div>
-                <div className="prose prose-lg max-w-none text-[#4A5568] leading-relaxed">
+                <div className="prose prose-sm sm:prose-base md:prose-lg max-w-none text-[#4A5568] leading-relaxed">
                   {consultationText}
                 </div>
               </div>
@@ -633,24 +640,27 @@ export default function ResultPage() {
           </Card>
         </section>
 
-        <section className="space-y-8 md:space-y-10">
+        <section className="space-y-6 sm:space-y-8 md:space-y-10 mb-12 sm:mb-16">
           {chatHistory.map((message, index) => (
-            <Card key={index} className="bg-white shadow-lg hover:shadow-xl transition-all duration-300 border-none rounded-2xl overflow-hidden">
-              <CardContent className="p-6 md:p-8">
+            <Card 
+              key={index} 
+              className="bg-white shadow-lg hover:shadow-xl transition-all duration-300 border-none rounded-xl sm:rounded-2xl overflow-hidden"
+            >
+              <CardContent className="p-4 sm:p-6 md:p-8">
                 <div className="flex flex-col">
                   <div className="flex items-center mb-4">
-                    <div className="w-12 h-12 rounded-full bg-[#E6F3EF] flex items-center justify-center">
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-[#E6F3EF] flex items-center justify-center">
                       {message.type === 'question' ? (
-                        <MessageCircle className="w-7 h-7 text-[#4C9A84]" aria-hidden="true" />
+                        <MessageCircle className="w-6 h-6 sm:w-7 sm:h-7 text-[#4C9A84]" />
                       ) : (
-                        <CheckCircle className="w-7 h-7 text-[#4C9A84]" aria-hidden="true" />
+                        <CheckCircle className="w-6 h-6 sm:w-7 sm:h-7 text-[#4C9A84]" />
                       )}
                     </div>
-                    <h2 className="text-xl font-bold ml-4 text-[#2D3748]">
+                    <h2 className="text-lg sm:text-xl font-bold ml-3 sm:ml-4 text-[#2D3748]">
                       {message.type === 'question' ? '追加の質問' : '回答'}
                     </h2>
                   </div>
-                  <div className="prose prose-lg max-w-none text-[#4A5568] leading-relaxed">
+                  <div className="prose prose-sm sm:prose-base md:prose-lg max-w-none text-[#4A5568] leading-relaxed">
                     <ReactMarkdown>{message.text}</ReactMarkdown>
                   </div>
                 </div>
@@ -659,131 +669,112 @@ export default function ResultPage() {
           ))}
         </section>
 
-        <section className="mt-16 md:mt-20 mb-24 bg-[#F8FBFA] p-6 md:p-8 rounded-3xl">
-          <h2 className="text-2xl font-bold mb-8 text-[#2D3748] flex items-center justify-center">
-            <div className="bg-white px-8 py-4 rounded-full shadow-sm inline-flex items-center">
-              <ShoppingBag className="w-7 h-7 mr-4 text-[#4C9A84]" aria-hidden="true" />
+        <section id="recommended-products" className="mb-16 sm:mb-24 bg-[#F8FBFA] p-4 sm:p-6 md:p-8 rounded-2xl sm:rounded-3xl">
+          <h2 className="text-xl sm:text-2xl font-bold mb-6 sm:mb-8 text-[#2D3748] flex items-center justify-center">
+            <div className="bg-white px-6 sm:px-8 py-3 sm:py-4 rounded-full shadow-sm inline-flex items-center">
+              <ShoppingBag className="w-6 h-6 sm:w-7 sm:h-7 mr-3 sm:mr-4 text-[#4C9A84]" />
               おすすめ商品
             </div>
           </h2>
           
-          {isLoadingProducts && (
-            <div className="text-center py-12">
-              <div className="animate-spin rounded-full h-16 w-16 border-4 border-[#E6F3EF] border-t-[#4C9A84] mx-auto" role="status">
-                <span className="sr-only">読み込み中...</span>
-              </div>
-              <p className="mt-6 text-[#4A5568] font-medium">商品を読み込んでいます...</p>
-            </div>
-          )}
-
-          {productError && (
-            <div className="bg-red-50 text-red-600 p-6 rounded-xl mb-8 text-center font-medium" role="alert">
-              {productError}
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
-            {recommendedProducts.length > 0 ? (
-              recommendedProducts.map((product) => (
-                <div key={product.id} className="group bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1">
-                  {product.image_url && (
-                    <div className="relative h-48 overflow-hidden">
-                      <img 
-                        src={product.image_url} 
-                        alt={`${product.name}の商品画像`}
-                        className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500"
-                      />
-                    </div>
-                  )}
-                  <div className="p-6">
-                    <h3 className="font-bold text-xl mb-3 text-[#2D3748] line-clamp-2">{product.name}</h3>
-                    <p className="text-[#4A5568] mb-4 line-clamp-2 text-base leading-relaxed">{product.description}</p>
-                    <div className="space-y-4">
-                      <p className="text-2xl font-bold text-[#2D3748]">¥{product.price.toLocaleString()}</p>
-                      <ProductPurchaseButton
-                        product={product}
-                        interviewId={interviewId}
-                      />
-                    </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 md:gap-8">
+            {recommendedProducts.map((product) => (
+              <div 
+                key={product.id} 
+                className="group bg-white rounded-xl sm:rounded-2xl overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 touch-manipulation"
+              >
+                {product.image_url && (
+                  <div className="relative h-40 sm:h-48 overflow-hidden">
+                    <img 
+                      src={product.image_url} 
+                      alt={`${product.name}の商品画像`}
+                      className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500"
+                      loading="lazy"
+                    />
+                  </div>
+                )}
+                <div className="p-4 sm:p-6">
+                  <h3 className="font-bold text-lg sm:text-xl mb-2 sm:mb-3 text-[#2D3748] line-clamp-2">
+                    {product.name}
+                  </h3>
+                  <p className="text-sm sm:text-base text-[#4A5568] mb-3 sm:mb-4 line-clamp-2 leading-relaxed">
+                    {product.description}
+                  </p>
+                  <div className="space-y-3 sm:space-y-4">
+                    <p className="text-xl sm:text-2xl font-bold text-[#2D3748]">
+                      ¥{product.price.toLocaleString()}
+                    </p>
+                    <ProductPurchaseButton
+                      product={product}
+                      interviewId={interviewId}
+                    />
                   </div>
                 </div>
-              ))
-            ) : (
-              <div className="col-span-full text-center py-16">
-                <div className="bg-white p-8 rounded-2xl shadow-lg inline-block">
-                  <ShoppingBag className="w-16 h-16 text-[#E2E8F0] mx-auto mb-4" aria-hidden="true" />
-                  <p className="text-[#4A5568] font-medium">
-                    おすすめ商品はありません
-                  </p>
-                </div>
               </div>
+            ))}
+          </div>
+        </section>
+
+        <div className="fixed bottom-20 sm:bottom-24 right-4 sm:right-6 z-40">
+          <div className="flex flex-col gap-3">
+            <button
+              onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+              className="bg-white/90 backdrop-blur-sm shadow-lg rounded-full p-3 sm:p-4 hover:bg-white transition-all duration-300 touch-manipulation"
+              aria-label="ページトップへ戻る"
+            >
+              <ArrowUp className="w-6 h-6 text-[#4C9A84]" />
+            </button>
+            {recommendedProducts.length > 0 && (
+              <button
+                onClick={() => {
+                  const productsSection = document.getElementById('recommended-products')
+                  productsSection?.scrollIntoView({ 
+                    behavior: 'smooth',
+                    block: 'start'
+                  })
+                }}
+                className="bg-[#4C9A84] shadow-lg rounded-full p-3 sm:p-4 hover:bg-[#3A8B73] transition-all duration-300 touch-manipulation"
+                aria-label="おすすめ商品を見る"
+              >
+                <ShoppingBag className="w-6 h-6 text-white" />
+              </button>
             )}
           </div>
-        </section>
-
-        <section className="mb-24">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card className="bg-white shadow-lg hover:shadow-xl transition-all duration-300 border-none rounded-2xl overflow-hidden">
-              <CardContent className="p-6">
-                <h3 className="text-lg font-bold mb-4 text-[#2D3748] flex items-center">
-                  <HelpCircle className="w-5 h-5 mr-2 text-[#4C9A84]" aria-hidden="true" />
-                  よくある質問
-                </h3>
-                <ul className="space-y-2">
-                  <li><a href="#" className="text-[#4A5568] hover:text-[#4C9A84]">商品の返品について</a></li>
-                  <li><a href="#" className="text-[#4A5568] hover:text-[#4C9A84]">支払い方法について</a></li>
-                  <li><a href="#" className="text-[#4A5568] hover:text-[#4C9A84]">配送について</a></li>
-                </ul>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-white shadow-lg hover:shadow-xl transition-all duration-300 border-none rounded-2xl overflow-hidden">
-              <CardContent className="p-6">
-                <h3 className="text-lg font-bold mb-4 text-[#2D3748] flex items-center">
-                  <Phone className="w-5 h-5 mr-2 text-[#4C9A84]" aria-hidden="true" />
-                  お問い合わせ
-                </h3>
-                <p className="text-[#4A5568] mb-4">
-                  ご不明な点がございましたら、お気軽にお問い合わせください。
-                </p>
-                <Button className="w-full bg-[#4C9A84] hover:bg-[#3A8B73] text-white rounded-xl py-2">
-                  お問い合わせフォーム
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-        </section>
-      </main>
-
-      <div className="fixed bottom-0 left-0 right-0 bg-white/95 border-t border-[#E2E8F0] p-4 md:p-6 shadow-lg backdrop-blur-lg">
-        <div className="container mx-auto max-w-4xl">
-          <form onSubmit={handleFollowUpSubmit} className="flex items-center space-x-4">
-            <Input
-              type="text"
-              placeholder="追加で相談できます..."
-              value={followUpQuestion}
-              onChange={(e) => setFollowUpQuestion(e.target.value)}
-              className="flex-grow py-4 px-6 rounded-xl border-[#E2E8F0] focus:border-[#4C9A84] focus:ring-[#4C9A84] text-lg shadow-sm"
-              disabled={isStreaming}
-              aria-label="追加の質問を入力"
-            />
-            <Button 
-              type="submit" 
-              className="bg-[#4C9A84] hover:bg-[#3A8B73] text-white rounded-xl p-4 min-w-[60px] h-[56px] flex items-center justify-center transition-all duration-300 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={isStreaming}
-              aria-label={isStreaming ? "送信中..." : "質問を送信"}
-            >
-              {isStreaming ? (
-                <div className="animate-spin rounded-full h-6 w-6 border-2 border-white border-t-transparent" role="status">
-                  <span className="sr-only">送信中...</span>
-                </div>
-              ) : (
-                <Send className="h-6 w-6" aria-hidden="true" />
-              )}
-            </Button>
-          </form>
         </div>
-      </div>
+
+        <div className="fixed bottom-0 left-0 right-0 bg-white/95 border-t border-[#E2E8F0] p-3 sm:p-4 shadow-lg backdrop-blur-lg z-50">
+          <div className="container mx-auto max-w-2xl">
+            <form 
+              onSubmit={handleFollowUpSubmit} 
+              className="flex items-center space-x-3 sm:space-x-4"
+            >
+              <Input
+                type="text"
+                placeholder="追加で相談できます..."
+                value={followUpQuestion}
+                onChange={(e) => setFollowUpQuestion(e.target.value)}
+                className="flex-grow py-3 sm:py-4 px-4 sm:px-6 rounded-xl border-[#E2E8F0] focus:border-[#4C9A84] focus:ring-[#4C9A84] text-base sm:text-lg shadow-sm min-h-[44px]"
+                disabled={isStreaming}
+                aria-label="追加の質問を入力"
+              />
+              <Button 
+                type="submit" 
+                className="bg-[#4C9A84] hover:bg-[#3A8B73] active:bg-[#2A7C63] text-white rounded-xl p-3 sm:p-4 min-w-[44px] sm:min-w-[60px] h-[44px] sm:h-[56px] flex items-center justify-center transition-all duration-300 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
+                disabled={isStreaming}
+                aria-label={isStreaming ? "送信中..." : "質問を送信"}
+              >
+                {isStreaming ? (
+                  <div className="animate-spin rounded-full h-5 w-5 sm:h-6 sm:w-6 border-2 border-white border-t-transparent">
+                    <span className="sr-only">送信中...</span>
+                  </div>
+                ) : (
+                  <Send className="h-5 w-5 sm:h-6 sm:w-6" />
+                )}
+              </Button>
+            </form>
+          </div>
+        </div>
+      </main>
     </div>
   )
 }
