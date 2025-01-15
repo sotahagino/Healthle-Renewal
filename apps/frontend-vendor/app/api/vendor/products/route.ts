@@ -63,6 +63,69 @@ export async function POST(request: Request) {
       });
     }
 
+    // 問診票が必要な場合は問診票データを保存
+    if (data.requires_questionnaire && data.questionnaire) {
+      const { error: questionnaireError } = await supabase
+        .from('questionnaires')
+        .insert([
+          {
+            product_id: product.id,
+            vendor_id: data.vendor_id,
+            title: data.questionnaire.title,
+            description: data.questionnaire.description,
+            status: 'active',
+          },
+        ])
+        .select()
+        .single();
+
+      if (questionnaireError) {
+        console.error('Questionnaire creation error:', questionnaireError);
+        // 問診票の作成に失敗した場合は商品を削除
+        await supabase
+          .from('products')
+          .delete()
+          .eq('id', product.id);
+        
+        return new NextResponse(JSON.stringify({ error: '問診票の作成に失敗しました' }), {
+          status: 500,
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+      }
+
+      // 問診項目の保存
+      const questionnaireItems = data.questionnaire.items.map((item: any, index: number) => ({
+        questionnaire_id: product.id,
+        question: item.question,
+        question_type: item.question_type,
+        required: item.required,
+        options: item.options ? item.options.map((opt: { value: string }) => opt.value) : [],
+        order_index: index,
+      }));
+
+      const { error: itemsError } = await supabase
+        .from('questionnaire_items')
+        .insert(questionnaireItems);
+
+      if (itemsError) {
+        console.error('Questionnaire items creation error:', itemsError);
+        // 問診項目の作成に失敗した場合は商品と問診票を削除
+        await supabase
+          .from('products')
+          .delete()
+          .eq('id', product.id);
+        
+        return new NextResponse(JSON.stringify({ error: '問診項目の作成に失敗しました' }), {
+          status: 500,
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+      }
+    }
+
     return NextResponse.json(product);
   } catch (error) {
     console.error('Product creation error:', error);

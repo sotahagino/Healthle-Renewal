@@ -52,6 +52,20 @@ export default function Home() {
             注文一覧へ
           </Link>
         </div>
+
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center mb-4">
+            <span className="text-xl">🏥</span>
+            <h3 className="text-lg font-semibold ml-2">店舗情報情報</h3>
+          </div>
+          <p className="text-gray-600 mb-4">薬局の基本情報や営業時間の設定ができます。</p>
+          <Link
+            href="/pharmacy/settings"
+            className="inline-block bg-primary text-white px-4 py-2 rounded hover:bg-primary/90 transition-colors"
+          >
+            薬局情報設定へ
+          </Link>
+        </div>
       </div>
     </main>
   )
