@@ -1,71 +1,73 @@
 'use client'
 
-import { useParams } from 'next/navigation'
 import { useState } from 'react'
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { PlusCircle } from "lucide-react"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { useParams } from 'next/navigation'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Label } from '@/components/ui/label'
 
 export default function NewPharmacistPage() {
   const params = useParams()
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [licenseError, setLicenseError] = useState<string | null>(null)
+  const vendorId = params.id as string
 
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     phone: '',
-    licenseNumber: '',
-    verificationStatus: 'pending'
+    license_number: '',
+    verification_status: 'pending'
   })
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
 
-  const verificationStatuses = [
-    { value: 'pending', label: '確認待ち' },
-    { value: 'verified', label: '確認済み' },
-    { value: 'rejected', label: '却下' }
-  ]
-
-  const validateLicenseNumber = (number: string) => {
-    // 保険機関コードの形式チェック
-    const licensePattern = /^\d{2}4\d{7}$/
-    if (!licensePattern.test(number)) {
-      setLicenseError('保険機関コードは「都道府県番号(2桁)」+「4」+「保険薬局コード(7桁)」の10桁の数字で入力してください')
-      return false
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setSelectedFile(e.target.files[0])
     }
-    setLicenseError(null)
-    return true
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
-    setError(null)
-
-    // 保険機関コードのバリデーション
-    if (!validateLicenseNumber(formData.licenseNumber)) {
-      setIsLoading(false)
-      return
-    }
 
     try {
-      const vendorId = params.id
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
-      const response = await fetch(`${baseUrl}/api/vendors/${vendorId}/pharmacists`, {
+      let license_image_url = ''
+
+      // 画像のアップロード処理
+      if (selectedFile) {
+        const formData = new FormData()
+        formData.append('file', selectedFile)
+        formData.append('vendorId', vendorId)
+
+        const uploadResponse = await fetch(`/api/vendors/${vendorId}/upload-license`, {
+          method: 'POST',
+          body: formData,
+        })
+
+        if (!uploadResponse.ok) {
+          const errorData = await uploadResponse.json()
+          throw new Error(errorData.error || '画像のアップロードに失敗しました')
+        }
+
+        const { url } = await uploadResponse.json()
+        license_image_url = url
+      } else {
+        throw new Error('ライセンス画像は必須です')
+      }
+
+      // スタッフ情報の登録
+      const response = await fetch(`/api/vendors/${vendorId}/staff`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+          role: 'pharmacist',
+          license_image_url
+        }),
       })
 
       if (!response.ok) {
@@ -75,15 +77,15 @@ export default function NewPharmacistPage() {
 
       window.location.href = `/vendors/${vendorId}`
     } catch (error) {
-      console.error('Failed to add pharmacist:', error)
-      setError(error instanceof Error ? error.message : '薬剤師の追加中にエラーが発生しました')
+      console.error('Error:', error)
+      alert(error instanceof Error ? error.message : '薬剤師の追加に失敗しました')
     } finally {
       setIsLoading(false)
     }
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-10">
+    <div className="max-w-2xl mx-auto p-6">
       <Card>
         <CardHeader>
           <CardTitle>薬剤師追加</CardTitle>
@@ -94,87 +96,84 @@ export default function NewPharmacistPage() {
               <Label htmlFor="name">名前</Label>
               <Input
                 id="name"
+                required
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                required
               />
             </div>
+
             <div className="space-y-2">
               <Label htmlFor="email">メールアドレス</Label>
               <Input
                 id="email"
                 type="email"
+                required
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                required
               />
             </div>
+
             <div className="space-y-2">
               <Label htmlFor="phone">電話番号</Label>
               <Input
                 id="phone"
                 type="tel"
+                required
                 value={formData.phone}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                required
               />
             </div>
+
             <div className="space-y-2">
-              <Label htmlFor="licenseNumber">保険機関コード</Label>
+              <Label htmlFor="license_number">保険薬剤師コード</Label>
               <Input
-                id="licenseNumber"
-                value={formData.licenseNumber}
-                onChange={(e) => {
-                  setFormData({ ...formData, licenseNumber: e.target.value })
-                  validateLicenseNumber(e.target.value)
-                }}
-                placeholder="例: 134XXXXXXX"
+                id="license_number"
                 required
+                placeholder="例: 134XXXXXXX"
+                value={formData.license_number}
+                onChange={(e) => setFormData({ ...formData, license_number: e.target.value })}
               />
-              {licenseError && (
-                <div className="text-red-600 text-sm mt-1">{licenseError}</div>
-              )}
             </div>
+
             <div className="space-y-2">
-              <Label htmlFor="verificationStatus">確認ステータス</Label>
+              <Label htmlFor="license_image">ライセンス画像</Label>
+              <Input
+                id="license_image"
+                type="file"
+                accept="image/*"
+                required
+                onChange={handleFileChange}
+                className="bg-white"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="verification_status">確認ステータス</Label>
               <Select
-                value={formData.verificationStatus}
-                onValueChange={(value) => setFormData({ ...formData, verificationStatus: value })}
+                value={formData.verification_status}
+                onValueChange={(value) => setFormData({ ...formData, verification_status: value })}
               >
-                <SelectTrigger className="bg-white">
-                  <SelectValue placeholder="確認ステータスを選択" />
+                <SelectTrigger id="verification_status" className="bg-white">
+                  <SelectValue />
                 </SelectTrigger>
-                <SelectContent className="bg-white">
-                  {verificationStatuses.map((status) => (
-                    <SelectItem 
-                      key={status.value} 
-                      value={status.value}
-                      className="hover:bg-gray-100"
-                    >
-                      {status.label}
-                    </SelectItem>
-                  ))}
+                <SelectContent>
+                  <SelectItem value="pending">確認待ち</SelectItem>
+                  <SelectItem value="verified">確認済み</SelectItem>
+                  <SelectItem value="rejected">却下</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            {error && (
-              <div className="text-red-600 text-sm">{error}</div>
-            )}
-            <div className="flex justify-end space-x-4">
+
+            <div className="flex justify-end space-x-4 pt-4">
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => window.location.href = `/vendors/${params.id}`}
+                onClick={() => window.location.href = `/vendors/${vendorId}`}
               >
                 キャンセル
               </Button>
-              <Button 
-                type="submit" 
-                disabled={isLoading}
-                className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-2 rounded-lg flex items-center gap-2"
-              >
-                <PlusCircle className="w-5 h-5" />
-                {isLoading ? '処理中...' : '追加'}
+              <Button type="submit" disabled={isLoading}>
+                {isLoading ? '追加中...' : '追加'}
               </Button>
             </div>
           </form>

@@ -17,15 +17,16 @@ export async function middleware(req: NextRequest) {
       return NextResponse.redirect(new URL('/login', req.url));
     }
 
-    // vendor_idの確認
-    const { data: vendorUser } = await supabase
-      .from('vendor_users')
-      .select('vendor_id')
+    // vendor_staff_rolesの確認
+    const { data: staffRole } = await supabase
+      .from('vendor_staff_roles')
+      .select('vendor_id, role, status')
       .eq('user_id', session.user.id)
+      .eq('status', 'active')
       .single();
 
-    if (!vendorUser?.vendor_id) {
-      // vendor_idが見つからない場合、ログインページにリダイレクト
+    if (!staffRole?.vendor_id || staffRole.status !== 'active') {
+      // vendor_idが見つからないか、アカウントが無効な場合、ログインページにリダイレクト
       return NextResponse.redirect(new URL('/login', req.url));
     }
   }
@@ -33,15 +34,16 @@ export async function middleware(req: NextRequest) {
   // ログインページへのアクセス
   if (req.nextUrl.pathname === '/login') {
     if (session) {
-      // セッションがある場合でも、vendor_idの確認
-      const { data: vendorUser } = await supabase
-        .from('vendor_users')
-        .select('vendor_id')
+      // セッションがある場合、vendor_staff_rolesの確認
+      const { data: staffRole } = await supabase
+        .from('vendor_staff_roles')
+        .select('vendor_id, role, status')
         .eq('user_id', session.user.id)
+        .eq('status', 'active')
         .single();
 
-      if (vendorUser?.vendor_id) {
-        // vendor_idが存在する場合はホーム画面にリダイレクト
+      if (staffRole?.vendor_id && staffRole.status === 'active') {
+        // アクティブなスタッフの場合はホーム画面にリダイレクト
         return NextResponse.redirect(new URL('/', req.url));
       }
     }
@@ -51,5 +53,14 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/', '/orders/:path*', '/login'],
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - public (public files)
+     */
+    '/((?!_next/static|_next/image|favicon.ico|public).*)',
+  ],
 }; 

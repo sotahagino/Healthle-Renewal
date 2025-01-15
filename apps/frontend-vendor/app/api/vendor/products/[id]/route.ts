@@ -44,14 +44,15 @@ export async function GET(
     }
 
     // ユーザーが指定されたvendor_idにアクセスする権限があるか確認
-    const { data: vendorUser, error: vendorError } = await supabase
-      .from('vendor_users')
-      .select('vendor_id')
+    const { data: staffRole, error: staffError } = await supabase
+      .from('vendor_staff_roles')
+      .select('vendor_id, role, status')
       .eq('user_id', session.user.id)
       .eq('vendor_id', product.vendor_id)
+      .eq('status', 'active')
       .single();
 
-    if (vendorError || !vendorUser) {
+    if (staffError || !staffRole) {
       return new NextResponse('Unauthorized', { status: 401 });
     }
 

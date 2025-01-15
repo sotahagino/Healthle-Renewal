@@ -22,13 +22,13 @@ export default function NewStaffPage() {
     name: '',
     email: '',
     phone: '',
-    role: 'Staff',
+    role: 'staff',
     status: 'active'
   })
 
   const roles = [
-    { value: 'Staff', label: 'スタッフ' },
-    { value: 'Owner', label: 'オーナー' }
+    { value: 'staff', label: 'スタッフ' },
+    { value: 'owner', label: 'オーナー' }
   ]
 
   const statuses = [
@@ -156,10 +156,16 @@ export default function NewStaffPage() {
                 type="button"
                 variant="outline"
                 onClick={() => window.location.href = `/vendors/${params.id}`}
+                className="hover:bg-gray-100"
               >
                 キャンセル
               </Button>
-              <Button type="submit" disabled={isLoading}>
+              <Button 
+                type="submit" 
+                disabled={isLoading}
+                variant="default"
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
                 {isLoading ? '処理中...' : '追加'}
               </Button>
             </div>

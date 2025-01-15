@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/button'
@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea'
 import Image from 'next/image'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { Label } from '@/components/ui/label'
-import { ImagePlus, Loader2 } from 'lucide-react'
+import { ImagePlus, Loader2, ArrowLeft } from 'lucide-react'
 import {
   Select,
   SelectContent,
@@ -29,7 +29,6 @@ import {
 import { Switch } from '@/components/ui/switch'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ArrowLeft } from 'lucide-react'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
 import * as z from 'zod'
@@ -69,7 +68,21 @@ const productSchema = z.object({
 
 type ProductFormValues = z.infer<typeof productSchema>
 
-export default function NewProductPage() {
+interface ProductFormProps {
+  mode: 'new' | 'edit'
+  productId?: string
+  onSubmit: (data: ProductFormValues) => Promise<void>
+}
+
+const CATEGORY_OPTIONS = [
+  { value: 'cold', label: '風邪薬' },
+  { value: 'stomach', label: '胃腸薬' },
+  { value: 'painkiller', label: '痛み止め' },
+  { value: 'sleep_improvement', label: '睡眠改善薬' },
+  { value: 'other', label: 'その他' },
+] as const
+
+export default function ProductForm({ mode, productId, onSubmit }: ProductFormProps) {
   const router = useRouter()
   const { isAuthenticated, vendorId } = useAuth()
   const [loading, setLoading] = useState(false)
@@ -88,6 +101,69 @@ export default function NewProductPage() {
       },
     },
   })
+
+  useEffect(() => {
+    if (mode === 'edit' && productId) {
+      const fetchProduct = async () => {
+        try {
+          const { data: { user } } = await supabase.auth.getUser()
+          if (!user) {
+            router.push('/login')
+            return
+          }
+
+          const { data: staffRole, error: staffError } = await supabase
+            .from('vendor_staff_roles')
+            .select('vendor_id, role, status')
+            .eq('user_id', user.id)
+            .eq('status', 'active')
+            .single()
+
+          if (staffError) throw staffError
+          if (!staffRole) {
+            router.push('/login')
+            return
+          }
+
+          const { data, error } = await supabase
+            .from('products')
+            .select('*')
+            .eq('id', productId)
+            .eq('vendor_id', staffRole.vendor_id)
+            .single()
+
+          if (error) throw error
+          if (!data) throw new Error('商品が見つかりません')
+
+          // フォームの初期値を設定
+          form.reset({
+            ...data,
+            price: data.price.toString(),
+            stock_quantity: data.stock_quantity.toString(),
+            purchase_limit: data.purchase_limit?.toString(),
+            shipping_info: {
+              ...data.shipping_info,
+              shipping_fee: data.shipping_info.shipping_fee.toString(),
+            },
+          })
+
+          if (data.image_url) {
+            setImagePreview(data.image_url)
+          }
+          
+          // データの取得に成功したらエラーをクリア
+          setError('')
+        } catch (err) {
+          console.error('Error fetching product:', err)
+          setError('商品情報の取得に失敗しました')
+          // エラーが発生した場合はルートページに戻る
+          router.push('/products')
+        }
+      }
+
+      fetchProduct()
+    }
+  }, [mode, productId, router, form, supabase])
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -136,31 +212,12 @@ export default function NewProductPage() {
     }
   }
 
-  const onSubmit = async (data: ProductFormValues) => {
+  const handleSubmit = async (data: ProductFormValues) => {
     setLoading(true)
     setError('')
 
     try {
-      const response = await fetch('/api/vendor/products', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...data,
-          vendor_id: vendorId,
-          price: parseInt(data.price),
-          stock_quantity: parseInt(data.stock_quantity),
-          purchase_limit: data.purchase_limit ? parseInt(data.purchase_limit) : null,
-        }),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || '商品の登録に失敗しました')
-      }
-
-      router.push('/products')
+      await onSubmit(data)
     } catch (err) {
       setError(err instanceof Error ? err.message : '予期せぬエラーが発生しました')
     } finally {
@@ -179,7 +236,7 @@ export default function NewProductPage() {
           <ArrowLeft className="mr-2 h-4 w-4" />
           戻る
         </Button>
-        <h1 className="text-2xl font-bold">商品登録</h1>
+        <h1 className="text-2xl font-bold">{mode === 'new' ? '商品登録' : '商品編集'}</h1>
       </div>
 
       {error && (
@@ -189,7 +246,7 @@ export default function NewProductPage() {
       )}
 
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+        <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
           <Tabs defaultValue="basic" className="w-full">
             <TabsList>
               <TabsTrigger value="basic">基本情報</TabsTrigger>
@@ -244,11 +301,11 @@ export default function NewProductPage() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="cold">風邪薬</SelectItem>
-                            <SelectItem value="stomach">胃腸薬</SelectItem>
-                            <SelectItem value="painkiller">痛み止め</SelectItem>
-                            <SelectItem value="sleep_improvement">睡眠改善薬</SelectItem>
-                            <SelectItem value="other">その他</SelectItem>
+                            {CATEGORY_OPTIONS.map(option => (
+                              <SelectItem key={option.value} value={option.value}>
+                                {option.label}
+                              </SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -400,7 +457,7 @@ export default function NewProductPage() {
                     name="medicine_type"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>リスク区分 *</FormLabel>
+                        <FormLabel>医薬品区分 *</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl>
                             <SelectTrigger>
@@ -477,20 +534,6 @@ export default function NewProductPage() {
 
                   <FormField
                     control={form.control}
-                    name="package_insert_url"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>添付文書URL</FormLabel>
-                        <FormControl>
-                          <Input {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
                     name="requires_questionnaire"
                     render={({ field }) => (
                       <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
@@ -500,6 +543,29 @@ export default function NewProductPage() {
                           </FormLabel>
                           <FormDescription>
                             購入時に問診を必須にする
+                          </FormDescription>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="requires_pharmacist_consultation"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                        <div className="space-y-0.5">
+                          <FormLabel className="text-base">
+                            薬剤師相談必須
+                          </FormLabel>
+                          <FormDescription>
+                            購入時に薬剤師との相談を必須にする
                           </FormDescription>
                         </div>
                         <FormControl>
@@ -622,12 +688,11 @@ export default function NewProductPage() {
 
           <div className="flex justify-end">
             <Button type="submit" disabled={loading || imageUploading}>
-              {loading ? '登録中...' : '商品を登録'}
+              {loading ? (mode === 'new' ? '登録中...' : '更新中...') : (mode === 'new' ? '商品を登録' : '更新する')}
             </Button>
           </div>
         </form>
       </Form>
     </div>
   )
-}
-
+} 

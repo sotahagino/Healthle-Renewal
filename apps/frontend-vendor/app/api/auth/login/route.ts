@@ -18,23 +18,36 @@ export async function POST(request: Request) {
 
     if (error) throw error
 
-    // vendor_usersテーブルからvendor_idを取得
-    const { data: vendorUser, error: vendorError } = await supabase
-      .from('vendor_users')
-      .select('vendor_id')
+    // vendor_staff_rolesテーブルからvendor_idとroleを取得
+    const { data: staffRole, error: staffError } = await supabase
+      .from('vendor_staff_roles')
+      .select('vendor_id, role, status')
       .eq('user_id', session?.user.id)
+      .eq('status', 'active')
       .single()
 
-    if (vendorError) throw vendorError
+    if (staffError) {
+      console.error('Vendor user fetch error:', staffError)
+      throw new Error('薬局スタッフ情報の取得に失敗しました')
+    }
+
+    if (!staffRole) {
+      throw new Error('このユーザーは薬局スタッフとして登録されていません')
+    }
+
+    if (staffRole.status !== 'active') {
+      throw new Error('このアカウントは現在無効です')
+    }
 
     return NextResponse.json({
       access_token: session?.access_token,
-      vendor_id: vendorUser.vendor_id
+      vendor_id: staffRole.vendor_id,
+      role: staffRole.role
     })
   } catch (error) {
     console.error('Login error:', error)
     return NextResponse.json(
-      { error: 'ログインに失敗しました' },
+      { error: error instanceof Error ? error.message : 'ログインに失敗しました' },
       { status: 401 }
     )
   }

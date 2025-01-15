@@ -22,8 +22,6 @@ export default function LoginPage() {
     setError('')
 
     try {
-      console.log('Attempting to sign in with:', email)
-      
       // Supabaseでログイン
       const { data: { session }, error: signInError } = await supabase.auth.signInWithPassword({
         email,
@@ -40,32 +38,35 @@ export default function LoginPage() {
         throw new Error('セッションの作成に失敗しました')
       }
 
-      console.log('Session created:', session)
-
-      // vendor_idの取得
-      const { data: vendorUser, error: vendorError } = await supabase
-        .from('vendor_users')
-        .select('vendor_id')
+      // スタッフ情報の取得
+      const { data: staffRole, error: staffError } = await supabase
+        .from('vendor_staff_roles')
+        .select('vendor_id, role, status')
         .eq('user_id', session.user.id)
+        .eq('status', 'active')
         .single()
 
-      if (vendorError) {
-        console.error('Vendor user fetch error:', vendorError)
-        throw vendorError
+      if (staffError) {
+        console.error('Staff role fetch error:', staffError)
+        throw new Error('薬局スタッフ情報の取得に失敗しました')
       }
 
-      if (!vendorUser) {
-        console.error('No vendor user found')
-        throw new Error('出展者情報が見つかりません')
+      if (!staffRole) {
+        console.error('No staff role found')
+        throw new Error('このユーザーは薬局スタッフとして登録されていません')
       }
 
-      console.log('Vendor user found:', vendorUser)
+      if (staffRole.status !== 'active') {
+        throw new Error('このアカウントは現在無効です')
+      }
 
-      // セッションの再確認
-      const { data: { session: currentSession } } = await supabase.auth.getSession()
-      console.log('Current session:', currentSession)
+      // ユーザー情報をローカルストレージに保存
+      localStorage.setItem('vendor_id', staffRole.vendor_id)
+      localStorage.setItem('staff_role', staffRole.role)
 
+      // ホームページにリダイレクト
       router.push('/')
+      router.refresh() // 新しいセッション情報でページを更新
     } catch (err) {
       console.error('Login error:', err)
       setError(err instanceof Error ? err.message : '予期せぬエラーが発生しました')
@@ -78,7 +79,7 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl text-center">出展者ログイン</CardTitle>
+          <CardTitle className="text-2xl text-center">薬局スタッフログイン</CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">

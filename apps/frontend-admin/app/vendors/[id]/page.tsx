@@ -32,8 +32,12 @@ interface StaffMember {
   role: string
   status: string
   created_at: string
-  user: User
-  users?: User
+  user: {
+    id: string
+    name: string
+    email: string
+    phone_number: string
+  }
 }
 
 interface Pharmacist {
@@ -41,11 +45,7 @@ interface Pharmacist {
   license_number: string
   verification_status: string
   created_at: string
-  user: {
-    name: string
-    email: string
-    phone: string
-  }
+  user: User
 }
 
 interface Vendor {
@@ -55,14 +55,60 @@ interface Vendor {
   email: string
   phone: string
   postal_code: string
-  address: string
+  prefecture: string
+  city: string
+  address_line1: string
+  address_line2: string
   business_hours: string
   description: string
   created_at: string
   updated_at: string
   staff_members: StaffMember[]
-  pharmacists: Pharmacist[]
+  pharmacists: StaffMember[]
 }
+
+const DAYS_OF_WEEK = [
+  { id: 'monday', label: '月曜日' },
+  { id: 'tuesday', label: '火曜日' },
+  { id: 'wednesday', label: '水曜日' },
+  { id: 'thursday', label: '木曜日' },
+  { id: 'friday', label: '金曜日' },
+  { id: 'saturday', label: '土曜日' },
+  { id: 'sunday', label: '日曜日' },
+] as const;
+
+const formatBusinessHours = (businessHours: any) => {
+  if (!businessHours) return '未設定';
+  
+  try {
+    const hours = typeof businessHours === 'string' 
+      ? JSON.parse(businessHours) 
+      : businessHours;
+
+    return (
+      <div className="space-y-1">
+        {DAYS_OF_WEEK.map(day => {
+          const dayHours = hours[day.id];
+          if (!dayHours) return null;
+
+          return (
+            <div key={day.id} className="flex items-center space-x-2">
+              <span className="w-20">{day.label}:</span>
+              {dayHours.isOpen ? (
+                <span>{dayHours.openTime} 〜 {dayHours.closeTime}</span>
+              ) : (
+                <span className="text-gray-500">休業</span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  } catch (e) {
+    console.error('Error parsing business hours:', e);
+    return '形式エラー';
+  }
+};
 
 export default function VendorDetailPage() {
   const params = useParams()
@@ -157,6 +203,8 @@ export default function VendorDetailPage() {
             一覧に戻る
           </Button>
           <Button
+            variant="default"
+            className="bg-blue-600 hover:bg-blue-700 text-white"
             onClick={() => window.location.href = `/vendors/${vendor.id}/edit`}
           >
             編集
@@ -184,11 +232,13 @@ export default function VendorDetailPage() {
             </div>
             <div>
               <h3 className="text-sm font-medium text-gray-500">住所</h3>
-              <div className="mt-1">{`〒${vendor.postal_code} ${vendor.address}`}</div>
+              <div className="mt-1">{`〒${vendor.postal_code} ${vendor.address_line1} ${vendor.address_line2}`}</div>
             </div>
             <div>
               <h3 className="text-sm font-medium text-gray-500">営業時間</h3>
-              <div className="mt-1">{vendor.business_hours}</div>
+              <div className="mt-1">
+                {formatBusinessHours(vendor.business_hours)}
+              </div>
             </div>
             <div>
               <h3 className="text-sm font-medium text-gray-500">登録日</h3>
@@ -204,24 +254,22 @@ export default function VendorDetailPage() {
 
       <div className="mt-8">
         <Card>
-          <CardHeader>
-            <div className="flex justify-between items-center">
-              <CardTitle>スタッフ一覧</CardTitle>
-              <Button
-                onClick={() => window.location.href = `/vendors/${vendor.id}/staff/new`}
-                className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg flex items-center gap-2"
-              >
-                <PlusCircle className="w-5 h-5" />
-                スタッフを追加
-              </Button>
-            </div>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>スタッフ一覧</CardTitle>
+            <Button
+              variant="outline"
+              onClick={() => window.location.href = `/vendors/${vendor.id}/staff/new`}
+            >
+              <PlusCircle className="w-4 h-4 mr-2" />
+              スタッフを追加
+            </Button>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>名前</TableHead>
-                  <TableHead>メール</TableHead>
+                  <TableHead>メールアドレス</TableHead>
                   <TableHead>電話番号</TableHead>
                   <TableHead>役割</TableHead>
                   <TableHead>ステータス</TableHead>
@@ -231,23 +279,14 @@ export default function VendorDetailPage() {
               <TableBody>
                 {vendor.staff_members.map((staff) => (
                   <TableRow key={staff.id}>
-                    <TableCell>{(staff.users || staff.user)?.name}</TableCell>
-                    <TableCell>{(staff.users || staff.user)?.email}</TableCell>
-                    <TableCell>{(staff.users || staff.user)?.phone}</TableCell>
+                    <TableCell>{staff.user.name}</TableCell>
+                    <TableCell>{staff.user.email}</TableCell>
+                    <TableCell>{staff.user.phone_number}</TableCell>
                     <TableCell>
-                      <Badge variant="outline">
-                        {staff.role === 'staff' ? 'スタッフ' : '管理者'}
-                      </Badge>
+                      {staff.role === 'owner' ? '店舗オーナー' :
+                       staff.role === 'staff' ? 'スタッフ' : staff.role}
                     </TableCell>
-                    <TableCell>
-                      <Badge className={
-                        staff.status === 'active' 
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-gray-100 text-gray-800'
-                      }>
-                        {staff.status === 'active' ? '有効' : '無効'}
-                      </Badge>
-                    </TableCell>
+                    <TableCell>{getStatusBadge(staff.status)}</TableCell>
                     <TableCell>
                       {new Date(staff.created_at).toLocaleDateString('ja-JP')}
                     </TableCell>
@@ -261,27 +300,24 @@ export default function VendorDetailPage() {
 
       <div className="mt-8">
         <Card>
-          <CardHeader>
-            <div className="flex justify-between items-center">
-              <CardTitle>薬剤師一覧</CardTitle>
-              <Button
-                onClick={() => window.location.href = `/vendors/${vendor.id}/pharmacists/new`}
-                className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg flex items-center gap-2"
-              >
-                <PlusCircle className="w-5 h-5" />
-                薬剤師を追加
-              </Button>
-            </div>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>薬剤師一覧</CardTitle>
+            <Button
+              variant="outline"
+              onClick={() => window.location.href = `/vendors/${vendor.id}/pharmacists/new`}
+            >
+              <PlusCircle className="w-4 h-4 mr-2" />
+              薬剤師を追加
+            </Button>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>名前</TableHead>
-                  <TableHead>メール</TableHead>
+                  <TableHead>メールアドレス</TableHead>
                   <TableHead>電話番号</TableHead>
-                  <TableHead>免許番号</TableHead>
-                  <TableHead>認証状態</TableHead>
+                  <TableHead>ステータス</TableHead>
                   <TableHead>登録日</TableHead>
                 </TableRow>
               </TableHeader>
@@ -290,21 +326,8 @@ export default function VendorDetailPage() {
                   <TableRow key={pharmacist.id}>
                     <TableCell>{pharmacist.user.name}</TableCell>
                     <TableCell>{pharmacist.user.email}</TableCell>
-                    <TableCell>{pharmacist.user.phone}</TableCell>
-                    <TableCell>{pharmacist.license_number}</TableCell>
-                    <TableCell>
-                      <Badge className={
-                        pharmacist.verification_status === 'verified'
-                          ? 'bg-green-100 text-green-800'
-                          : pharmacist.verification_status === 'pending'
-                          ? 'bg-yellow-100 text-yellow-800'
-                          : 'bg-red-100 text-red-800'
-                      }>
-                        {pharmacist.verification_status === 'verified' ? '認証済み'
-                          : pharmacist.verification_status === 'pending' ? '審査中'
-                          : '未認証'}
-                      </Badge>
-                    </TableCell>
+                    <TableCell>{pharmacist.user.phone_number}</TableCell>
+                    <TableCell>{getStatusBadge(pharmacist.status)}</TableCell>
                     <TableCell>
                       {new Date(pharmacist.created_at).toLocaleDateString('ja-JP')}
                     </TableCell>

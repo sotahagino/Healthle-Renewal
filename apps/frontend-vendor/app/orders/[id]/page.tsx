@@ -56,14 +56,15 @@ export default function OrderDetailsPage({
           return
         }
 
-        const { data: vendorData, error: vendorError } = await supabase
-          .from('vendor_users')
-          .select('vendor_id')
+        const { data: staffRole, error: staffError } = await supabase
+          .from('vendor_staff_roles')
+          .select('vendor_id, role, status')
           .eq('user_id', user.id)
+          .eq('status', 'active')
           .single()
 
-        if (vendorError) throw vendorError
-        if (!vendorData) {
+        if (staffError) throw staffError
+        if (!staffRole) {
           router.push('/login')
           return
         }
@@ -85,7 +86,7 @@ export default function OrderDetailsPage({
             product_id
           `)
           .eq('id', params.id)
-          .eq('vendor_id', vendorData.vendor_id)
+          .eq('vendor_id', staffRole.vendor_id)
           .single()
 
         if (error) {

@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react'
+import { useState, useEffect } from 'react'
+import { createClientComponentClient, User } from '@supabase/auth-helpers-nextjs'
 import { useRouter } from 'next/navigation'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import { User } from '@supabase/supabase-js'
+
+const MAX_RETRIES = 3
 
 export function useAuth() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
@@ -31,11 +32,11 @@ export function useAuth() {
   const fetchVendorId = async (userId: string) => {
     console.log('Starting vendor_id fetch for user:', userId)
     try {
-      // シンプルなクエリで実行
       const { data, error } = await supabase
-        .from('vendor_users')
-        .select('vendor_id')
+        .from('vendor_staff_roles')
+        .select('vendor_id, role, status')
         .eq('user_id', userId)
+        .eq('status', 'active')
         .single()
 
       if (error) {
@@ -43,10 +44,14 @@ export function useAuth() {
       }
 
       if (!data) {
-        throw new Error('No vendor user found')
+        throw new Error('No vendor staff found')
       }
 
-      console.log('Vendor user found:', data)
+      if (data.status !== 'active') {
+        throw new Error('This account is currently inactive')
+      }
+
+      console.log('Vendor staff found:', data)
       return data.vendor_id
     } catch (error) {
       console.error('Error in fetchVendorId:', error)
@@ -57,7 +62,6 @@ export function useAuth() {
   useEffect(() => {
     let mounted = true
     let retryCount = 0
-    const MAX_RETRIES = 3
 
     const checkAuth = async () => {
       try {
@@ -129,10 +133,15 @@ export function useAuth() {
 
     checkAuth()
 
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      checkAuth()
+    })
+
     return () => {
       mounted = false
+      subscription.unsubscribe()
     }
-  }, [supabase])
+  }, [supabase, router])
 
   return {
     isAuthenticated,
