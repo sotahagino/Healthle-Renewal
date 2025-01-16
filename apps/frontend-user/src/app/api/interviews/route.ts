@@ -62,6 +62,8 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    const supabase = createRouteHandlerClient({ cookies })
+
     const { data: interviewData, error: interviewError } = await supabase
       .from('medical_interviews')
       .select('*')
