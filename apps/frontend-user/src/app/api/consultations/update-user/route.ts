@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
+import { cookies } from 'next/dist/client/components/headers'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 
 // サービスロール用クライアント（認証不要の操作用）

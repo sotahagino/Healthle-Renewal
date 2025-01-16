@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { headers } from 'next/headers';
+import { headers } from 'next/dist/client/components/headers';
 
 export async function POST(req: Request) {
   console.log('Test webhook endpoint called');

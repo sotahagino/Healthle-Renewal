@@ -1,5 +1,5 @@
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
+import { cookies } from 'next/dist/client/components/headers'
 
 export async function POST(req: Request) {
   try {

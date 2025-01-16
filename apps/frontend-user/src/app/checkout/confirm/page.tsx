@@ -1,6 +1,6 @@
-import { redirect } from 'next/navigation';
+import { redirect } from 'next/dist/client/components/navigation';
 import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
+import { cookies } from 'next/dist/client/components/headers';
 import { CheckoutButton } from '@/components/checkout-button';
 
 export default async function CheckoutConfirmPage({
