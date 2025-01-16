@@ -367,7 +367,11 @@ export default function QuestionnairePage() {
             <Card 
               key={question.id} 
               className="transition-all duration-300 hover:shadow-md"
-              ref={el => questionRefs.current[index] = el}
+              ref={(el: HTMLDivElement | null) => {
+                if (questionRefs.current) {
+                  questionRefs.current[index] = el;
+                }
+              }}
             >
               <CardContent className="p-6">
                 <div className="flex items-start gap-4 mb-6">
