@@ -390,7 +390,7 @@ export default function QuestionnairePage() {
                   </div>
                 </div>
 
-                <div className="pl-12">
+                <div className="pl-0">
                   {renderQuestionInput(question, index)}
                 </div>
               </CardContent>

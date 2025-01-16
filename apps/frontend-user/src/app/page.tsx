@@ -186,10 +186,7 @@ export default function Home() {
       <main className="flex-grow px-5 pt-8 pb-20">
         <div className="max-w-md mx-auto animate-fade-in">
           {/* ヒーローセクション - 改善版 */}
-          <div className="text-center mb-8">
-            <h1 className="text-2xl sm:text-3xl font-bold text-[#1A1A1A] mb-4 leading-tight">
-              AIがあなたの健康をサポート
-            </h1>
+          <div className="text-center mb-8 pt-16">
             <p className="text-xl font-bold text-accent mb-4">
               24時間365日、いつでも相談可能
             </p>

@@ -22,6 +22,8 @@ export async function GET() {
         last_response_at
       `)
       .eq('user_id', user.id)
+      .not('ai_response_text', 'is', null)
+      .eq('status', 'completed')
       .order('created_at', { ascending: false })
 
     if (error) throw error
