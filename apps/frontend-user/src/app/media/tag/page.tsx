@@ -1,6 +1,5 @@
 'use client';
 
-import { Metadata } from 'next';
 import Link from 'next/link';
 import { client } from '@/lib/microcms/client';
 import { Tag } from '@/lib/microcms/types';
@@ -10,13 +9,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Breadcrumbs } from '@/components/media/Breadcrumbs';
 import { Tag as TagIcon } from 'lucide-react';
 
-export const metadata: Metadata = {
-  title: 'タグ一覧 | Healthle',
-  description: '健康・医療に関する記事をタグ別に閲覧できます。',
-};
-
 export const revalidate = 60;
-
 export const dynamic = 'force-dynamic';
 
 type TagType = '症状' | '原因' | '解決策';
