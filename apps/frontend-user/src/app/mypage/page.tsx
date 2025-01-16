@@ -17,18 +17,40 @@ interface Order {
   product_name: string
 }
 
-const statusMap: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
-  pending: { label: '処理中', variant: 'secondary' },
-  paid: { label: '支払い完了', variant: 'default' },
-  cancelled: { label: 'キャンセル', variant: 'destructive' },
-  completed: { label: '完了', variant: 'default' },
-  default: { label: '未定義', variant: 'default' }
+interface Consultation {
+  id: string
+  created_at: string
+  status: string
+  title: string
+  last_message: string
 }
+
+const statusMap: Record<string, { label: string; className: string }> = {
+  pending: { label: '処理中', className: 'bg-yellow-100 text-yellow-800' },
+  paid: { label: '支払い完了', className: 'bg-[#E8F5F1] text-[#4C9A84]' },
+  cancelled: { label: 'キャンセル', className: 'bg-red-100 text-red-800' },
+  completed: { label: '完了', className: 'bg-blue-100 text-blue-800' },
+  default: { label: '未定義', className: 'bg-gray-100 text-gray-800' }
+}
+
+const consultationStatusMap: Record<string, { label: string; className: string }> = {
+  ongoing: { label: '相談中', className: 'bg-yellow-100 text-yellow-800' },
+  completed: { label: '完了', className: 'bg-[#E8F5F1] text-[#4C9A84]' },
+  default: { label: '未定義', className: 'bg-gray-100 text-gray-800' }
+}
+
+// 回答テキストを制限する関数を追加
+const truncateText = (text: string, maxLength: number = 100) => {
+  if (!text) return '';
+  if (text.length <= maxLength) return text;
+  return text.substring(0, maxLength).trim() + '...';
+};
 
 export default function MyPage() {
   const { user, signOut } = useAuth()
   const router = useRouter()
   const [orders, setOrders] = useState<Order[]>([])
+  const [consultations, setConsultations] = useState<Consultation[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -37,25 +59,44 @@ export default function MyPage() {
       return
     }
 
-    const fetchOrders = async () => {
+    const fetchData = async () => {
       try {
-        const response = await fetch('/api/orders/list')
-        if (!response.ok) throw new Error('Failed to fetch orders')
-        const data = await response.json()
-        setOrders(data)
+        // 注文データの取得
+        const ordersResponse = await fetch('/api/orders/list')
+        console.log('Orders API Response:', ordersResponse)
+        const ordersData = await ordersResponse.json()
+        console.log('Orders Data:', ordersData)
+        setOrders(ordersData)
+
+        // 相談データの取得
+        try {
+          const consultationsResponse = await fetch('/api/consultations/list')
+          if (consultationsResponse.ok) {
+            const consultationsData = await consultationsResponse.json()
+            setConsultations(consultationsData)
+          }
+        } catch (error) {
+          console.error('Error fetching consultations:', error)
+          setConsultations([])
+        }
       } catch (error) {
         console.error('Error fetching orders:', error)
+        setOrders([])
       } finally {
         setLoading(false)
       }
     }
 
-    fetchOrders()
+    fetchData()
   }, [user, router])
 
   const handleSignOut = async () => {
     await signOut()
     router.push('/')
+  }
+
+  const handleResumeConsultation = (consultationId: string) => {
+    router.push(`/result?interview_id=${consultationId}`)
   }
 
   if (loading) {
@@ -105,6 +146,60 @@ export default function MyPage() {
           <Card className="border-0 shadow-lg">
             <CardHeader className="space-y-2">
               <CardTitle className="text-2xl font-bold text-[#4C9A84]">
+                相談履歴
+              </CardTitle>
+              <CardDescription>
+                過去の相談履歴を確認できます
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {consultations.length === 0 ? (
+                <div className="text-center py-12">
+                  <Icons.inbox className="mx-auto h-12 w-12 text-gray-400" />
+                  <p className="mt-4 text-gray-500">相談履歴はありません</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {consultations.map((consultation) => (
+                    <div
+                      key={consultation.id}
+                      className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+                    >
+                      <div className="space-y-1 mb-2 sm:mb-0 flex-1">
+                        <h3 className="font-medium line-clamp-1">{consultation.title}</h3>
+                        <p className="text-sm text-gray-500">
+                          {new Date(consultation.created_at).toLocaleDateString('ja-JP', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                          })}
+                        </p>
+                        <p className="text-sm text-gray-600 line-clamp-2">{truncateText(consultation.last_message)}</p>
+                      </div>
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 ml-4">
+                        <span className={`px-3 py-1 rounded-full text-sm font-medium ${consultationStatusMap[consultation.status]?.className || consultationStatusMap.default.className}`}>
+                          {consultationStatusMap[consultation.status]?.label || consultation.status}
+                        </span>
+                        <Button
+                          onClick={() => handleResumeConsultation(consultation.id)}
+                          variant="outline"
+                          size="sm"
+                          className="text-[#4C9A84] border-[#4C9A84] hover:bg-[#4C9A84] hover:text-white whitespace-nowrap"
+                        >
+                          <Icons.messageSquare className="h-4 w-4 mr-1" />
+                          詳細を見る
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="border-0 shadow-lg">
+            <CardHeader className="space-y-2">
+              <CardTitle className="text-2xl font-bold text-[#4C9A84]">
                 購入履歴
               </CardTitle>
               <CardDescription>
@@ -135,9 +230,9 @@ export default function MyPage() {
                         </p>
                       </div>
                       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4">
-                        <Badge variant={statusMap[order.status]?.variant || 'default'}>
+                        <span className={`px-3 py-1 rounded-full text-sm font-medium ${statusMap[order.status]?.className || statusMap.default.className}`}>
                           {statusMap[order.status]?.label || order.status}
-                        </Badge>
+                        </span>
                         <span className="font-medium whitespace-nowrap">
                           ¥{order.total_amount.toLocaleString()}
                         </span>

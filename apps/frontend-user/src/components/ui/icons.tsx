@@ -1,4 +1,4 @@
-import { Loader2, Inbox, Eye, EyeOff, ChevronRight } from "lucide-react"
+import { Loader2, Inbox, Eye, EyeOff, ChevronRight, MessageSquare } from "lucide-react"
 
 export const Icons = {
   spinner: Loader2,
@@ -6,4 +6,5 @@ export const Icons = {
   eye: Eye,
   eyeOff: EyeOff,
   chevronRight: ChevronRight,
+  messageSquare: MessageSquare,
 } 

@@ -95,11 +95,36 @@
 |---------|----------|----------|--------------|------|
 | id | uuid | NO | gen_random_uuid() | 主キー |
 | user_id | uuid | YES | NULL | ユーザーID |
+| guest_user_id | uuid | YES | NULL | ゲストユーザーID |
 | symptom_text | text | YES | NULL | 症状テキスト |
 | questions | jsonb | YES | NULL | 質問情報 |
 | answers | jsonb | YES | NULL | 回答情報 |
 | status | text | YES | 'pending' | 問診ステータス |
 | ai_response_text | text | YES | NULL | AI回答テキスト |
+| created_at | timestamp with time zone | YES | now() | 作成日時 |
+| updated_at | timestamp with time zone | YES | now() | 更新日時 |
+| question_1 | text | YES | NULL | 質問1 |
+| question_2 | text | YES | NULL | 質問2 |
+| question_3 | text | YES | NULL | 質問3 |
+| question_4 | text | YES | NULL | 質問4 |
+| question_5 | text | YES | NULL | 質問5 |
+| question_6 | text | YES | NULL | 質問6 |
+| question_7 | text | YES | NULL | 質問7 |
+| question_8 | text | YES | NULL | 質問8 |
+| question_9 | text | YES | NULL | 質問9 |
+| question_10 | text | YES | NULL | 質問10 |
+| answer_1 | text | YES | NULL | 回答1 |
+| answer_2 | text | YES | NULL | 回答2 |
+| answer_3 | text | YES | NULL | 回答3 |
+| answer_4 | text | YES | NULL | 回答4 |
+| answer_5 | text | YES | NULL | 回答5 |
+| answer_6 | text | YES | NULL | 回答6 |
+| answer_7 | text | YES | NULL | 回答7 |
+| answer_8 | text | YES | NULL | 回答8 |
+| answer_9 | text | YES | NULL | 回答9 |
+| answer_10 | text | YES | NULL | 回答10 |
+| conversation_id | text | YES | NULL | 会話ID |
+| last_response_at | timestamp with time zone | YES | NULL | 最終応答日時 |
 
 ### interview_conversations
 問診の会話履歴を管理するテーブル
@@ -110,6 +135,8 @@
 | interview_id | uuid | YES | NULL | 問診ID |
 | question | text | NO | NULL | 質問 |
 | answer | text | YES | NULL | 回答 |
+| created_at | timestamp with time zone | YES | CURRENT_TIMESTAMP | 作成日時 |
+| updated_at | timestamp with time zone | YES | CURRENT_TIMESTAMP | 更新日時 |
 
 ### interview_recommendations
 問診に基づく商品レコメンドを管理するテーブル
@@ -118,4 +145,5 @@
 |---------|----------|----------|--------------|------|
 | id | uuid | NO | uuid_generate_v4() | 主キー |
 | interview_id | uuid | YES | NULL | 問診ID |
-| recommended_products | jsonb | YES | NULL | レコメンド商品情報 | 
+| recommended_products | jsonb | YES | NULL | レコメンド商品情報 |
+| created_at | timestamp with time zone | YES | CURRENT_TIMESTAMP | 作成日時 | 
