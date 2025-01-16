@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
 import { PaymentForm } from './PaymentForm';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 if (!process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) {
   throw new Error('NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY must be set in environment variables');
@@ -20,11 +21,39 @@ interface PaymentFormWrapperProps {
   };
 }
 
+interface UserProfile {
+  name: string;
+  email: string;
+  phone: string;
+  postal_code: string;
+  prefecture: string;
+  city: string;
+  address_line1: string;
+  address_line2: string | null;
+}
+
 export function PaymentFormWrapper({ productId, amount, medical_interview_id, metadata }: PaymentFormWrapperProps) {
   const [clientSecret, setClientSecret] = useState<string>();
   const [error, setError] = useState<string>();
   const [isLoading, setIsLoading] = useState(false);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const fetchAttempted = useRef(false);
+  const supabase = createClientComponentClient();
+
+  const fetchUserProfile = useCallback(async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        const response = await fetch('/api/user/profile');
+        if (response.ok) {
+          const profile = await response.json();
+          setUserProfile(profile);
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching user profile:', err);
+    }
+  }, [supabase]);
 
   const fetchClientSecret = useCallback(async () => {
     if (fetchAttempted.current || !productId) return;
@@ -69,7 +98,8 @@ export function PaymentFormWrapper({ productId, amount, medical_interview_id, me
 
   useEffect(() => {
     fetchClientSecret();
-  }, [fetchClientSecret]);
+    fetchUserProfile();
+  }, [fetchClientSecret, fetchUserProfile]);
 
   if (error) {
     return (
@@ -102,6 +132,7 @@ export function PaymentFormWrapper({ productId, amount, medical_interview_id, me
       <PaymentForm 
         clientSecret={clientSecret}
         interviewId={medical_interview_id}
+        userProfile={userProfile}
       />
     </Elements>
   );

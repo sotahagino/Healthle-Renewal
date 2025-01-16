@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   PaymentElement,
   useStripe,
@@ -10,6 +10,16 @@ import {
 interface PaymentFormProps {
   clientSecret: string;
   interviewId?: string;
+  userProfile?: {
+    name: string;
+    email: string;
+    phone: string;
+    postal_code: string;
+    prefecture: string;
+    city: string;
+    address_line1: string;
+    address_line2: string | null;
+  } | null;
 }
 
 interface ShippingInfo {
@@ -23,7 +33,7 @@ interface ShippingInfo {
   line2: string;
 }
 
-export function PaymentForm({ clientSecret, interviewId }: PaymentFormProps) {
+export function PaymentForm({ clientSecret, interviewId, userProfile }: PaymentFormProps) {
   const stripe = useStripe();
   const elements = useElements();
   const [error, setError] = useState<string>();
@@ -40,6 +50,24 @@ export function PaymentForm({ clientSecret, interviewId }: PaymentFormProps) {
     line1: '',
     line2: ''
   });
+
+  useEffect(() => {
+    if (userProfile) {
+      setShippingInfo({
+        name: userProfile.name || '',
+        email: userProfile.email || '',
+        phone: userProfile.phone || '',
+        postalCode: userProfile.postal_code || '',
+        prefecture: userProfile.prefecture || '',
+        city: userProfile.city || '',
+        line1: userProfile.address_line1 || '',
+        line2: userProfile.address_line2 || ''
+      });
+      if (userProfile.postal_code) {
+        setShowDetailedAddress(true);
+      }
+    }
+  }, [userProfile]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -214,7 +242,7 @@ export function PaymentForm({ clientSecret, interviewId }: PaymentFormProps) {
         <button
           type="submit"
           disabled={!stripe || isProcessing}
-          className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed mb-4"
+          className="w-full bg-[#4C9A84] text-white py-2 px-4 rounded-md hover:bg-[#3D7A69] disabled:bg-gray-400 disabled:cursor-not-allowed mb-4"
         >
           {isProcessing ? '処理中...' : '支払う'}
         </button>
