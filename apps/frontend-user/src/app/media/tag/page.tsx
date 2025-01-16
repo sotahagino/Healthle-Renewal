@@ -32,6 +32,10 @@ async function getTags() {
   return response.contents;
 }
 
+function isValidTagType(type: string | undefined): type is TagType {
+  return type === 'symptom' || type === 'cause' || type === 'solution';
+}
+
 // タグをタイプごとにグループ化する関数
 function organizeTags(tags: Tag[]) {
   const groupedTags: Record<TagType, Tag[]> = {
@@ -41,7 +45,7 @@ function organizeTags(tags: Tag[]) {
   };
 
   tags.forEach((tag) => {
-    if (tag.type) {
+    if (isValidTagType(tag.type)) {
       groupedTags[tag.type].push(tag);
     }
   });
