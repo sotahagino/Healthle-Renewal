@@ -4,6 +4,11 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter } from 'next/navigation';
+import { Icons } from '@/components/ui/icons';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Header } from '@/components/header';
 
 interface OrderInfo {
   order_id: string;
@@ -182,6 +187,9 @@ export default function CompletePage() {
 
       // 成功メッセージを表示
       alert('アカウント登録が完了しました。確認メールをご確認ください。');
+      
+      // マイページに遷移
+      router.push('/mypage');
 
     } catch (err) {
       console.error('Registration error:', err);
@@ -197,133 +205,170 @@ export default function CompletePage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-        <span className="ml-2">決済情報を確認中...</span>
+      <div className="min-h-screen bg-gradient-to-b from-[#F8FBFA] to-white">
+        <Header />
+        <div className="flex items-center justify-center h-[calc(100vh-4rem)]">
+          <Icons.spinner className="h-8 w-8 animate-spin text-[#4C9A84]" />
+          <span className="ml-2 text-gray-600">決済情報を確認中...</span>
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="bg-red-50 border border-red-200 rounded-md p-4">
-          <p className="text-red-600">{error}</p>
+      <div className="min-h-screen bg-gradient-to-b from-[#F8FBFA] to-white">
+        <Header />
+        <div className="container mx-auto px-4 py-8 max-w-4xl">
+          <Card className="border-0 shadow-lg">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-center text-red-600">
+                <Icons.chevronRight className="h-6 w-6 mr-2" />
+                <p>{error}</p>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md mx-auto">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">
-            ご注文ありがとうございます
-          </h1>
-          {orderInfo && (
-            <p className="text-gray-600 mb-8">
-              注文番号: {orderInfo.order_id}
-            </p>
-          )}
-        </div>
-
+    <div className="min-h-screen bg-gradient-to-b from-[#F8FBFA] to-white">
+      <Header />
+      <div className="container mx-auto px-4 py-12 max-w-4xl">
         {!isLoggedIn && orderInfo?.customer_email && (
-          <div className="mt-8 bg-white shadow rounded-lg p-6">
-            <h2 className="text-lg font-medium text-gray-900 mb-4">
-              アカウント登録のご案内
-            </h2>
-            <p className="text-gray-600 mb-4">
-              アカウントを登録すると、注文履歴の確認や次回のお買い物がより便利になります。
-            </p>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  メールアドレス
-                </label>
-                <input
-                  type="email"
-                  value={orderInfo.customer_email || ''}
-                  disabled
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-50"
-                />
-              </div>
-              <div className="relative">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="パスワードを設定"
-                  className="w-full p-2 border rounded pr-10"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
+          <Card className="border-0 shadow-lg mb-8">
+            <CardHeader>
+              <CardTitle className="text-xl font-bold text-[#4C9A84]">
+                アカウント登録のご案内
+              </CardTitle>
+              <CardDescription>
+                アカウントを登録すると、注文履歴の確認や次回のお買い物がより便利になります。
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-6 space-y-4">
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    メールアドレス
+                  </label>
+                  <Input
+                    type="email"
+                    value={orderInfo.customer_email || ''}
+                    disabled
+                    className="bg-gray-50"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    パスワード
+                  </label>
+                  <div className="relative">
+                    <Input
+                      type={showPassword ? "text" : "password"}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                    >
+                      {showPassword ? (
+                        <Icons.eyeOff className="h-4 w-4 text-gray-400" />
+                      ) : (
+                        <Icons.eye className="h-4 w-4 text-gray-400" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    パスワード（確認）
+                  </label>
+                  <div className="relative">
+                    <Input
+                      type={showConfirmPassword ? "text" : "password"}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className="pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                    >
+                      {showConfirmPassword ? (
+                        <Icons.eyeOff className="h-4 w-4 text-gray-400" />
+                      ) : (
+                        <Icons.eye className="h-4 w-4 text-gray-400" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+                {registrationError && (
+                  <div className="text-red-600 text-sm flex items-center">
+                    <Icons.chevronRight className="h-4 w-4 mr-1" />
+                    {registrationError}
+                  </div>
+                )}
+                <Button
+                  onClick={handleRegistration}
+                  disabled={isRegistering}
+                  className="w-full bg-[#4C9A84] hover:bg-[#3D7A69] text-white"
                 >
-                  {showPassword ? (
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M3.707 2.293a1 1 0 00-1.414 1.414l14 14a1 1 0 001.414-1.414l-1.473-1.473A10.014 10.014 0 0019.542 10C18.268 5.943 14.478 3 10 3a9.958 9.958 0 00-4.512 1.074l-1.78-1.781zm4.261 4.26l1.514 1.515a2.003 2.003 0 012.45 2.45l1.514 1.514a4 4 0 00-5.478-5.478z" clipRule="evenodd" />
-                      <path d="M12.454 16.697L9.75 13.992a4 4 0 01-3.742-3.741L2.335 6.578A9.98 9.98 0 00.458 10c1.274 4.057 5.065 7 9.542 7 .847 0 1.669-.105 2.454-.303z" />
-                    </svg>
+                  {isRegistering ? (
+                    <>
+                      <Icons.spinner className="h-4 w-4 mr-2 animate-spin" />
+                      登録中...
+                    </>
                   ) : (
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                      <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-                      <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
-                    </svg>
+                    <>
+                      <Icons.userPlus className="h-4 w-4 mr-2" />
+                      アカウントを登録
+                    </>
                   )}
-                </button>
+                </Button>
               </div>
-
-              <div className="relative">
-                <input
-                  type={showConfirmPassword ? "text" : "password"}
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="パスワードを確認"
-                  className="w-full p-2 border rounded pr-10"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
-                >
-                  {showConfirmPassword ? (
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M3.707 2.293a1 1 0 00-1.414 1.414l14 14a1 1 0 001.414-1.414l-1.473-1.473A10.014 10.014 0 0019.542 10C18.268 5.943 14.478 3 10 3a9.958 9.958 0 00-4.512 1.074l-1.78-1.781zm4.261 4.26l1.514 1.515a2.003 2.003 0 012.45 2.45l1.514 1.514a4 4 0 00-5.478-5.478z" clipRule="evenodd" />
-                      <path d="M12.454 16.697L9.75 13.992a4 4 0 01-3.742-3.741L2.335 6.578A9.98 9.98 0 00.458 10c1.274 4.057 5.065 7 9.542 7 .847 0 1.669-.105 2.454-.303z" />
-                    </svg>
-                  ) : (
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                      <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-                      <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
-                    </svg>
-                  )}
-                </button>
-              </div>
-
-              <button
-                onClick={handleRegistration}
-                disabled={isRegistering}
-                className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 disabled:bg-gray-400"
-              >
-                {isRegistering ? '登録中...' : 'アカウントを登録'}
-              </button>
-              {registrationError && (
-                <p className="text-red-500 text-sm">{registrationError}</p>
-              )}
-            </div>
-          </div>
+            </CardContent>
+          </Card>
         )}
 
-        <div className="mt-8 text-center">
-          <a
-            href="/"
-            className="text-blue-600 hover:text-blue-800 font-medium"
-          >
-            トップページに戻る
-          </a>
-        </div>
+        <Card className="border-0 shadow-lg mb-8">
+          <CardHeader className="text-center space-y-2">
+            <div className="flex justify-center mb-4">
+              <div className="rounded-full bg-[#E8F5F1] p-4">
+                <Icons.checkCircle className="h-12 w-12 text-[#4C9A84]" />
+              </div>
+            </div>
+            <CardTitle className="text-2xl font-bold text-[#4C9A84]">
+              ご注文ありがとうございます
+            </CardTitle>
+            {orderInfo && (
+              <CardDescription className="text-gray-600">
+                注文番号: {orderInfo.order_id}
+              </CardDescription>
+            )}
+          </CardHeader>
+          <CardContent className="p-6">
+            <div className="space-y-4">
+              <p className="text-gray-600 text-center">
+                ご注文内容の確認メールを送信いたしました。
+              </p>
+              <div className="flex justify-center">
+                <Button
+                  onClick={() => router.push('/mypage')}
+                  className="bg-[#4C9A84] hover:bg-[#3D7A69] text-white"
+                >
+                  <Icons.user className="h-4 w-4 mr-2" />
+                  マイページへ
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
