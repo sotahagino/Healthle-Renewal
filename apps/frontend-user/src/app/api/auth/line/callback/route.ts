@@ -2,6 +2,8 @@ import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
 
+export const dynamic = 'force-dynamic'
+
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -174,7 +176,7 @@ export async function GET(request: NextRequest) {
                     return;
                   }
 
-                  // �ッションが正しく保存されたことを確認
+                  // セッションが正しく保存されたことを確認
                   try {
                     const parsedSession = JSON.parse(storedSession);
                     if (!parsedSession.access_token || !parsedSession.user) {
