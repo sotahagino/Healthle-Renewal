@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/dist/client/components/headers'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 
+export const dynamic = 'force-dynamic';
+
 // サービスロール用クライアント（認証不要の操作用）
 const serviceClient = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,

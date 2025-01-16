@@ -1,6 +1,8 @@
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/dist/client/components/headers'
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(req: Request) {
   try {
     const cookieStore = cookies()
