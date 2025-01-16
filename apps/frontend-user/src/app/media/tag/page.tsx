@@ -12,7 +12,13 @@ import { Tag as TagIcon } from 'lucide-react';
 export const revalidate = 60;
 export const dynamic = 'force-dynamic';
 
-type TagType = '症状' | '原因' | '解決策';
+type TagType = 'symptom' | 'cause' | 'solution';
+
+const TAG_TYPE_DISPLAY: Record<TagType, string> = {
+  symptom: '症状',
+  cause: '原因',
+  solution: '解決策',
+};
 
 async function getTags() {
   const response = await client.getList<Tag>({
@@ -29,13 +35,13 @@ async function getTags() {
 // タグをタイプごとにグループ化する関数
 function organizeTags(tags: Tag[]) {
   const groupedTags: Record<TagType, Tag[]> = {
-    症状: [],
-    原因: [],
-    解決策: [],
+    symptom: [],
+    cause: [],
+    solution: [],
   };
 
   tags.forEach((tag) => {
-    if (tag.type && (tag.type === '症状' || tag.type === '原因' || tag.type === '解決策')) {
+    if (tag.type) {
       groupedTags[tag.type].push(tag);
     }
   });
@@ -49,17 +55,17 @@ export default async function TagListPage() {
 
   const tagTypes: { type: TagType; color: string; description: string }[] = [
     {
-      type: '症状',
+      type: 'symptom',
       color: '#E53E3E',
       description: '健康上の症状や不調に関連する記事を見つけることができます。',
     },
     {
-      type: '原因',
+      type: 'cause',
       color: '#DD6B20',
       description: '症状や健康問題の原因について解説している記事を見つけることができます。',
     },
     {
-      type: '解決策',
+      type: 'solution',
       color: '#38A169',
       description: '健康問題の解決策や改善方法について解説している記事を見つけることができます。',
     },
@@ -81,7 +87,7 @@ export default async function TagListPage() {
               <div key={type}>
                 <div className="mb-6">
                   <h2 className="text-2xl font-bold" style={{ color }}>
-                    {type}
+                    {TAG_TYPE_DISPLAY[type]}
                   </h2>
                   <p className="text-gray-600 mt-2">{description}</p>
                 </div>
