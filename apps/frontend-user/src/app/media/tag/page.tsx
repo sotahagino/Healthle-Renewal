@@ -35,8 +35,8 @@ function organizeTags(tags: Tag[]) {
   };
 
   tags.forEach((tag) => {
-    if (tag.type) {
-      groupedTags[tag.type as TagType].push(tag);
+    if (tag.type && (tag.type === '症状' || tag.type === '原因' || tag.type === '解決策')) {
+      groupedTags[tag.type].push(tag);
     }
   });
 
