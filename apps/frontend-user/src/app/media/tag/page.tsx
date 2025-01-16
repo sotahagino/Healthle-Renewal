@@ -1,3 +1,5 @@
+'use client';
+
 import { Metadata } from 'next';
 import Link from 'next/link';
 import { client } from '@/lib/microcms/client';
@@ -14,6 +16,8 @@ export const metadata: Metadata = {
 };
 
 export const revalidate = 60;
+
+export const dynamic = 'force-dynamic';
 
 type TagType = '症状' | '原因' | '解決策';
 
