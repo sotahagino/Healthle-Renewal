@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from 'react'
+// @ts-ignore - Next.js 14.1.0の型定義の問題を回避
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from "../../../components/ui/button"

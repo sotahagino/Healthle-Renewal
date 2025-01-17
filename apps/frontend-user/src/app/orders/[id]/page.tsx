@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
+// @ts-ignore - Next.js 14.1.0の型定義の問題を回避
 import { useParams } from 'next/navigation'
 import { Button } from "../../../components/ui/button"
 import { Card, CardContent, CardFooter } from "../../../components/ui/card"

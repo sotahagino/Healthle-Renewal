@@ -7,6 +7,7 @@ import { Card, CardContent, CardFooter } from "../../components/ui/card"
 import { SiteHeader } from '../../components/site-header'
 import { Footer } from '../../components/footer'
 import { CheckCircle, Package, Truck, ArrowRight } from 'lucide-react'
+// @ts-ignore - Next.js 14.1.0の型定義の問題を回避
 import { useRouter } from 'next/navigation'
 
 // Mock order data (in a real app, this would come from the backend)

@@ -5,6 +5,7 @@ import { useAuth } from '@/providers/auth-provider'
 import { Header } from '@/components/header'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+// @ts-ignore - Next.js 14.1.0の型定義の問題を回避
 import { useRouter } from 'next/navigation'
 import { Icons } from '@/components/ui/icons'
 import { Badge } from '@/components/ui/badge'

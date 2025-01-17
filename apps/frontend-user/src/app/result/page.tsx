@@ -1,7 +1,9 @@
 "use client"
 
 import { useState, useEffect, useRef } from 'react'
+// @ts-ignore - Next.js 14.1.0の型定義の問題を回避
 import { useRouter as useNavigation } from 'next/navigation'
+// @ts-ignore - Next.js 14.1.0の型定義の問題を回避
 import { useSearchParams as useNavigationSearchParams } from 'next/navigation'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { Button } from "@/components/ui/button"
