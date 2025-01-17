@@ -74,18 +74,24 @@ const licenseSchema = z.object({
 // 専門家情報のスキーマ
 const professionalsSchema = z.object({
   pharmacist_manager: z.object({
+    qualification: z.string().min(1, '資格区分を選択してください'),
     name: z.string().min(1, '氏名を入力してください'),
     license_number: z.string().min(1, '登録番号を入力してください'),
     registration_prefecture: z.string().min(1, '登録先都道府県を入力してください'),
+    duties: z.string().min(1, '従事する業務を入力してください'),
     work_hours: z.string().min(1, '勤務状況を入力してください'),
+    staff_type: z.string().min(1, '勤務する者の区別を選択してください'),
+    uniform_info: z.string().min(1, '着用する服装を入力してください'),
   }),
   professionals: z.array(z.object({
-    qualification: z.string().min(1, '資格の名称を入力してください'),
+    qualification: z.string().min(1, '資格区分を選択してください'),
     name: z.string().min(1, '氏名を入力してください'),
     license_number: z.string().min(1, '登録番号を入力してください'),
     registration_prefecture: z.string().min(1, '登録先都道府県を入力してください'),
     duties: z.string().min(1, '担当業務を入力してください'),
     work_hours: z.string().min(1, '勤務状況を入力してください'),
+    staff_type: z.string().min(1, '勤務する者の区別を選択してください'),
+    uniform_info: z.string().min(1, '着用する服装を入力してください'),
   })),
 })
 
@@ -133,6 +139,7 @@ const pharmacySchema = z.object({
 })
 
 type PharmacyFormValues = z.infer<typeof pharmacySchema>
+export type { PharmacyFormValues }
 
 interface PharmacyFormProps {
   mode: 'new' | 'edit'
@@ -192,10 +199,14 @@ export default function PharmacyForm({ mode, onSubmit, initialData }: PharmacyFo
       },
       handling_categories: [],
       pharmacist_manager: {
+        qualification: '',
         name: '',
         license_number: '',
         registration_prefecture: '',
+        duties: '',
         work_hours: '',
+        staff_type: '',
+        uniform_info: '',
       },
       professionals: [],
       store_hours: {
@@ -782,75 +793,130 @@ export default function PharmacyForm({ mode, onSubmit, initialData }: PharmacyFo
             </TabsContent>
 
             {/* 専門家情報タブ */}
-            <TabsContent value="professionals" className="space-y-4">
-              {/* 店舗の管理者情報カード */}
+            <TabsContent value="professionals">
               <Card>
                 <CardHeader>
                   <CardTitle>店舗の管理者情報</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                <CardContent>
+                  <div className="grid gap-6">
                     <FormField
                       control={form.control}
-                      name="pharmacist_manager.name"
+                      name="pharmacist_manager.qualification"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>氏名 *</FormLabel>
-                          <FormControl>
-                            <Input {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="pharmacist_manager.license_number"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>登録番号 *</FormLabel>
-                          <FormControl>
-                            <Input {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="pharmacist_manager.registration_prefecture"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>登録先都道府県 *</FormLabel>
+                          <FormLabel>資格区分</FormLabel>
                           <Select onValueChange={field.onChange} defaultValue={field.value}>
                             <FormControl>
                               <SelectTrigger>
-                                <SelectValue placeholder="都道府県を選択" />
+                                <SelectValue placeholder="資格を選択" />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              {PREFECTURE_OPTIONS.map((pref) => (
-                                <SelectItem key={pref} value={pref}>
-                                  {pref}
-                                </SelectItem>
-                              ))}
+                              <SelectItem value="薬剤師">薬剤師</SelectItem>
+                              <SelectItem value="登録販売者">登録販売者</SelectItem>
                             </SelectContent>
                           </Select>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
-
+                    <FormField
+                      control={form.control}
+                      name="pharmacist_manager.name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>氏名</FormLabel>
+                          <FormControl>
+                            <Input {...field} value={field.value || ''} placeholder="山田 太郎" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="pharmacist_manager.license_number"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>免許番号</FormLabel>
+                          <FormControl>
+                            <Input {...field} value={field.value || ''} placeholder="第123456号" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="pharmacist_manager.registration_prefecture"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>登録都道府県</FormLabel>
+                          <FormControl>
+                            <Input {...field} value={field.value || ''} placeholder="東京都" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="pharmacist_manager.duties"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>従事する業務</FormLabel>
+                          <FormControl>
+                            <Input {...field} value={field.value || ''} placeholder="医薬品の販売・情報提供" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                     <FormField
                       control={form.control}
                       name="pharmacist_manager.work_hours"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>勤務状況 *</FormLabel>
+                          <FormLabel>勤務時間</FormLabel>
                           <FormControl>
-                            <Input {...field} placeholder="例: 平日 9:00～13:00・15:00～17:00" />
+                            <Input {...field} value={field.value || ''} placeholder="平日 9:00-18:00" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="pharmacist_manager.staff_type"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>勤務する者の区別</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="区別を選択" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="薬剤師">薬剤師</SelectItem>
+                              <SelectItem value="登録販売者">登録販売者</SelectItem>
+                              <SelectItem value="登録販売者(研修中)">登録販売者(研修中)</SelectItem>
+                              <SelectItem value="一般従事者">一般従事者</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="pharmacist_manager.uniform_info"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>着用する服装</FormLabel>
+                          <FormControl>
+                            <Input {...field} value={field.value || ''} placeholder="例: 「薬剤師」と氏名を記した名札と、コート型の白衣(白)を着用" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -860,135 +926,150 @@ export default function PharmacyForm({ mode, onSubmit, initialData }: PharmacyFo
                 </CardContent>
               </Card>
 
-              {/* 専門家情報カード */}
-              <Card>
+              <Card className="mt-6">
                 <CardHeader>
                   <CardTitle>医薬品販売に従事する専門家の情報</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-8">
+                <CardContent>
                   {form.watch('professionals')?.map((professional: any, index: number) => (
-                    <div key={index} className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <FormField
-                          control={form.control}
-                          name={`professionals.${index}.qualification`}
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>資格の名称 *</FormLabel>
-                              <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                <FormControl>
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="資格を選択" />
-                                  </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                  <SelectItem value="薬剤師">薬剤師</SelectItem>
-                                  <SelectItem value="登録販売者">登録販売者</SelectItem>
-                                </SelectContent>
-                              </Select>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-
-                        <FormField
-                          control={form.control}
-                          name={`professionals.${index}.name`}
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>氏名 *</FormLabel>
-                              <FormControl>
-                                <Input {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-
-                        <FormField
-                          control={form.control}
-                          name={`professionals.${index}.license_number`}
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>登録番号 *</FormLabel>
-                              <FormControl>
-                                <Input {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-
-                        <FormField
-                          control={form.control}
-                          name={`professionals.${index}.registration_prefecture`}
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>登録先都道府県 *</FormLabel>
-                              <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                <FormControl>
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="都道府県を選択" />
-                                  </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                  {PREFECTURE_OPTIONS.map((pref) => (
-                                    <SelectItem key={pref} value={pref}>
-                                      {pref}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-
-                        <FormField
-                          control={form.control}
-                          name={`professionals.${index}.duties`}
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>担当業務 *</FormLabel>
-                              <FormControl>
-                                <Input {...field} placeholder="例: 医薬品販売・情報提供・相談・発送" />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-
-                        <FormField
-                          control={form.control}
-                          name={`professionals.${index}.work_hours`}
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>勤務状況 *</FormLabel>
-                              <FormControl>
-                                <Input {...field} placeholder="例: 平日・月金曜日 9:00～13:00" />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
+                    <div key={index} className="mb-6 grid gap-6">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-sm font-medium">専門家 {index + 1}</h4>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const current = form.getValues('professionals')
+                            form.setValue('professionals', 
+                              current.filter((_: any, i: number) => i !== index)
+                            )
+                          }}
+                        >
+                          削除
+                        </Button>
                       </div>
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        onClick={() => {
-                          const current = form.getValues('professionals')
-                          form.setValue('professionals', 
-                            current.filter((_: any, i: number) => i !== index)
-                          )
-                        }}
-                      >
-                        この専門家を削除
-                      </Button>
+                      <FormField
+                        control={form.control}
+                        name={`professionals.${index}.qualification`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>資格区分</FormLabel>
+                            <FormControl>
+                              <Input {...field} value={field.value || ''} placeholder="薬剤師" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name={`professionals.${index}.name`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>氏名</FormLabel>
+                            <FormControl>
+                              <Input {...field} value={field.value || ''} placeholder="山田 花子" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name={`professionals.${index}.license_number`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>免許番号</FormLabel>
+                            <FormControl>
+                              <Input {...field} value={field.value || ''} placeholder="第123456号" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name={`professionals.${index}.registration_prefecture`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>登録都道府県</FormLabel>
+                            <FormControl>
+                              <Input {...field} value={field.value || ''} placeholder="東京都" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name={`professionals.${index}.duties`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>従事する業務</FormLabel>
+                            <FormControl>
+                              <Input {...field} value={field.value || ''} placeholder="医薬品の販売・情報提供" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name={`professionals.${index}.work_hours`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>勤務時間</FormLabel>
+                            <FormControl>
+                              <Input {...field} value={field.value || ''} placeholder="平日 9:00-18:00" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name={`professionals.${index}.staff_type`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>勤務する者の区別</FormLabel>
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="区別を選択" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="薬剤師">薬剤師</SelectItem>
+                                <SelectItem value="登録販売者">登録販売者</SelectItem>
+                                <SelectItem value="登録販売者(研修中)">登録販売者(研修中)</SelectItem>
+                                <SelectItem value="一般従事者">一般従事者</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name={`professionals.${index}.uniform_info`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>着用する服装</FormLabel>
+                            <FormControl>
+                              <Input {...field} value={field.value || ''} placeholder="例: 「登録販売者」と氏名を記した名札と、短丈の白衣(白･ﾌﾞﾙｰ･ﾋﾟﾝｸ)を着用" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                     </div>
                   ))}
                   <Button
                     type="button"
                     variant="outline"
+                    size="sm"
+                    className="mt-2"
                     onClick={() => {
                       const current = form.getValues('professionals') || []
                       form.setValue('professionals', [
@@ -1000,6 +1081,8 @@ export default function PharmacyForm({ mode, onSubmit, initialData }: PharmacyFo
                           registration_prefecture: '',
                           duties: '',
                           work_hours: '',
+                          staff_type: '',
+                          uniform_info: '',
                         },
                       ])
                     }}

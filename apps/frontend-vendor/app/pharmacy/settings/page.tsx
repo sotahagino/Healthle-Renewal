@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/hooks/useAuth'
-import PharmacyForm from '../_components/PharmacyForm'
+import PharmacyForm, { PharmacyFormValues } from '../_components/PharmacyForm'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { useRouter } from 'next/navigation'
 import { toast, Toaster } from 'sonner'
@@ -13,6 +13,7 @@ export default function PharmacySettingsPage() {
   const supabase = createClientComponentClient()
   const [loading, setLoading] = useState(true)
   const [currentData, setCurrentData] = useState<any>(null)
+  const [error, setError] = useState<string>('')
 
   useEffect(() => {
     const fetchData = async () => {
@@ -113,6 +114,10 @@ export default function PharmacySettingsPage() {
             throw new Error('専門家情報の取得に失敗しました')
           }
 
+          // 管理者と一般の専門家を分離
+          const managerData = professionalsData?.find(prof => prof.is_manager)
+          const otherProfessionals = professionalsData?.filter(prof => !prof.is_manager)
+
           // データを結合
           const combinedData = {
             ...vendorData,
@@ -124,18 +129,30 @@ export default function PharmacySettingsPage() {
               holder_name: licenseData.license_holder_name,
               issuer: licenseData.issuing_authority,
             } : undefined,
-            handling_categories: licenseData?.handling_categories || vendorData?.handling_categories || [],
+            handling_categories: licenseData?.handling_categories || [],
             online_notification: notificationData ? {
               notification_date: notificationData.notification_date,
               notification_office: notificationData.notification_authority,
             } : undefined,
-            professionals: professionalsData ? professionalsData.map((prof: any) => ({
+            pharmacist_manager: managerData ? {
+              qualification: managerData.qualification_type,
+              name: managerData.name,
+              license_number: managerData.registration_number,
+              registration_prefecture: managerData.registration_prefecture,
+              duties: managerData.responsibilities?.[0] || '',
+              work_hours: managerData.work_schedule?.hours || '',
+              staff_type: managerData.staff_type,
+              uniform_info: managerData.uniform_info,
+            } : undefined,
+            professionals: otherProfessionals ? otherProfessionals.map(prof => ({
               qualification: prof.qualification_type,
               name: prof.name,
               license_number: prof.registration_number,
               registration_prefecture: prof.registration_prefecture,
               duties: prof.responsibilities?.[0] || '',
-              work_hours: prof.work_schedule,
+              work_hours: prof.work_schedule?.hours || '',
+              staff_type: prof.staff_type,
+              uniform_info: prof.uniform_info,
             })) : [],
             store_hours: vendorData.store_hours || {
               online_order: '24時間365日',
@@ -169,215 +186,74 @@ export default function PharmacySettingsPage() {
     fetchData()
   }, [user, vendorId, supabase])
 
-  const handleSubmit = async (partialData: any) => {
+  const handleSubmit = async (data: Partial<PharmacyFormValues>) => {
+    setLoading(true)
+    setError('')
+
     try {
-      if (!user) {
-        throw new Error('ログインが必要です')
-      }
+      if (!vendorId) throw new Error('店舗IDが見つかりません')
 
-      if (!vendorId) {
-        throw new Error('店舗情報が見つかりません')
-      }
-
-      // 保存開始のフィードバック
-      toast.loading('保存中...')
-
-      // 各テーブルのデータを分離
-      const {
-        pharmacy_license,
-        professionals,
-        store_hours,
-        consultation_info,
-        online_notification,
-        handling_categories,
-        ...vendorData
-      } = partialData
-
-      // vendors テーブルの更新
-      const { error: vendorError } = await supabase
-        .from('vendors')
-        .upsert({
-          id: vendorId,
-          ...vendorData,
-          updated_at: new Date().toISOString(),
-        }, {
-          onConflict: 'id'
-        })
-
-      if (vendorError) {
-        console.error('Vendor save error:', vendorError)
-        throw new Error('店舗情報の保存に失敗しました')
-      }
-
-      // pharmacy_license が存在する場合、vendor_licenses テーブルを更新
-      if (pharmacy_license) {
-        // 既存のレコードを確認
-        const { data: existingLicense } = await supabase
-          .from('vendor_licenses')
-          .select('*')
-          .eq('vendor_id', vendorId)
-          .single()
-
-        const licenseData = {
-          vendor_id: vendorId,
-          license_type: pharmacy_license.type,
-          license_number: pharmacy_license.number,
-          issue_date: pharmacy_license.issue_date,
-          valid_from: pharmacy_license.issue_date,
-          valid_until: pharmacy_license.expiration_date,
-          license_holder_name: pharmacy_license.holder_name,
-          issuing_authority: pharmacy_license.issuer,
-          handling_categories: handling_categories || [],
-        }
-
-        if (!existingLicense) {
-          // 新規作成
-          const { error: licenseError } = await supabase
-            .from('vendor_licenses')
-            .insert(licenseData)
-
-          if (licenseError) {
-            console.error('License save error:', licenseError)
-            throw new Error('許可情報の保存に失敗しました')
-          }
-        } else {
-          // 更新
-          const { error: licenseError } = await supabase
-            .from('vendor_licenses')
-            .update(licenseData)
-            .eq('vendor_id', vendorId)
-
-          if (licenseError) {
-            console.error('License save error:', licenseError)
-            throw new Error('許可情報の保存に失敗しました')
-          }
-        }
-      }
-
-      // online_notification が存在する場合、vendor_online_sales_notifications テーブルを更新
-      if (online_notification) {
-        const { data: existingNotification } = await supabase
-          .from('vendor_online_sales_notifications')
-          .select('*')
-          .eq('vendor_id', vendorId)
-          .single()
-
-        if (!existingNotification) {
-          // 新規作成
-          const { error: notificationError } = await supabase
-            .from('vendor_online_sales_notifications')
-            .insert({
-              vendor_id: vendorId,
-              notification_date: online_notification.notification_date,
-              notification_authority: online_notification.notification_office,
-            })
-
-          if (notificationError) {
-            console.error('Notification save error:', notificationError)
-            throw new Error('特定販売届出情報の保存に失敗しました')
-          }
-        } else {
-          // 更新
-          const { error: notificationError } = await supabase
-            .from('vendor_online_sales_notifications')
-            .update({
-              notification_date: online_notification.notification_date,
-              notification_authority: online_notification.notification_office,
-            })
-            .eq('vendor_id', vendorId)
-
-          if (notificationError) {
-            console.error('Notification save error:', notificationError)
-            throw new Error('特定販売届出情報の保存に失敗しました')
-          }
-        }
-      }
-
-      // professionals が存在する場合、vendor_professionals テーブルを更新
-      if (professionals?.length > 0) {
-        // 既存のプロフェッショナルを確認
-        const { data: existingProfessionals } = await supabase
+      // 専門家情報の保存
+      if (data.pharmacist_manager || data.professionals) {
+        // 既存の専門家情報を削除
+        const { error: deleteError } = await supabase
           .from('vendor_professionals')
-          .select('*')
+          .delete()
           .eq('vendor_id', vendorId)
 
-        if (!existingProfessionals || existingProfessionals.length === 0) {
-          // 新規作成
-          const { error: professionalsError } = await supabase
-            .from('vendor_professionals')
-            .insert(
-              professionals.map((prof: any) => ({
-                vendor_id: vendorId,
-                name: prof.name,
-                qualification_type: prof.qualification,
-                registration_number: prof.license_number,
-                registration_prefecture: prof.registration_prefecture,
-                responsibilities: [prof.duties],
-                work_schedule: prof.work_hours,
-              }))
-            )
+        if (deleteError) throw deleteError
 
-          if (professionalsError) {
-            console.error('Professionals save error:', professionalsError)
-            throw new Error('専門家情報の保存に失敗しました')
+        // 管理者情報を保存
+        if (data.pharmacist_manager) {
+          const managerData = {
+            vendor_id: vendorId,
+            is_manager: true,
+            qualification_type: data.pharmacist_manager.qualification,
+            name: data.pharmacist_manager.name,
+            license_number: data.pharmacist_manager.license_number,
+            registration_prefecture: data.pharmacist_manager.registration_prefecture,
+            responsibilities: [data.pharmacist_manager.duties],
+            work_schedule: { hours: data.pharmacist_manager.work_hours },
+            staff_type: data.pharmacist_manager.staff_type,
+            uniform_info: data.pharmacist_manager.uniform_info,
           }
-        } else {
-          // 既存のレコードを削除して新規作成
-          const { error: deleteError } = await supabase
+          const { error: managerError } = await supabase
             .from('vendor_professionals')
-            .delete()
-            .eq('vendor_id', vendorId)
+            .insert(managerData)
 
-          if (deleteError) {
-            console.error('Professionals delete error:', deleteError)
-            throw new Error('専門家情報の更新に失敗しました')
-          }
-
-          const { error: professionalsError } = await supabase
-            .from('vendor_professionals')
-            .insert(
-              professionals.map((prof: any) => ({
-                vendor_id: vendorId,
-                name: prof.name,
-                qualification_type: prof.qualification,
-                registration_number: prof.license_number,
-                registration_prefecture: prof.registration_prefecture,
-                responsibilities: [prof.duties],
-                work_schedule: prof.work_hours,
-              }))
-            )
-
-          if (professionalsError) {
-            console.error('Professionals save error:', professionalsError)
-            throw new Error('専門家情報の保存に失敗しました')
-          }
+          if (managerError) throw managerError
         }
+
+        // その他の専門家情報を保存
+        if (data.professionals && data.professionals.length > 0) {
+          const professionalsData = data.professionals.map(prof => ({
+            vendor_id: vendorId,
+            is_manager: false,
+            qualification_type: prof.qualification,
+            name: prof.name,
+            license_number: prof.license_number,
+            registration_prefecture: prof.registration_prefecture,
+            responsibilities: [prof.duties],
+            work_schedule: { hours: prof.work_hours },
+            staff_type: prof.staff_type,
+            uniform_info: prof.uniform_info,
+          }))
+
+          const { error: professionalsError } = await supabase
+            .from('vendor_professionals')
+            .insert(professionalsData)
+
+          if (professionalsError) throw professionalsError
+        }
+
+        toast.success('専門家情報を保存しました', { duration: 3000 })
       }
-
-      // 保存完了のフィードバック
-      toast.dismiss()
-      toast.success(
-        `${
-          pharmacy_license ? '許可情報' :
-          professionals ? '専門家情報' :
-          online_notification ? '営業情報' :
-          consultation_info ? '相談応需情報' :
-          '基本情報'
-        }を保存しました`,
-        {
-          duration: 3000,
-          position: 'top-center',
-        }
-      )
-
-      router.refresh()
-    } catch (error) {
-      toast.dismiss()
-      console.error('Submit error:', error)
-      toast.error(error instanceof Error ? error.message : '予期せぬエラーが発生しました', {
-        duration: 5000,
-        position: 'top-center',
-      })
+    } catch (err) {
+      console.error('Vendor save error:', err)
+      setError('店舗情報の保存に失敗しました')
+      throw err
+    } finally {
+      setLoading(false)
     }
   }
 
