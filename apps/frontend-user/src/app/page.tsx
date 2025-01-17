@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+// @ts-ignore - Next.js 14.1.0の型定義の問題を回避
 import { useRouter } from 'next/navigation'
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
