@@ -1,8 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+// @ts-ignore - Next.js 14.1.0の型定義の問題を回避
 import { useSearchParams } from 'next/navigation';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+// @ts-ignore - Next.js 14.1.0の型定義の問題を回避
 import { useRouter } from 'next/navigation';
 import { Icons } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
@@ -16,6 +18,7 @@ interface OrderInfo {
 }
 
 export default function CompletePage() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const paymentIntentId = searchParams.get('payment_intent');
   const interviewId = searchParams.get('interview_id');
@@ -29,7 +32,6 @@ export default function CompletePage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
   const [registrationError, setRegistrationError] = useState<string | null>(null);
-  const router = useRouter();
   const supabase = createClientComponentClient();
 
   useEffect(() => {
