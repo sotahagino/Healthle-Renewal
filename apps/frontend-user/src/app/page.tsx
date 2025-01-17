@@ -191,7 +191,7 @@ export default function Home() {
           <div className="relative w-full h-[300px] mb-4">
             <div className="absolute inset-0 bg-white"></div>
             <Image
-              src="https://wojtqrjpxivotuzjtgsc.supabase.co/storage/v1/object/public/Healthle/homepage.png"
+              src="https://wojtqrjpxivotuzjtgsc.supabase.co/storage/v1/object/public/Healthle/homepagev2.png"
               alt="医師の画像"
               fill
               style={{ objectFit: 'contain' }}
