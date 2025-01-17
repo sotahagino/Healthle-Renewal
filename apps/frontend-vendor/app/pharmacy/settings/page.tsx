@@ -16,6 +16,8 @@ import LicenseForm from '../_components/forms/LicenseForm'
 import ProfessionalsForm from '../_components/forms/ProfessionalsForm'
 import BusinessForm from '../_components/forms/BusinessForm'
 import ConsultationForm from '../_components/forms/ConsultationForm'
+import { Button } from "@/components/ui/button"
+import { ArrowLeft } from "lucide-react"
 
 export default function PharmacySettingsPage() {
   const { user, vendorId, loading: authLoading } = useAuth()
@@ -106,6 +108,21 @@ export default function PharmacySettingsPage() {
             console.error('License data fetch error:', licenseError)
             throw new Error('許可情報の取得に失敗しました')
           }
+
+          // vendor_emergency_contacts テーブルのデータを取得
+          const { data: emergencyContactsData, error: emergencyContactsError } = await supabase
+            .from('vendor_emergency_contacts')
+            .select('*')
+            .eq('vendor_id', vendorId)
+
+          if (emergencyContactsError) {
+            console.error('Emergency contacts fetch error:', emergencyContactsError)
+            throw new Error('相談応需情報の取得に失敗しました')
+          }
+
+          // 通常時と緊急時の相談応需情報を分離
+          const normalContact = emergencyContactsData?.find(contact => contact.type === 'normal')
+          const emergencyContact = emergencyContactsData?.find(contact => contact.type === 'emergency')
 
           // vendor_online_sales_notifications テーブルのデータを取得
           const { data: notificationData, error: notificationError } = await supabase
@@ -232,6 +249,18 @@ export default function PharmacySettingsPage() {
                 '祝': { start: '09:00', end: '17:00' },
               },
             },
+            consultation_info: {
+              normal: {
+                phone: normalContact?.phone || '',
+                email: normalContact?.email || '',
+                hours: normalContact?.available_hours?.hours || '平日 9:00～18:00',
+              },
+              emergency: {
+                phone: emergencyContact?.phone || '',
+                email: emergencyContact?.email || '',
+                hours: emergencyContact?.available_hours?.hours || '24時間対応',
+              },
+            },
           }
 
           setCurrentData(combinedData)
@@ -249,15 +278,68 @@ export default function PharmacySettingsPage() {
 
   // 認証状態のロード中は読み込み中表示
   if (authLoading || loading) {
-    return <div>Loading...</div>
+    return (
+      <div className="container mx-auto py-6">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => router.push('/')}
+            >
+              <ArrowLeft className="h-6 w-6" />
+            </Button>
+            <h1 className="text-2xl font-bold">店舗情報設定</h1>
+          </div>
+        </div>
+        <div className="flex items-center justify-center h-[400px]">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+        </div>
+      </div>
+    )
   }
 
   // vendorIdが取得できない場合はエラーメッセージを表示
   if (!vendorId) {
     return (
       <div className="container mx-auto py-6">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => router.push('/')}
+            >
+              <ArrowLeft className="h-6 w-6" />
+            </Button>
+            <h1 className="text-2xl font-bold">店舗情報設定</h1>
+          </div>
+        </div>
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
           <p>店舗情報が見つかりません。システム管理者にお問い合わせください。</p>
+        </div>
+      </div>
+    )
+  }
+
+  // データ取得が完了していない場合はローディング表示
+  if (!currentData) {
+    return (
+      <div className="container mx-auto py-6">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => router.push('/')}
+            >
+              <ArrowLeft className="h-6 w-6" />
+            </Button>
+            <h1 className="text-2xl font-bold">店舗情報設定</h1>
+          </div>
+        </div>
+        <div className="flex items-center justify-center h-[400px]">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
         </div>
       </div>
     )
@@ -266,7 +348,18 @@ export default function PharmacySettingsPage() {
   return (
     <div className="container mx-auto py-6">
       <Toaster />
-      <h1 className="text-2xl font-bold mb-6">店舗情報設定</h1>
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => router.push('/')}
+          >
+            <ArrowLeft className="h-6 w-6" />
+          </Button>
+          <h1 className="text-2xl font-bold">店舗情報設定</h1>
+        </div>
+      </div>
       <Tabs defaultValue="basic" className="space-y-4">
         <TabsList>
           <TabsTrigger value="basic">基本情報</TabsTrigger>
@@ -277,38 +370,38 @@ export default function PharmacySettingsPage() {
         </TabsList>
 
         <TabsContent value="basic">
-          {vendorId && <BasicInfoForm
+          <BasicInfoForm
             initialData={currentData}
             vendorId={vendorId}
-          />}
+          />
         </TabsContent>
 
         <TabsContent value="license">
-          {vendorId && <LicenseForm
+          <LicenseForm
             initialData={currentData}
             vendorId={vendorId}
-          />}
+          />
         </TabsContent>
 
         <TabsContent value="professionals">
-          {vendorId && <ProfessionalsForm
+          <ProfessionalsForm
             initialData={currentData}
             vendorId={vendorId}
-          />}
+          />
         </TabsContent>
 
         <TabsContent value="business">
-          {vendorId && <BusinessForm
+          <BusinessForm
             initialData={currentData}
             vendorId={vendorId}
-          />}
+          />
         </TabsContent>
 
         <TabsContent value="consultation">
-          {vendorId && <ConsultationForm
+          <ConsultationForm
             initialData={currentData}
             vendorId={vendorId}
-          />}
+          />
         </TabsContent>
       </Tabs>
     </div>
