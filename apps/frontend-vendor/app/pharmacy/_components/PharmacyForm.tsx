@@ -36,6 +36,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs"
+import { toast } from 'sonner'
 
 // 基本情報のスキーマ
 const basicInfoSchema = z.object({
@@ -69,6 +70,10 @@ const licenseSchema = z.object({
     issuer: z.string().min(1, '許可証発行自治体名を入力してください'),
   }),
   handling_categories: z.array(z.string()).min(1, '取扱医薬品区分を1つ以上選択してください'),
+  online_notification: z.object({
+    notification_date: z.string().default(''),
+    notification_office: z.string().default(''),
+  }).default({}),
 })
 
 // 専門家情報のスキーマ
@@ -95,18 +100,29 @@ const professionalsSchema = z.object({
   })),
 })
 
+// 営業時間の型定義
+const timeSchema = z.object({
+  start: z.string().min(1, '開始時間を入力してください').default('09:00'),
+  end: z.string().min(1, '終了時間を入力してください').default('17:00'),
+  breakStart: z.string().optional(),
+  breakEnd: z.string().optional(),
+  is_holiday: z.boolean().default(false),
+})
+
+const onlineOrderSchema = z.object({
+  type: z.enum(['24hours', 'business_hours']).default('24hours'),
+  start: z.string().min(1, '開始時間を入力してください').default('00:00'),
+  end: z.string().min(1, '終了時間を入力してください').default('24:00'),
+})
+
 // 営業情報のスキーマ
 const businessSchema = z.object({
   store_hours: z.object({
-    online_order: z.string().min(1, 'インターネットでの注文受付時間を入力してください'),
-    store: z.string().min(1, '実店舗の営業時間を入力してください'),
-    online_sales: z.string().min(1, 'インターネット販売の医薬品販売時間を入力してください'),
-  }),
-  online_notification: z.object({
-    notification_date: z.string().min(1, '届出年月日を入力してください'),
-    notification_office: z.string().min(1, '届出先を入力してください'),
-  }),
-})
+    store: z.record(timeSchema).default({}),
+    online_order: onlineOrderSchema.default({ type: '24hours', start: '00:00', end: '24:00' }),
+    online_sales: z.record(timeSchema).default({}),
+  }).default({}),
+}).default({})
 
 // 相談応需情報のスキーマ
 const consultationSchema = z.object({
@@ -133,7 +149,11 @@ const pharmacySchema = z.object({
   // 専門家情報
   ...professionalsSchema.shape,
   // 営業情報
-  ...businessSchema.shape,
+  store_hours: z.object({
+    store: z.record(timeSchema).default({}),
+    online_order: onlineOrderSchema.default({ type: '24hours', start: '00:00', end: '24:00' }),
+    online_sales: z.record(timeSchema).default({}),
+  }).default({}),
   // 相談応需情報
   ...consultationSchema.shape,
 })
@@ -168,11 +188,7 @@ export default function PharmacyForm({ mode, onSubmit, initialData }: PharmacyFo
   const [activeTab, setActiveTab] = useState('basic')
 
   const form = useForm<PharmacyFormValues>({
-    resolver: async (data, context, options) => {
-      // 現在のタブのスキーマのみでバリデーション
-      const currentSchema = getSchemaForTab(activeTab)
-      return zodResolver(currentSchema)(data, context, options)
-    },
+    resolver: zodResolver(pharmacySchema),
     defaultValues: initialData || {
       vendor_name: '',
       company_name: '',
@@ -210,9 +226,27 @@ export default function PharmacyForm({ mode, onSubmit, initialData }: PharmacyFo
       },
       professionals: [],
       store_hours: {
-        online_order: '24時間365日',
-        store: '平日 9:00～18:00',
-        online_sales: '平日 9:00～18:00',
+        store: {
+          '月': { start: '09:00', end: '17:00', is_holiday: false },
+          '火': { start: '09:00', end: '17:00', is_holiday: false },
+          '水': { start: '09:00', end: '17:00', is_holiday: false },
+          '木': { start: '09:00', end: '17:00', is_holiday: false },
+          '金': { start: '09:00', end: '17:00', is_holiday: false },
+          '土': { start: '09:00', end: '17:00', is_holiday: false },
+          '日': { start: '09:00', end: '17:00', is_holiday: true },
+          '祝': { start: '09:00', end: '17:00', is_holiday: true },
+        },
+        online_order: { type: '24hours', start: '00:00', end: '24:00' },
+        online_sales: {
+          '月': { start: '09:00', end: '17:00', is_holiday: false },
+          '火': { start: '09:00', end: '17:00', is_holiday: false },
+          '水': { start: '09:00', end: '17:00', is_holiday: false },
+          '木': { start: '09:00', end: '17:00', is_holiday: false },
+          '金': { start: '09:00', end: '17:00', is_holiday: false },
+          '土': { start: '09:00', end: '17:00', is_holiday: false },
+          '日': { start: '09:00', end: '17:00', is_holiday: true },
+          '祝': { start: '09:00', end: '17:00', is_holiday: true },
+        },
       },
       consultation_info: {
         normal: {
@@ -236,6 +270,13 @@ export default function PharmacyForm({ mode, onSubmit, initialData }: PharmacyFo
   // 初期データが変更された場合にフォームをリセット
   useEffect(() => {
     if (initialData) {
+      // online_notificationのデフォルト値を設定
+      if (!initialData.online_notification) {
+        initialData.online_notification = {
+          notification_date: '',
+          notification_office: '',
+        }
+      }
       form.reset(initialData)
     }
   }, [initialData, form])
@@ -326,19 +367,24 @@ export default function PharmacyForm({ mode, onSubmit, initialData }: PharmacyFo
   }
 
   const handleSubmit = async (data: PharmacyFormValues) => {
-    setLoading(true)
-    setError('')
-
     try {
-      // 現在のタブのデータのみを抽出
-      const currentSchema = getSchemaForTab(activeTab)
-      const relevantData = Object.keys(currentSchema.shape).reduce((acc, key) => {
-        return { ...acc, [key]: data[key as keyof typeof data] }
-      }, {} as Partial<PharmacyFormValues>)
+      setLoading(true)
+      setError('')
+      
+      console.log('フォーム送信開始:', {
+        activeTab,
+        formData: data,
+        storeHours: data.store_hours
+      })
 
-      await onSubmit(relevantData)
+      // フォーム全体のデータを送信
+      await onSubmit(data)
+      
+      toast.success('保存しました')
     } catch (err) {
+      console.error('保存エラー:', err)
       setError(err instanceof Error ? err.message : '予期せぬエラーが発生しました')
+      toast.error('保存に失敗しました')
     } finally {
       setLoading(false)
     }
@@ -790,6 +836,56 @@ export default function PharmacyForm({ mode, onSubmit, initialData }: PharmacyFo
                   />
                 </CardContent>
               </Card>
+
+              {/* 特定販売（インターネット販売）届出情報カード */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>特定販売（インターネット販売）届出情報</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="online_notification.notification_date"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>届出年月日 *</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="date" 
+                            {...field} 
+                            value={field.value || ''}
+                            onChange={(e) => {
+                              field.onChange(e.target.value)
+                            }}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="online_notification.notification_office"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>届出先 *</FormLabel>
+                        <FormControl>
+                          <Input 
+                            {...field} 
+                            value={field.value || ''}
+                            onChange={(e) => {
+                              field.onChange(e.target.value)
+                            }}
+                            placeholder="例: 豊島区池袋保健所 生活衛生課医務・薬事グループ" 
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </CardContent>
+              </Card>
             </TabsContent>
 
             {/* 専門家情報タブ */}
@@ -1100,87 +1196,221 @@ export default function PharmacyForm({ mode, onSubmit, initialData }: PharmacyFo
                 <CardHeader>
                   <CardTitle>医薬品販売店舗の営業時間</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="store_hours.online_order"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>インターネットでの注文受付時間 *</FormLabel>
-                        <FormControl>
-                          <Input {...field} placeholder="例: 注文は24時間365日承っています" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                <CardContent>
+                  <div className="space-y-8">
+                    <div>
+                      <h3 className="text-lg font-medium mb-4">実店舗の営業時間</h3>
+                      <div className="space-y-4">
+                        {['月', '火', '水', '木', '金', '土', '日', '祝'].map((day) => (
+                          <div key={day} className="grid grid-cols-4 gap-4 items-center">
+                            <div className="text-sm font-medium">{day}曜日</div>
+                            <FormField
+                              control={form.control}
+                              name={`store_hours.store.${day}.is_holiday`}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormControl>
+                                    <div className="flex items-center space-x-2">
+                                      <input
+                                        type="checkbox"
+                                        checked={field.value || false}
+                                        onChange={(e) => {
+                                          field.onChange(e.target.checked)
+                                        }}
+                                        id={`store-${day}-holiday`}
+                                      />
+                                      <label htmlFor={`store-${day}-holiday`} className="text-sm">休業日</label>
+                                    </div>
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name={`store_hours.store.${day}.start`}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormControl>
+                                    <Input
+                                      type="time"
+                                      {...field}
+                                      value={field.value || '09:00'}
+                                      onChange={(e) => {
+                                        field.onChange(e.target.value || '09:00')
+                                      }}
+                                      disabled={form.watch(`store_hours.store.${day}.is_holiday`)}
+                                      onBlur={(e) => {
+                                        if (!e.target.value) {
+                                          field.onChange('09:00')
+                                        }
+                                        field.onBlur()
+                                      }}
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name={`store_hours.store.${day}.end`}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormControl>
+                                    <Input
+                                      type="time"
+                                      {...field}
+                                      value={field.value || '17:00'}
+                                      onChange={(e) => {
+                                        field.onChange(e.target.value || '17:00')
+                                      }}
+                                      disabled={form.watch(`store_hours.store.${day}.is_holiday`)}
+                                      onBlur={(e) => {
+                                        if (!e.target.value) {
+                                          field.onChange('17:00')
+                                        }
+                                        field.onBlur()
+                                      }}
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
 
-                  <FormField
-                    control={form.control}
-                    name="store_hours.store"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>実店舗の営業時間 *</FormLabel>
-                        <FormControl>
-                          <Input {...field} placeholder="例: 平日：9:00～13:00・15:00～17:00" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                    <div>
+                      <h3 className="text-lg font-medium mb-4">インターネットでの注文受付時間</h3>
+                      <div className="space-y-4">
+                        <FormField
+                          control={form.control}
+                          name="store_hours.online_order.type"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormControl>
+                                <div className="space-y-2">
+                                  <div className="flex items-center space-x-2">
+                                    <input
+                                      type="radio"
+                                      id="24hours"
+                                      value="24hours"
+                                      checked={field.value === '24hours' || !field.value}
+                                      onChange={(e) => {
+                                        field.onChange(e.target.value)
+                                      }}
+                                    />
+                                    <label htmlFor="24hours" className="text-sm">24時間365日</label>
+                                  </div>
+                                  <div className="flex items-center space-x-2">
+                                    <input
+                                      type="radio"
+                                      id="business_hours"
+                                      value="business_hours"
+                                      checked={field.value === 'business_hours'}
+                                      onChange={(e) => {
+                                        field.onChange(e.target.value)
+                                      }}
+                                    />
+                                    <label htmlFor="business_hours" className="text-sm">営業時間のみ</label>
+                                  </div>
+                                </div>
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    </div>
 
-                  <FormField
-                    control={form.control}
-                    name="store_hours.online_sales"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>インターネット販売の医薬品販売時間 *</FormLabel>
-                        <FormControl>
-                          <Input {...field} placeholder="例: 平日：9:00～13:00・15:00～17:00" />
-                        </FormControl>
-                        <FormDescription>
-                          薬剤師または登録販売者が常駐している時間
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </CardContent>
-              </Card>
-
-              {/* 特定販売（インターネット販売）届出情報カード */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>特定販売（インターネット販売）届出情報</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="online_notification.notification_date"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>届出年月日 *</FormLabel>
-                        <FormControl>
-                          <Input type="date" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="online_notification.notification_office"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>届出先 *</FormLabel>
-                        <FormControl>
-                          <Input {...field} placeholder="例: 豊島区池袋保健所 生活衛生課医務・薬事グループ" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                    <div>
+                      <h3 className="text-lg font-medium mb-4">インターネット販売の医薬品販売時間</h3>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        薬剤師または登録販売者が勤務している時間に限り販売可能です
+                      </p>
+                      <div className="space-y-4">
+                        {['月', '火', '水', '木', '金', '土', '日', '祝'].map((day) => (
+                          <div key={day} className="grid grid-cols-4 gap-4 items-center">
+                            <div className="text-sm font-medium">{day}曜日</div>
+                            <FormField
+                              control={form.control}
+                              name={`store_hours.online_sales.${day}.is_holiday`}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormControl>
+                                    <div className="flex items-center space-x-2">
+                                      <input
+                                        type="checkbox"
+                                        checked={field.value || false}
+                                        onChange={(e) => {
+                                          field.onChange(e.target.checked)
+                                        }}
+                                        id={`online-${day}-holiday`}
+                                      />
+                                      <label htmlFor={`online-${day}-holiday`} className="text-sm">休業日</label>
+                                    </div>
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name={`store_hours.online_sales.${day}.start`}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormControl>
+                                    <Input
+                                      type="time"
+                                      {...field}
+                                      value={field.value || '09:00'}
+                                      onChange={(e) => {
+                                        field.onChange(e.target.value || '09:00')
+                                      }}
+                                      disabled={form.watch(`store_hours.online_sales.${day}.is_holiday`)}
+                                      onBlur={(e) => {
+                                        if (!e.target.value) {
+                                          field.onChange('09:00')
+                                        }
+                                        field.onBlur()
+                                      }}
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name={`store_hours.online_sales.${day}.end`}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormControl>
+                                    <Input
+                                      type="time"
+                                      {...field}
+                                      value={field.value || '17:00'}
+                                      onChange={(e) => {
+                                        field.onChange(e.target.value || '17:00')
+                                      }}
+                                      disabled={form.watch(`store_hours.online_sales.${day}.is_holiday`)}
+                                      onBlur={(e) => {
+                                        if (!e.target.value) {
+                                          field.onChange('17:00')
+                                        }
+                                        field.onBlur()
+                                      }}
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>

@@ -2,13 +2,23 @@
 
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/hooks/useAuth'
-import PharmacyForm, { PharmacyFormValues } from '../_components/PharmacyForm'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { useRouter } from 'next/navigation'
 import { toast, Toaster } from 'sonner'
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs"
+import BasicInfoForm from '../_components/forms/BasicInfoForm'
+import LicenseForm from '../_components/forms/LicenseForm'
+import ProfessionalsForm from '../_components/forms/ProfessionalsForm'
+import BusinessForm from '../_components/forms/BusinessForm'
+import ConsultationForm from '../_components/forms/ConsultationForm'
 
 export default function PharmacySettingsPage() {
-  const { user, vendorId } = useAuth()
+  const { user, vendorId, loading: authLoading } = useAuth()
   const router = useRouter()
   const supabase = createClientComponentClient()
   const [loading, setLoading] = useState(true)
@@ -18,6 +28,12 @@ export default function PharmacySettingsPage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
+        // 認証状態のロードが完了し、かつユーザーが存在しない場合はホームにリダイレクト
+        if (!authLoading && !user) {
+          router.push('/')
+          return
+        }
+
         if (!user) {
           setLoading(false)
           return
@@ -118,6 +134,41 @@ export default function PharmacySettingsPage() {
           const managerData = professionalsData?.find(prof => prof.is_manager)
           const otherProfessionals = professionalsData?.filter(prof => !prof.is_manager)
 
+          // vendor_business_hours テーブルのデータを取得
+          const { data: businessHoursData, error: businessHoursError } = await supabase
+            .from('vendor_business_hours')
+            .select('*')
+            .eq('vendor_id', vendorId)
+
+          if (businessHoursError) {
+            console.error('Business hours data fetch error:', businessHoursError)
+            throw new Error('営業時間情報の取得に失敗しました')
+          }
+
+          // 営業時間データを種別ごとに分類
+          const storeHours = businessHoursData?.filter(hours => hours.type === 'store')
+            .reduce((acc, hours) => ({
+              ...acc,
+              [hours.weekday]: {
+                start: hours.start_time,
+                end: hours.end_time,
+                breakStart: hours.break_start_time,
+                breakEnd: hours.break_end_time,
+                is_holiday: hours.is_holiday,
+              }
+            }), {})
+
+          const onlineOrderHours = businessHoursData?.find(hours => hours.type === 'online_order')
+          const onlineSalesHours = businessHoursData?.filter(hours => hours.type === 'online_sales')
+            .reduce((acc, hours) => ({
+              ...acc,
+              [hours.weekday]: {
+                start: hours.start_time,
+                end: hours.end_time,
+                is_holiday: hours.is_holiday,
+              }
+            }), {})
+
           // データを結合
           const combinedData = {
             ...vendorData,
@@ -154,21 +205,31 @@ export default function PharmacySettingsPage() {
               staff_type: prof.staff_type,
               uniform_info: prof.uniform_info,
             })) : [],
-            store_hours: vendorData.store_hours || {
-              online_order: '24時間365日',
-              store: '平日 9:00～18:00',
-              online_sales: '平日 9:00～18:00',
-            },
-            consultation_info: vendorData.consultation_info || {
-              normal: {
-                phone: '',
-                email: '',
-                hours: '平日 9:00～18:00',
+            store_hours: {
+              store: storeHours || {
+                '月': { start: '09:00', end: '17:00' },
+                '火': { start: '09:00', end: '17:00' },
+                '水': { start: '09:00', end: '17:00' },
+                '木': { start: '09:00', end: '17:00' },
+                '金': { start: '09:00', end: '17:00' },
+                '土': { start: '09:00', end: '17:00' },
+                '日': { start: '09:00', end: '17:00' },
+                '祝': { start: '09:00', end: '17:00' },
               },
-              emergency: {
-                phone: '',
-                email: '',
-                hours: '24時間対応',
+              online_order: onlineOrderHours ? {
+                type: onlineOrderHours.start_time === '00:00' && onlineOrderHours.end_time === '24:00' ? '24hours' : 'business_hours',
+                start: onlineOrderHours.start_time,
+                end: onlineOrderHours.end_time,
+              } : { type: '24hours', start: '00:00', end: '24:00' },
+              online_sales: onlineSalesHours || {
+                '月': { start: '09:00', end: '17:00' },
+                '火': { start: '09:00', end: '17:00' },
+                '水': { start: '09:00', end: '17:00' },
+                '木': { start: '09:00', end: '17:00' },
+                '金': { start: '09:00', end: '17:00' },
+                '土': { start: '09:00', end: '17:00' },
+                '日': { start: '09:00', end: '17:00' },
+                '祝': { start: '09:00', end: '17:00' },
               },
             },
           }
@@ -184,91 +245,72 @@ export default function PharmacySettingsPage() {
     }
 
     fetchData()
-  }, [user, vendorId, supabase])
+  }, [supabase, user, vendorId, authLoading, router])
 
-  const handleSubmit = async (data: Partial<PharmacyFormValues>) => {
-    setLoading(true)
-    setError('')
-
-    try {
-      if (!vendorId) throw new Error('店舗IDが見つかりません')
-
-      // 専門家情報の保存
-      if (data.pharmacist_manager || data.professionals) {
-        // 既存の専門家情報を削除
-        const { error: deleteError } = await supabase
-          .from('vendor_professionals')
-          .delete()
-          .eq('vendor_id', vendorId)
-
-        if (deleteError) throw deleteError
-
-        // 管理者情報を保存
-        if (data.pharmacist_manager) {
-          const managerData = {
-            vendor_id: vendorId,
-            is_manager: true,
-            qualification_type: data.pharmacist_manager.qualification,
-            name: data.pharmacist_manager.name,
-            license_number: data.pharmacist_manager.license_number,
-            registration_prefecture: data.pharmacist_manager.registration_prefecture,
-            responsibilities: [data.pharmacist_manager.duties],
-            work_schedule: { hours: data.pharmacist_manager.work_hours },
-            staff_type: data.pharmacist_manager.staff_type,
-            uniform_info: data.pharmacist_manager.uniform_info,
-          }
-          const { error: managerError } = await supabase
-            .from('vendor_professionals')
-            .insert(managerData)
-
-          if (managerError) throw managerError
-        }
-
-        // その他の専門家情報を保存
-        if (data.professionals && data.professionals.length > 0) {
-          const professionalsData = data.professionals.map(prof => ({
-            vendor_id: vendorId,
-            is_manager: false,
-            qualification_type: prof.qualification,
-            name: prof.name,
-            license_number: prof.license_number,
-            registration_prefecture: prof.registration_prefecture,
-            responsibilities: [prof.duties],
-            work_schedule: { hours: prof.work_hours },
-            staff_type: prof.staff_type,
-            uniform_info: prof.uniform_info,
-          }))
-
-          const { error: professionalsError } = await supabase
-            .from('vendor_professionals')
-            .insert(professionalsData)
-
-          if (professionalsError) throw professionalsError
-        }
-
-        toast.success('専門家情報を保存しました', { duration: 3000 })
-      }
-    } catch (err) {
-      console.error('Vendor save error:', err)
-      setError('店舗情報の保存に失敗しました')
-      throw err
-    } finally {
-      setLoading(false)
-    }
+  // 認証状態のロード中は読み込み中表示
+  if (authLoading || loading) {
+    return <div>Loading...</div>
   }
 
-  if (loading) {
-    return <div>読み込み中...</div>
-  }
-
-  if (!user) {
-    return <div>ログインが必要です</div>
+  // vendorIdが取得できない場合はエラーメッセージを表示
+  if (!vendorId) {
+    return (
+      <div className="container mx-auto py-6">
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+          <p>店舗情報が見つかりません。システム管理者にお問い合わせください。</p>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <>
-      <Toaster richColors position="top-center" />
-      <PharmacyForm mode="edit" onSubmit={handleSubmit} initialData={currentData} />
-    </>
+    <div className="container mx-auto py-6">
+      <Toaster />
+      <h1 className="text-2xl font-bold mb-6">店舗情報設定</h1>
+      <Tabs defaultValue="basic" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="basic">基本情報</TabsTrigger>
+          <TabsTrigger value="license">許可情報</TabsTrigger>
+          <TabsTrigger value="professionals">専門家情報</TabsTrigger>
+          <TabsTrigger value="business">営業情報</TabsTrigger>
+          <TabsTrigger value="consultation">相談応需情報</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="basic">
+          {vendorId && <BasicInfoForm
+            initialData={currentData}
+            vendorId={vendorId}
+          />}
+        </TabsContent>
+
+        <TabsContent value="license">
+          {vendorId && <LicenseForm
+            initialData={currentData}
+            vendorId={vendorId}
+          />}
+        </TabsContent>
+
+        <TabsContent value="professionals">
+          {vendorId && <ProfessionalsForm
+            initialData={currentData}
+            vendorId={vendorId}
+          />}
+        </TabsContent>
+
+        <TabsContent value="business">
+          {vendorId && <BusinessForm
+            initialData={currentData}
+            vendorId={vendorId}
+          />}
+        </TabsContent>
+
+        <TabsContent value="consultation">
+          {vendorId && <ConsultationForm
+            initialData={currentData}
+            vendorId={vendorId}
+          />}
+        </TabsContent>
+      </Tabs>
+    </div>
   )
 } 
