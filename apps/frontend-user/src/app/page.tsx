@@ -17,7 +17,8 @@ import {
   Search,
   ThumbsUp,
   ArrowRight,
-  ChevronRight
+  ChevronRight,
+  X
 } from 'lucide-react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import Image from 'next/image'
@@ -37,12 +38,78 @@ interface Question {
 
 // 症状カテゴリーの定義
 const SYMPTOM_CATEGORIES = [
-  { id: 'sleep', name: '睡眠の悩み', example: '寝つきが悪い、夜中に目が覚める' },
-  { id: 'headache', name: '頭痛', example: '慢性的な頭痛、片頭痛' },
-  { id: 'stomach', name: '胃腸の不調', example: '胃痛、消化不良' },
-  { id: 'fatigue', name: '疲労・だるさ', example: '慢性的な疲れ、だるさ' },
-  { id: 'stress', name: 'ストレス', example: '不安、イライラ' },
-  { id: 'other', name: 'その他の症状', example: 'その他の気になる症状' },
+  { 
+    id: 'sleep', 
+    name: '睡眠の悩み', 
+    example: '寝つきが悪い、夜中に目が覚める',
+    options: [
+      "寝つきが悪く、眠るまでに時間がかかる",
+      "夜中に何度も目が覚めてしまう",
+      "朝早く目が覚めてしまい、十分な睡眠が取れない",
+      "睡眠薬を使用しないと眠れない",
+      "日中の眠気が強く、集中できない"
+    ]
+  },
+  { 
+    id: 'headache', 
+    name: '頭痛', 
+    example: '慢性的な頭痛、片頭痛',
+    options: [
+      "頭の片側が激しく痛む",
+      "頭全体がズキズキと痛む",
+      "首や肩のこりを伴う頭痛",
+      "光や音に敏感になる",
+      "吐き気を伴う頭痛がある"
+    ]
+  },
+  { 
+    id: 'stomach', 
+    name: '胃腸の不調', 
+    example: '胃痛、消化不良',
+    options: [
+      "食後に胃が重たくなる",
+      "胃がむかむかして吐き気がする",
+      "お腹が張って痛む",
+      "食欲不振が続いている",
+      "胸焼けがよくある"
+    ]
+  },
+  { 
+    id: 'fatigue', 
+    name: '疲労・だるさ', 
+    example: '慢性的な疲れ、だるさ',
+    options: [
+      "朝起きても疲れが取れない",
+      "体が重くだるい感じが続く",
+      "些細な活動でも疲れやすい",
+      "集中力が続かない",
+      "疲労感が長期間続いている"
+    ]
+  },
+  { 
+    id: 'stress', 
+    name: 'ストレス', 
+    example: '不安、イライラ',
+    options: [
+      "イライラが続いて落ち着かない",
+      "不安感が強く、心配が止まらない",
+      "気分の浮き沈みが激しい",
+      "やる気が出ない",
+      "緊張が続いて休めない"
+    ]
+  },
+  { 
+    id: 'other', 
+    name: 'その他の症状', 
+    example: 'その他の気になる症状',
+    options: [
+      "風邪のような症状がある",
+      "アレルギー症状が気になる",
+      "皮膚のトラブルがある",
+      "目の疲れや痛みがある",
+      "関節や筋肉の痛みがある"
+    ]
+  }
 ]
 
 // よくある相談例
@@ -59,6 +126,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showFloatingCTA, setShowFloatingCTA] = useState(false)
+  const [selectedCategory, setSelectedCategory] = useState<typeof SYMPTOM_CATEGORIES[0] | null>(null)
   const supabase = createClientComponentClient()
 
   // スクロールに応じてフローティングCTAを表示
@@ -70,11 +138,30 @@ export default function Home() {
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
-  const handleCategorySelect = (example: string) => {
-    setSymptomText(example)
-    // スムーズスクロール
+  // スムーズスクロール関数
+  const scrollToSymptomInput = () => {
     const textarea = document.getElementById('symptom-textarea')
-    textarea?.scrollIntoView({ behavior: 'smooth' })
+    if (textarea) {
+      const offset = -100 // スクロール位置を100px上に調整
+      const elementPosition = textarea.getBoundingClientRect().top
+      const offsetPosition = elementPosition + window.pageYOffset + offset
+      
+      window.scrollTo({
+        top: offsetPosition,
+        behavior: 'smooth'
+      })
+    }
+  }
+
+  const handleCategorySelect = (category: typeof SYMPTOM_CATEGORIES[0]) => {
+    setSelectedCategory(category)
+  }
+
+  const handleOptionSelect = (option: string) => {
+    setSymptomText(option)
+    setSelectedCategory(null)
+    // 調整したスクロール関数を使用
+    scrollToSymptomInput()
   }
 
   const handleCommonSymptomSelect = (symptom: string) => {
@@ -87,7 +174,7 @@ export default function Home() {
 
     if (!symptomText.trim()) {
       setError("相談内容を入力してください。")
-      setLoading(false)
+      scrollToSymptomInput()
       return
     }
 
@@ -201,7 +288,7 @@ export default function Home() {
           </div>
 
           {/* メイン相談フォーム */}
-          <div className="relative z-30">
+          <div className="relative z-20">
             <Card className="bg-white shadow-lg mb-8">
               <CardContent className="p-6">
                 <div className="mb-4">
@@ -364,7 +451,7 @@ export default function Home() {
                 {SYMPTOM_CATEGORIES.map((category) => (
                   <button
                     key={category.id}
-                    onClick={() => handleCategorySelect(category.example)}
+                    onClick={() => handleCategorySelect(category)}
                     className="bg-white p-3 rounded-lg shadow-md hover:shadow-lg transition-shadow text-left"
                   >
                     <p className="font-bold text-sm mb-1">{category.name}</p>
@@ -373,25 +460,59 @@ export default function Home() {
                 ))}
               </div>
             </div>
+
+            {/* 症状選択モーダル */}
+            {selectedCategory && (
+              <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                <div className="bg-white rounded-xl w-full max-w-md p-6 relative animate-fade-in">
+                  <button
+                    onClick={() => setSelectedCategory(null)}
+                    className="absolute right-4 top-4 text-gray-500 hover:text-gray-700"
+                  >
+                    <X className="w-6 h-6" />
+                  </button>
+                  <h3 className="text-lg font-bold mb-4">{selectedCategory.name}の症状</h3>
+                  <div className="space-y-2">
+                    {selectedCategory.options.map((option, index) => (
+                      <button
+                        key={index}
+                        onClick={() => handleOptionSelect(option)}
+                        className="w-full text-left p-3 rounded-lg hover:bg-secondary/20 transition-colors text-sm"
+                      >
+                        {option}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </main>
 
       {/* フローティングCTAボタン */}
       {showFloatingCTA && (
-        <div className="fixed bottom-6 left-0 right-0 px-5 animate-fade-in">
-          <div className="max-w-md mx-auto">
-            <Button
-              onClick={() => {
-                const textarea = document.getElementById('symptom-textarea')
-                textarea?.scrollIntoView({ behavior: 'smooth' })
-              }}
-              className="w-full bg-primary hover:bg-primary-hover text-white py-4 rounded-xl shadow-lg flex items-center justify-center gap-2"
-            >
-              <MessageCircle className="w-5 h-5" />
-              <span>相談を始める</span>
-            </Button>
-          </div>
+        <div className="fixed bottom-6 left-0 right-0 z-50 px-4 animate-fade-in">
+          <Button
+            onClick={() => {
+              if (!symptomText.trim()) {
+                scrollToSymptomInput()
+              } else {
+                handleStartConsultation()
+              }
+            }}
+            className="w-full max-w-md mx-auto bg-primary hover:bg-primary-hover text-white text-lg py-5 font-bold rounded-xl shadow-lg transition-all duration-300 flex items-center justify-center gap-3"
+            disabled={loading}
+          >
+            {loading ? (
+              <>相談を開始中...</>
+            ) : (
+              <>
+                <MessageCircle className="w-6 h-6" />
+                無料で相談を始める
+              </>
+            )}
+          </Button>
         </div>
       )}
 
