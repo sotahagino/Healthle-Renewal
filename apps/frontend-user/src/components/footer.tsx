@@ -25,9 +25,7 @@ export function Footer() {
             </div>
             <div className="flex flex-col space-y-4">
               <Link 
-                href="https://corporate.healthle.jp" 
-                target="_blank" 
-                rel="noopener noreferrer" 
+                href="/corporate" 
                 className="flex items-center text-gray-600 hover:text-[#4C9A84] transition-colors duration-200"
               >
                 <Building2 className="w-5 h-5 mr-2.5 opacity-70" />
