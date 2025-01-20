@@ -7,7 +7,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     console.log('Received request body:', body)
     
-    const { symptom_text = '', matched_categories, is_child } = body
+    const { symptom_text, matched_categories, is_child } = body
     
     if (!symptom_text) {
       return NextResponse.json(
