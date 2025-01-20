@@ -120,6 +120,9 @@ const COMMON_SYMPTOMS = [
   "頭痛が続いて集中できません",
 ]
 
+// APIから返される型定義
+type MatchedCategory = { category: string; confidence: number }
+
 export default function Home() {
   const router = useRouter()
   const [symptomText, setSymptomText] = useState('')
@@ -179,29 +182,11 @@ export default function Home() {
     }
 
     try {
-      // 問診データを作成
-      const res = await fetch('/api/interviews', {
+      // 症状判定APIを呼び出し
+      const symptomAssessmentRes = await fetch('https://api.dify.ai/v1/completion-messages', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          symptom_text: symptomText,
-        }),
-      })
-
-      if (!res.ok) {
-        const errorData = await res.json()
-        throw new Error(errorData.error || '問診の開始に失敗しました')
-      }
-
-      const { interview_id } = await res.json()
-
-      // 質問生成APIを呼び出し
-      const difyRes = await fetch(`${process.env.NEXT_PUBLIC_DIFY_API_URL}/completion-messages`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_DIFY_QUESTION_API_KEY}`,
+          'Authorization': 'Bearer app-Ymt6FHFyEu2R5sQUlKydYX34',
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
@@ -213,52 +198,70 @@ export default function Home() {
         })
       })
 
-      if (!difyRes.ok) {
-        throw new Error('質問の生成に失敗しました')
+      if (!symptomAssessmentRes.ok) {
+        throw new Error('症状判定に失敗しました')
       }
 
-      const difyData = await difyRes.json()
-      console.log('Dify API response:', difyData)
+      const symptomAssessmentData = await symptomAssessmentRes.json()
+      console.log('Symptom Assessment Response:', symptomAssessmentData)
 
-      // Markdown形式の回答からJSONを抽出して正規化
-      const jsonMatch = difyData.answer.match(/```json\n([\s\S]*?)\n```/)
-      if (!jsonMatch) {
-        throw new Error('質問データの形式が不正です')
-      }
-
-      let questions
+      // JSONデータを抽出
+      let matchedCategories = []
+      let isChild = false
       try {
-        const jsonContent = jsonMatch[1]
-          .trim()
-          .replace(/\s+(?=(?:[^"]*"[^"]*")*[^"]*$)/g, '') // 不要な空白を削除（文字列内は除く）
-        
-        const parsedData = JSON.parse(jsonContent)
-        const parsedQuestions = parsedData.questions
-
-        if (!Array.isArray(parsedQuestions)) {
-          throw new Error('質問データが配列ではありません')
+        // カテゴリーIDのマッピング
+        const categoryMapping: { [key: string]: number } = {
+          '息が苦しい（大人）': 1,
+          '息が苦しい（子供）': 2,
+          // 他のカテゴリーも同様に追加
         }
-
-        // 質問データの正規化
-        questions = parsedQuestions.map((q: any) => ({
-          id: q.id.trim(),
-          text: q.text.trim(),
-          type: q.type.trim(),
-          options: Array.isArray(q.options) ? q.options.map((opt: QuestionOption) => ({
-            id: opt.id.trim(),
-            text: opt.text.trim()
-          })) : []
-        }));
-
-        console.log('Normalized questions:', questions)
-      } catch (parseError) {
-        console.error('JSON parse error:', parseError)
-        throw new Error('質問データの解析に失敗しました')
+        
+        // Markdown形式のJSONを抽出
+        const jsonMatch = symptomAssessmentData.answer.match(/```json\n([\s\S]*?)\n```/)
+        if (jsonMatch) {
+          const jsonContent = jsonMatch[1].trim()
+          console.log('Extracted JSON content:', jsonContent)
+          const jsonData = JSON.parse(jsonContent)
+          matchedCategories = jsonData.matched_categories.map((mc: MatchedCategory) => categoryMapping[mc.category]).filter(Boolean)
+          isChild = jsonData.is_child
+        } else {
+          // Markdownでない場合は直接パース
+          const jsonData = JSON.parse(symptomAssessmentData.answer)
+          matchedCategories = jsonData.matched_categories.map((mc: MatchedCategory) => categoryMapping[mc.category]).filter(Boolean)
+          isChild = jsonData.is_child
+        }
+        console.log('Parsed data:', { matchedCategories, isChild })
+      } catch (error) {
+        console.error('症状判定結果の解析に失敗しました:', error)
       }
 
-      // 質問票画面に遷移
-      const encodedData = encodeURIComponent(JSON.stringify(questions))
-      router.push(`/questionnaire?interview_id=${interview_id}&data=${encodedData}`)
+      // 問診データを作成
+      const res = await fetch('/api/interviews', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          symptom_text: symptomText,
+          matched_categories: matchedCategories,
+          is_child: isChild
+        }),
+      })
+
+      if (!res.ok) {
+        const errorData = await res.json()
+        console.error('Interview creation failed:', errorData)
+        throw new Error(errorData.details || errorData.error || '問診の開始に失敗しました')
+      }
+
+      const { interview_id } = await res.json()
+
+      // 症状カテゴリーが一致した場合は重症度判定画面へ遷移
+      if (matchedCategories && matchedCategories.length > 0) {
+        router.push(`/urgency-assessment?interview_id=${interview_id}&category_id=${matchedCategories[0]}`)
+      } else {
+        router.push(`/medical?interview_id=${interview_id}`)
+      }
 
     } catch (error) {
       console.error('Error in handleStartConsultation:', error)

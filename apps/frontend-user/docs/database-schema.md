@@ -92,39 +92,59 @@
 問診情報を管理するテーブル
 
 | カラム名 | データ型 | NULL許可 | デフォルト値 | 説明 |
-|---------|----------|----------|--------------|------|
-| id | uuid | NO | gen_random_uuid() | 主キー |
-| user_id | uuid | YES | NULL | ユーザーID |
-| guest_user_id | uuid | YES | NULL | ゲストユーザーID |
-| symptom_text | text | YES | NULL | 症状テキスト |
-| questions | jsonb | YES | NULL | 質問情報 |
-| answers | jsonb | YES | NULL | 回答情報 |
-| status | text | YES | 'pending' | 問診ステータス |
-| ai_response_text | text | YES | NULL | AI回答テキスト |
+|---------|----------|-----------|--------------|------|
+| id | uuid | NO | gen_random_uuid() | 問診ID |
+| user_id | uuid | YES | - | ユーザーID |
+| guest_user_id | uuid | YES | - | ゲストユーザーID |
+| symptom_text | text | YES | - | 症状テキスト |
+| questions | jsonb | YES | - | 質問情報 |
+| answers | jsonb | YES | - | 回答情報 |
+| ai_response_text | text | YES | - | AI回答テキスト |
+| status | text | YES | 'pending' | ステータス |
+| matched_categories | jsonb | YES | '[]' | マッチしたカテゴリ |
+| is_child | boolean | YES | false | 小児フラグ |
 | created_at | timestamp with time zone | YES | now() | 作成日時 |
 | updated_at | timestamp with time zone | YES | now() | 更新日時 |
-| question_1 | text | YES | NULL | 質問1 |
-| question_2 | text | YES | NULL | 質問2 |
-| question_3 | text | YES | NULL | 質問3 |
-| question_4 | text | YES | NULL | 質問4 |
-| question_5 | text | YES | NULL | 質問5 |
-| question_6 | text | YES | NULL | 質問6 |
-| question_7 | text | YES | NULL | 質問7 |
-| question_8 | text | YES | NULL | 質問8 |
-| question_9 | text | YES | NULL | 質問9 |
-| question_10 | text | YES | NULL | 質問10 |
-| answer_1 | text | YES | NULL | 回答1 |
-| answer_2 | text | YES | NULL | 回答2 |
-| answer_3 | text | YES | NULL | 回答3 |
-| answer_4 | text | YES | NULL | 回答4 |
-| answer_5 | text | YES | NULL | 回答5 |
-| answer_6 | text | YES | NULL | 回答6 |
-| answer_7 | text | YES | NULL | 回答7 |
-| answer_8 | text | YES | NULL | 回答8 |
-| answer_9 | text | YES | NULL | 回答9 |
-| answer_10 | text | YES | NULL | 回答10 |
-| conversation_id | text | YES | NULL | 会話ID |
-| last_response_at | timestamp with time zone | YES | NULL | 最終応答日時 |
+
+### urgency_assessments
+緊急度評価を管理するテーブル
+
+| カラム名 | データ型 | NULL許可 | デフォルト値 | 説明 |
+|---------|----------|-----------|--------------|------|
+| id | integer | NO | nextval | 評価ID |
+| interview_id | uuid | YES | - | 問診ID |
+| category_id | integer | YES | - | カテゴリID |
+| matched_question_ids | ARRAY | YES | - | マッチした質問ID |
+| urgency_level | varchar | NO | - | 緊急度レベル |
+| recommended_departments | ARRAY | YES | - | 推奨診療科 |
+| created_at | timestamp with time zone | YES | CURRENT_TIMESTAMP | 作成日時 |
+
+### symptom_categories
+症状カテゴリを管理するテーブル
+
+| カラム名 | データ型 | NULL許可 | デフォルト値 | 説明 |
+|---------|----------|-----------|--------------|------|
+| id | integer | NO | nextval | カテゴリID |
+| category_code | varchar | NO | - | カテゴリコード |
+| name | text | NO | - | カテゴリ名 |
+| description | text | YES | - | 説明 |
+| created_at | timestamp with time zone | YES | CURRENT_TIMESTAMP | 作成日時 |
+| updated_at | timestamp with time zone | YES | CURRENT_TIMESTAMP | 更新日時 |
+
+### urgency_questions
+緊急度質問を管理するテーブル
+
+| カラム名 | データ型 | NULL許可 | デフォルト値 | 説明 |
+|---------|----------|-----------|--------------|------|
+| id | integer | NO | nextval | 質問ID |
+| category_id | integer | YES | - | カテゴリID |
+| question_text | text | NO | - | 質問テキスト |
+| urgency_level | varchar | NO | - | 緊急度レベル |
+| recommended_departments | ARRAY | YES | - | 推奨診療科 |
+| display_order | integer | NO | - | 表示順序 |
+| is_escalator | boolean | YES | false | エスカレーターフラグ |
+| created_at | timestamp with time zone | YES | CURRENT_TIMESTAMP | 作成日時 |
+| updated_at | timestamp with time zone | YES | CURRENT_TIMESTAMP | 更新日時 |
 
 ### interview_conversations
 問診の会話履歴を管理するテーブル
@@ -146,4 +166,48 @@
 | id | uuid | NO | uuid_generate_v4() | 主キー |
 | interview_id | uuid | YES | NULL | 問診ID |
 | recommended_products | jsonb | YES | NULL | レコメンド商品情報 |
-| created_at | timestamp with time zone | YES | CURRENT_TIMESTAMP | 作成日時 | 
+| created_at | timestamp with time zone | YES | CURRENT_TIMESTAMP | 作成日時 |
+
+## 医療機関関連テーブル
+
+### facilities（医療機関情報）
+| カラム名 | データ型 | NULL許可 | デフォルト値 | 説明 |
+|---------|----------|-----------|--------------|------|
+| id | text | NO | - | 医療機関ID |
+| official_name | text | NO | - | 医療機関名 |
+| address | text | YES | - | 住所 |
+| latitude | numeric | YES | - | 緯度 |
+| longitude | numeric | YES | - | 経度 |
+| homepage | text | YES | - | ホームページURL |
+| prefecture_code | text | YES | - | 都道府県コード |
+| city_code | text | YES | - | 市区町村コード |
+| is_open_mon | boolean | YES | - | 月曜日営業フラグ |
+| is_open_tue | boolean | YES | - | 火曜日営業フラグ |
+| is_open_wed | boolean | YES | - | 水曜日営業フラグ |
+| is_open_thu | boolean | YES | - | 木曜日営業フラグ |
+| is_open_fri | boolean | YES | - | 金曜日営業フラグ |
+| is_open_sat | boolean | YES | - | 土曜日営業フラグ |
+| is_open_sun | boolean | YES | - | 日曜日営業フラグ |
+
+### departments（診療科情報）
+| カラム名 | データ型 | NULL許可 | デフォルト値 | 説明 |
+|---------|----------|-----------|--------------|------|
+| department_id | integer | NO | nextval | 診療科ID |
+| facility_id | text | NO | - | 医療機関ID |
+| department_code | text | YES | - | 診療科コード |
+| department_name | text | NO | - | 診療科名 |
+| time_slot | integer | YES | - | 診療時間枠 |
+| mon_start | time | YES | - | 月曜日開始時間 |
+| mon_end | time | YES | - | 月曜日終了時間 |
+| tue_start | time | YES | - | 火曜日開始時間 |
+| tue_end | time | YES | - | 火曜日終了時間 |
+| wed_start | time | YES | - | 水曜日開始時間 |
+| wed_end | time | YES | - | 水曜日終了時間 |
+| thu_start | time | YES | - | 木曜日開始時間 |
+| thu_end | time | YES | - | 木曜日終了時間 |
+| fri_start | time | YES | - | 金曜日開始時間 |
+| fri_end | time | YES | - | 金曜日終了時間 |
+| sat_start | time | YES | - | 土曜日開始時間 |
+| sat_end | time | YES | - | 土曜日終了時間 |
+| sun_start | time | YES | - | 日曜日開始時間 |
+| sun_end | time | YES | - | 日曜日終了時間 | 

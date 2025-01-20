@@ -10,13 +10,13 @@ import Link from 'next/link'
 import { getSupabaseClient } from "@/lib/supabase"
 import { Input } from "@/components/ui/input"
 
-interface TriageResponse {
-  triageResult: 'self_care' | 'medical_consultation'
-  reason: string
-  recommendedSpecialty: string
+interface UrgencyAssessment {
+  urgency_level: 'red' | 'yellow' | 'green'
+  recommended_departments: string[]
 }
 
 interface FacilityInfo {
+  id: string
   official_name: string
   address: string
   latitude: number
@@ -38,6 +38,7 @@ interface FacilityInfo {
 // 診療科名のマッピング
 const DEPARTMENT_MAPPING: { [key: string]: string } = {
   '内科': '1001',
+  '救急科': '1031',  // 救急科のコードを追加
   '精神科': '1002',
   '神経科': '1003',
   '神経内科': '1004',
@@ -83,8 +84,8 @@ const normalizeDepartmentName = (name: string): string => {
 
 // 診療科名から診療科コードを取得する関数
 const getDepartmentCodes = (specialtyString: string): string[] => {
-  // カンマまたは、で区切られた診療科名を配列に分割
-  const specialties = specialtyString.split(/[,、]/).map(s => s.trim())
+  // カンマ、スラッシュ、中黒、または・で区切られた診療科名を配列に分割
+  const specialties = specialtyString.split(/[,、・/／]/).map(s => s.trim())
   
   // 各診療科名を正規化してコードを取得
   const codes = specialties
@@ -94,12 +95,12 @@ const getDepartmentCodes = (specialtyString: string): string[] => {
     })
     .filter((code): code is string => code !== undefined) // undefinedを除外
 
-  return codes
+  return Array.from(new Set(codes)) // 重複を除去
 }
 
 export default function MedicalPage() {
   const searchParams = useSearchParams()
-  const [triageResponse, setTriageResponse] = useState<TriageResponse | null>(null)
+  const [assessment, setAssessment] = useState<UrgencyAssessment | null>(null)
   const [facilities, setFacilities] = useState<FacilityInfo[]>([])
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -107,20 +108,35 @@ export default function MedicalPage() {
   const [hasSearched, setHasSearched] = useState(false)
 
   useEffect(() => {
-    try {
-      const triageParam = searchParams.get('triage')
-      if (!triageParam) {
-        setError('トリアージ結果が見つかりません')
-        return
-      }
+    const fetchAssessment = async () => {
+      try {
+        const interviewId = searchParams.get('interview_id')
+        const urgencyLevel = searchParams.get('urgency_level')
+        
+        if (!interviewId || !urgencyLevel) {
+          setError('必要な情報が不足しています')
+          return
+        }
 
-      const decodedTriage = JSON.parse(decodeURIComponent(triageParam)) as TriageResponse
-      console.log('推奨診療科:', decodedTriage.recommendedSpecialty)
-      setTriageResponse(decodedTriage)
-    } catch (err) {
-      console.error('Error parsing triage response:', err)
-      setError('トリアージ結果の読み込みに失敗しました')
+        const supabase = getSupabaseClient()
+        const { data, error } = await supabase
+          .from('urgency_assessments')
+          .select('urgency_level, recommended_departments')
+          .eq('interview_id', interviewId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single()
+
+        if (error) throw error
+
+        setAssessment(data)
+      } catch (err) {
+        console.error('Error fetching assessment:', err)
+        setError('評価結果の読み込みに失敗しました')
+      }
     }
+
+    fetchAssessment()
   }, [searchParams])
 
   const handlePostalCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -136,7 +152,7 @@ export default function MedicalPage() {
       return
     }
 
-    if (!triageResponse?.recommendedSpecialty) {
+    if (!assessment?.recommended_departments) {
       setError('診療科情報が見つかりません')
       return
     }
@@ -147,12 +163,12 @@ export default function MedicalPage() {
 
     try {
       // 診療科コードを取得
-      const departmentCodes = getDepartmentCodes(triageResponse.recommendedSpecialty)
+      const departmentCodes = getDepartmentCodes(assessment.recommended_departments.join(','))
       console.log('診療科コード:', departmentCodes)
       
       if (departmentCodes.length === 0) {
-        console.error('マッピングされていない診療科名:', triageResponse.recommendedSpecialty)
-        setError(`指定された診療科「${triageResponse.recommendedSpecialty}」の情報が見つかりません`)
+        console.error('マッピングされていない診療科名:', assessment.recommended_departments.join(','))
+        setError(`指定された診療科「${assessment.recommended_departments.join(', ')}」の情報が見つかりません`)
         setIsLoading(false)
         return
       }
@@ -190,133 +206,114 @@ export default function MedicalPage() {
       const [longitude, latitude] = geocodeData[0].geometry.coordinates
       console.log('郵便番号の位置情報:', { latitude, longitude, address: `${addressInfo.address1}${addressInfo.address2}${addressInfo.address3}` })
 
-      // まず診療科を持つ施設IDを取得
-      const { data: departmentData, error: departmentError } = await supabase
-        .from('departments')
-        .select('facility_id, department_code')
-        .in('department_code', departmentCodes)
+      let foundFacilities: FacilityInfo[] = []
+      let offset = 0
+      const batchSize = 500 // より多くの施設を一度に取得
 
-      if (departmentError) {
-        console.error('Department error:', departmentError)
-        throw departmentError
-      }
-
-      if (!departmentData || departmentData.length === 0) {
-        console.log('診療科に対応する施設が見つかりません')
-        setFacilities([])
-        return
-      }
-
-      console.log('取得した施設ID:', departmentData)
-
-      // 取得した施設IDを使用して施設情報を取得（末尾のスペースを保持）
-      const facilityIds = [...new Set(departmentData.map(d => d.facility_id))]
-      console.log('整形後の施設ID（重複除去済み）:', facilityIds)
-      
-      // 都道府県コードから先頭の0を削除し、数値に変換して文字列に戻す
-      const prefCodeNumber = parseInt(prefCode)
-      const prefCodeString = prefCodeNumber.toString()
-      console.log('データベース形式の都道府県コード:', prefCodeString)
-      
-      // 都道府県コードで検索（TEXT型として扱う）
-      const { data: facilityData, error: facilityError } = await supabase
-        .from('facilities')
-        .select(`
-          id,
-          official_name,
-          address,
-          latitude,
-          longitude,
-          homepage,
-          prefecture_code,
-          city_code,
-          is_open_mon,
-          is_open_tue,
-          is_open_wed,
-          is_open_thu,
-          is_open_fri,
-          is_open_sat,
-          is_open_sun
-        `)
-        .in('id', facilityIds)
-        .eq('prefecture_code', prefCodeString)
-
-      if (facilityError) {
-        console.error('Facility error:', facilityError)
-        throw facilityError
-      }
-
-      if (!facilityData || facilityData.length === 0) {
-        console.log('都道府県内で施設が見つかりません')
-        setFacilities([])
-        return
-      }
-
-      // 診療科情報を取得
-      const { data: departmentsData, error: deptError } = await supabase
-        .from('departments')
-        .select('*')
-        .in('facility_id', facilityData.map(f => f.id))
-        .in('department_code', departmentCodes)
-
-      if (deptError) {
-        console.error('Departments error:', deptError)
-        throw deptError
-      }
-
-      // 施設情報と診療科情報を結合
-      const combinedData = facilityData.map(facility => {
-        const facilityDepartments = departmentsData?.filter(
-          dept => dept.facility_id.trim() === facility.id.trim()
-        ) || []
-        
-        if (facilityDepartments.length === 0) return null
-
-        return {
-          official_name: facility.official_name,
-          address: facility.address,
-          latitude: facility.latitude,
-          longitude: facility.longitude,
-          homepage: facility.homepage,
-          department_name: facilityDepartments[0].department_name,
-          department_code: facilityDepartments[0].department_code,
-          is_open_mon: facility.is_open_mon,
-          is_open_tue: facility.is_open_tue,
-          is_open_wed: facility.is_open_wed,
-          is_open_thu: facility.is_open_thu,
-          is_open_fri: facility.is_open_fri,
-          is_open_sat: facility.is_open_sat,
-          is_open_sun: facility.is_open_sun,
-          prefecture_code: facility.prefecture_code,
-          city_code: facility.city_code
-        }
-      }).filter((data): data is FacilityInfo => data !== null)
-
-      // 郵便番号の代表点からの距離でソート
-      const sortedData = combinedData
-        .map(facility => {
-          const distance = calculateDistance(
+      // 5件の該当施設が見つかるまで繰り返し
+      while (foundFacilities.length < 5) {
+        // 施設を取得（都道府県での絞り込みを外す）
+        const { data: facilityData, error: facilityError } = await supabase
+          .from('facilities')
+          .select(`
+            id,
+            official_name,
+            address,
             latitude,
             longitude,
-            facility.latitude,
-            facility.longitude
+            homepage,
+            prefecture_code,
+            city_code,
+            is_open_mon,
+            is_open_tue,
+            is_open_wed,
+            is_open_thu,
+            is_open_fri,
+            is_open_sat,
+            is_open_sun
+          `)
+          .range(offset, offset + batchSize - 1)
+
+        if (facilityError) {
+          console.error('Facility error:', facilityError)
+          throw facilityError
+        }
+
+        if (!facilityData || facilityData.length === 0) {
+          break
+        }
+
+        // 距離を計算してソート
+        const facilitiesWithDistance = facilityData
+          .filter(facility => 
+            facility.latitude && 
+            facility.longitude && 
+            !isNaN(parseFloat(facility.latitude)) && 
+            !isNaN(parseFloat(facility.longitude))
           )
-          console.log(`施設: ${facility.official_name}, 距離: ${distance.toFixed(2)}km, 緯度経度: [${facility.latitude}, ${facility.longitude}]`)
-          return {
+          .map(facility => ({
             ...facility,
-            distance
-          }
-        })
-        .sort((a, b) => a.distance - b.distance)
-        .slice(0, 5)
+            distance: calculateDistance(
+              latitude,
+              longitude,
+              parseFloat(facility.latitude),
+              parseFloat(facility.longitude)
+            )
+          }))
+          .sort((a, b) => a.distance - b.distance)
+          .slice(0, 100) // 近い100件に絞る
 
-      console.log('検索基準点:', {
-        latitude,
-        longitude,
-        address: `${addressInfo.address1}${addressInfo.address2}${addressInfo.address3}`
-      })
+        // デバッグ用のログ出力
+        console.log('距離計算結果:', facilitiesWithDistance.map(f => ({
+          name: f.official_name,
+          address: f.address,
+          distance: f.distance.toFixed(2) + 'km'
+        })))
 
-      setFacilities(sortedData)
+        // 近い順に並んだ施設の診療科を確認
+        const facilityIds = facilitiesWithDistance.map(f => f.id)
+        const { data: departmentData, error: departmentError } = await supabase
+          .from('departments')
+          .select('facility_id, department_code, department_name')
+          .in('facility_id', facilityIds)
+          .or(departmentCodes.map(code => `department_code.eq.${code}`).join(','))
+
+        if (departmentError) {
+          console.error('Department error:', departmentError)
+          throw departmentError
+        }
+
+        // 施設情報と診療科情報を結合
+        const validFacilities = facilitiesWithDistance
+          .map(facility => {
+            const facilityDepartments = departmentData?.filter(
+              dept => dept.facility_id === facility.id
+            ) || []
+            
+            if (facilityDepartments.length === 0) return null
+
+            return {
+              ...facility,
+              department_name: facilityDepartments.map(d => d.department_name).join('、'),
+              department_code: facilityDepartments.map(d => d.department_code).join(','),
+            }
+          })
+          .filter((data): data is (FacilityInfo & { distance: number }) => data !== null)
+
+        // 見つかった施設を追加
+        foundFacilities = [...foundFacilities, ...validFacilities]
+
+        // 次のバッチのために offset を更新
+        offset += batchSize
+
+        // 2000件まで検索しても見つからない場合は終了
+        if (offset >= 2000) {
+          break
+        }
+      }
+
+      // 最終的に近い順5件を設定
+      setFacilities(foundFacilities.slice(0, 5))
     } catch (err) {
       console.error('Error fetching facilities:', err)
       setError(
@@ -329,17 +326,34 @@ export default function MedicalPage() {
     }
   }
 
-  // ヒュベニの公式を使用して2点間の距離を計算（より正確な距離計算）
+  // ヒュベニの公式を使用して2点間の距離を計算
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
-    const R = 6371 // 地球の半径（km）
-    const dLat = (lat2 - lat1) * Math.PI / 180
-    const dLon = (lon2 - lon1) * Math.PI / 180
-    const a = 
-      Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-      Math.sin(dLon/2) * Math.sin(dLon/2)
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
-    return R * c // 距離（km）
+    // 緯度経度をラジアンに変換
+    const radLat1 = lat1 * Math.PI / 180
+    const radLon1 = lon1 * Math.PI / 180
+    const radLat2 = lat2 * Math.PI / 180
+    const radLon2 = lon2 * Math.PI / 180
+
+    // 緯度差、経度差
+    const latDiff = radLat2 - radLat1
+    const lonDiff = radLon2 - radLon1
+
+    // 平均緯度
+    const latAvg = (radLat1 + radLat2) / 2.0
+
+    // 測地系による値の違い
+    const e2 = 0.00669437999019758  // WGS84の第一離心率の二乗
+    const w = Math.sqrt(1 - e2 * Math.pow(Math.sin(latAvg), 2))
+    const m = 6334834 / Math.pow(w, 3)  // 子午線曲率半径
+    const n = 6377397 / w                // 卯酉線曲率半径
+
+    // 距離計算
+    const distance = Math.sqrt(
+      Math.pow(m * latDiff, 2) +
+      Math.pow(n * lonDiff * Math.cos(latAvg), 2)
+    ) / 1000  // メートルからキロメートルに変換
+
+    return distance
   }
 
   const formatTime = (time: string | null) => {
@@ -378,6 +392,55 @@ export default function MedicalPage() {
     )
   }
 
+  const renderUrgencyMessage = () => {
+    if (!assessment) return null
+
+    switch (assessment.urgency_level) {
+      case 'red':
+        return (
+          <Card className="bg-red-50 border-red-200 mb-6">
+            <CardContent className="pt-6">
+              <div className="flex items-center space-x-2 text-red-600 mb-2">
+                <AlertCircle className="h-5 w-5" />
+                <h2 className="font-semibold">緊急性の高い症状があります</h2>
+              </div>
+              <p className="text-red-700">
+                直ちに救急車を呼ぶことをお勧めします。救急車を呼ぶ場合は119番に電話してください。
+              </p>
+            </CardContent>
+          </Card>
+        )
+      case 'yellow':
+        return (
+          <Card className="bg-yellow-50 border-yellow-200 mb-6">
+            <CardContent className="pt-6">
+              <div className="flex items-center space-x-2 text-yellow-600 mb-2">
+                <AlertCircle className="h-5 w-5" />
+                <h2 className="font-semibold">早めの受診をお勧めします</h2>
+              </div>
+              <p className="text-yellow-700">
+                できるだけ早く（本日中に）医療機関を受診することをお勧めします。
+              </p>
+            </CardContent>
+          </Card>
+        )
+      case 'green':
+        return (
+          <Card className="bg-green-50 border-green-200 mb-6">
+            <CardContent className="pt-6">
+              <div className="flex items-center space-x-2 text-green-600 mb-2">
+                <AlertCircle className="h-5 w-5" />
+                <h2 className="font-semibold">受診をお勧めします</h2>
+              </div>
+              <p className="text-green-700">
+                体調に応じて医療機関の受診を検討してください。
+              </p>
+            </CardContent>
+          </Card>
+        )
+    }
+  }
+
   if (error) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -393,186 +456,118 @@ export default function MedicalPage() {
     )
   }
 
-  if (!triageResponse) {
+  if (!assessment) {
     return null
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl">
-      <Card className="mb-8 border-l-4 border-l-primary shadow-md">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-2xl font-bold text-primary">
-            医療機関への受診をお勧めします
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-6">
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <h3 className="font-semibold text-lg mb-3 text-gray-800">判断理由</h3>
-              <p className="text-gray-700 leading-relaxed">{triageResponse.reason}</p>
-            </div>
-            
-            {triageResponse.recommendedSpecialty && (
-              <div className="bg-primary/5 p-4 rounded-lg">
-                <h3 className="font-semibold text-lg mb-3 text-gray-800">推奨される診療科</h3>
-                <p className="text-primary font-medium text-lg">{triageResponse.recommendedSpecialty}</p>
-              </div>
-            )}
+    <div className="min-h-screen bg-gray-50">
+      <div className="container mx-auto px-4 py-12 max-w-2xl">
+        {renderUrgencyMessage()}
 
-            <div className="bg-yellow-50 p-4 rounded-lg">
-              <h3 className="font-semibold text-lg mb-3 text-gray-800">注意事項</h3>
-              <ul className="list-none space-y-3 text-gray-700">
-                <li className="flex items-start gap-2">
-                  <span className="text-yellow-500 font-bold">•</span>
-                  <span>この判断は参考情報です。実際の受診については、ご自身でご判断ください。</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-yellow-500 font-bold">•</span>
-                  <span>症状が重い場合や急を要する場合は、すぐに救急医療機関を受診してください。</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-yellow-500 font-bold">•</span>
-                  <span>かかりつけ医がいる場合は、まずはかかりつけ医に相談することをお勧めします。</span>
-                </li>
+        {assessment?.recommended_departments && assessment.recommended_departments.length > 0 && (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>推奨される診療科</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ul className="list-disc pl-5 space-y-1">
+                {assessment.recommended_departments.map((dept, index) => (
+                  <li key={index} className="text-gray-700">{dept}</li>
+                ))}
               </ul>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+        )}
 
-      {/* 郵便番号入力フォーム */}
-      <Card className="mb-8 shadow-md">
-        <CardContent className="p-6">
-          <h3 className="text-xl font-bold text-primary mb-6">
-            お近くの医療機関を探す
-          </h3>
-          <div className="flex gap-4">
-            <div className="flex-1">
-              <Input
-                type="text"
-                placeholder="郵便番号を入力（例：1234567）"
-                value={postalCode}
-                onChange={handlePostalCodeChange}
-                maxLength={7}
-                className="text-lg h-12"
-              />
-            </div>
-            <Button
-              onClick={handleSearch}
-              disabled={isLoading || postalCode.length !== 7}
-              className="min-w-[120px] h-12 text-lg text-white"
-            >
-              {isLoading ? (
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-              ) : (
-                <>
-                  <Search className="w-5 h-5 mr-2" />
-                  検索
-                </>
-              )}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* 医療機関リスト */}
-      {hasSearched && (
-        <div className="space-y-6">
-          <h2 className="text-2xl font-bold text-primary mb-6">
-            検索結果
-          </h2>
-          
-          {isLoading ? (
-            <Card>
-              <CardContent className="p-8">
-                <div className="flex items-center justify-center">
-                  <div className="animate-spin rounded-full h-10 w-10 border-4 border-primary border-t-transparent"></div>
-                </div>
-              </CardContent>
-            </Card>
-          ) : facilities.length === 0 ? (
-            <Card>
-              <CardContent className="p-8">
-                <p className="text-center text-gray-500 text-lg">
-                  条件に合う医療機関が見つかりませんでした。
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            facilities.map((facility, index) => (
-              <Card key={index} className="hover:shadow-lg transition-shadow duration-300 border-l-4 border-l-gray-200">
-                <CardContent className="p-6">
-                  <h3 className="text-xl font-bold text-primary mb-6">
-                    {facility.official_name}
-                  </h3>
-                  
-                  <div className="space-y-6">
-                    <div className="flex items-start gap-3 bg-gray-50 p-4 rounded-lg">
-                      <div className="w-6 flex-shrink-0">
-                        <MapPin className="w-6 h-6 text-gray-500" />
-                      </div>
-                      <p className="text-gray-700 text-lg">{facility.address}</p>
-                    </div>
-
-                    {facility.homepage && (
-                      <div className="flex items-center gap-3 bg-gray-50 p-4 rounded-lg">
-                        <div className="w-6 flex-shrink-0">
-                          <Globe className="w-6 h-6 text-gray-500" />
-                        </div>
-                        <a
-                          href={facility.homepage}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:underline text-lg"
-                        >
-                          ホームページ
-                        </a>
-                      </div>
-                    )}
-
-                    <div className="bg-gray-50 p-4 rounded-lg">
-                      <div className="flex items-center gap-3 mb-4">
-                        <div className="w-6 flex-shrink-0">
-                          <Clock className="w-6 h-6 text-gray-500" />
-                        </div>
-                        <span className="font-semibold text-lg">診療日</span>
-                      </div>
-                      <div className="grid grid-cols-7 gap-2">
-                        {['月', '火', '水', '木', '金', '土', '日'].map((day, index) => {
-                          const isOpen = [
-                            facility.is_open_mon,
-                            facility.is_open_tue,
-                            facility.is_open_wed,
-                            facility.is_open_thu,
-                            facility.is_open_fri,
-                            facility.is_open_sat,
-                            facility.is_open_sun,
-                          ][index]
-                          return (
-                            <div key={day} className={`text-center p-2 rounded ${isOpen ? 'bg-primary/10' : 'bg-gray-200'}`}>
-                              <div className="font-semibold text-gray-700">{day}</div>
-                              <div className={`text-lg ${isOpen ? 'text-primary font-medium' : 'text-gray-500'}`}>
-                                {isOpen ? '〇' : '休'}
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </div>
+        {assessment?.urgency_level !== 'red' && (
+          <Card>
+            <CardHeader>
+              <CardTitle>医療機関を探す</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="postal-code" className="block text-sm font-medium text-gray-700 mb-1">
+                    郵便番号
+                  </label>
+                  <div className="flex space-x-2">
+                    <Input
+                      id="postal-code"
+                      type="text"
+                      placeholder="1234567"
+                      value={postalCode}
+                      onChange={handlePostalCodeChange}
+                      maxLength={7}
+                      className="flex-1"
+                    />
+                    <Button
+                      onClick={handleSearch}
+                      disabled={isLoading || postalCode.length !== 7}
+                    >
+                      {isLoading ? '検索中...' : '検索'}
+                    </Button>
                   </div>
-                </CardContent>
-              </Card>
-            ))
-          )}
-        </div>
-      )}
+                  {error && (
+                    <p className="mt-2 text-sm text-red-600">{error}</p>
+                  )}
+                </div>
 
-      <div className="flex justify-center gap-4 mt-12">
-        <Link href="/">
-          <Button variant="outline" className="text-lg px-8 py-6">
-            トップページへ戻る
-          </Button>
-        </Link>
+                {hasSearched && facilities.length === 0 && !isLoading && !error && (
+                  <p className="text-gray-500">
+                    お近くの対応医療機関が見つかりませんでした。
+                  </p>
+                )}
+
+                {facilities.length > 0 && (
+                  <div className="space-y-4">
+                    {facilities.map((facility, index) => (
+                      <Card key={index}>
+                        <CardContent className="pt-6">
+                          <h3 className="font-semibold text-lg mb-2">{facility.official_name}</h3>
+                          <div className="space-y-2 text-sm text-gray-600">
+                            <div className="flex items-center space-x-2">
+                              <MapPin className="h-4 w-4" />
+                              <span>{facility.address}</span>
+                            </div>
+                            {facility.homepage && (
+                              <div className="flex items-center space-x-2">
+                                <Globe className="h-4 w-4" />
+                                <a
+                                  href={facility.homepage}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-blue-600 hover:underline"
+                                >
+                                  ウェブサイト
+                                </a>
+                              </div>
+                            )}
+                            <div className="flex items-center space-x-2">
+                              <Clock className="h-4 w-4" />
+                              <span>
+                                診療日：
+                                {[
+                                  facility.is_open_mon && '月',
+                                  facility.is_open_tue && '火',
+                                  facility.is_open_wed && '水',
+                                  facility.is_open_thu && '木',
+                                  facility.is_open_fri && '金',
+                                  facility.is_open_sat && '土',
+                                  facility.is_open_sun && '日'
+                                ].filter(Boolean).join('・')}
+                              </span>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   )
