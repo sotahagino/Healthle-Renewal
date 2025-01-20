@@ -27,6 +27,72 @@ interface Question {
   options: Option[]
 }
 
+// トリアージAPIのレスポンス型
+interface TriageResponse {
+  triageResult: 'self_care' | 'medical_consultation'
+  reason: string
+  recommendedSpecialty: string
+}
+
+// トリアージAPIを呼び出す関数
+const callTriageAssistant = async (symptomText: string, answers: any) => {
+  try {
+    const response = await fetch('https://api.dify.ai/v1/completion-messages', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer app-jetDeVCJVsrIVd7RCVeuXNUY',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        inputs: {},
+        query: JSON.stringify({
+          symptomText,
+          answers
+        }),
+        response_mode: 'blocking',
+        user: 'user',
+      }),
+    })
+
+    if (!response.ok) {
+      throw new Error('トリアージAPIの呼び出しに失敗しました')
+    }
+
+    const data = await response.json()
+    console.log('API Response:', data) // デバッグログ
+
+    if (!data || !data.answer) {
+      throw new Error('APIレスポンスの形式が不正です')
+    }
+
+    // APIの応答から余計なテキストを削除し、JSONを抽出
+    const text = data.answer
+    console.log('Response text:', text) // デバッグログ
+
+    try {
+      // まず、```json```で囲まれた部分を探す
+      const jsonMatch = text.match(/```json\s*([\s\S]*?)\s*```/)
+      if (jsonMatch) {
+        return JSON.parse(jsonMatch[1]) as TriageResponse
+      }
+
+      // 次に、単純なJSONテキストとして解析を試みる
+      const jsonObject = JSON.parse(text) as TriageResponse
+      if (jsonObject && typeof jsonObject === 'object') {
+        return jsonObject
+      }
+
+      throw new Error('JSONの解析に失敗しました')
+    } catch (parseError) {
+      console.error('JSON parse error:', parseError)
+      throw new Error('トリアージ結果の解析に失敗しました')
+    }
+  } catch (error) {
+    console.error('Triage API error:', error)
+    throw new Error('トリアージの判定に失敗しました')
+  }
+}
+
 export default function QuestionnairePage() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -205,9 +271,19 @@ export default function QuestionnairePage() {
 
       console.log('Save response:', data)
 
-      // 結果画面へ遷移
+      // トリアージアシスタントを呼び出し
+      const triageResponse = await callTriageAssistant(symptomText, answersArray)
+      
+      // 遷移先の決定
       const encodedAnswers = encodeURIComponent(JSON.stringify(answersArray))
-      router.push(`/result?interview_id=${interview_id}&answers=${encodedAnswers}`)
+      const encodedTriageResponse = encodeURIComponent(JSON.stringify(triageResponse))
+      
+      if (triageResponse.triageResult === 'medical_consultation') {
+        router.push(`/medical?interview_id=${interview_id}&answers=${encodedAnswers}&triage=${encodedTriageResponse}`)
+      } else {
+        router.push(`/result?interview_id=${interview_id}&answers=${encodedAnswers}&triage=${encodedTriageResponse}`)
+      }
+
     } catch (error) {
       console.error('Error saving answers:', error)
       setError('回答の保存に失敗しました')
