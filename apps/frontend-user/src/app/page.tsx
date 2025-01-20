@@ -39,75 +39,104 @@ interface Question {
 // 症状カテゴリーの定義
 const SYMPTOM_CATEGORIES = [
   { 
-    id: 'sleep', 
-    name: '睡眠の悩み', 
-    example: '寝つきが悪い、夜中に目が覚める',
+    id: 'adult-respiratory', 
+    name: '呼吸器の症状（大人）', 
+    example: '息苦しさ、ゼーゼー、ぜんそく',
     options: [
-      "寝つきが悪く、眠るまでに時間がかかる",
-      "夜中に何度も目が覚めてしまう",
-      "朝早く目が覚めてしまい、十分な睡眠が取れない",
-      "睡眠薬を使用しないと眠れない",
-      "日中の眠気が強く、集中できない"
+      "息が苦しい（大人）",
+      "呼吸がゼーゼーする（大人）",
+      "ぜんそく発作（大人）"
     ]
   },
   { 
-    id: 'headache', 
-    name: '頭痛', 
-    example: '慢性的な頭痛、片頭痛',
+    id: 'adult-emergency', 
+    name: '緊急性の高い症状（大人）', 
+    example: '意識障害、けいれん、胸痛',
     options: [
-      "頭の片側が激しく痛む",
-      "頭全体がズキズキと痛む",
-      "首や肩のこりを伴う頭痛",
-      "光や音に敏感になる",
-      "吐き気を伴う頭痛がある"
+      "動悸（大人・こども）",
+      "意識がおかしい（大人）",
+      "けいれん（大人）",
+      "胸が痛い（大人）",
+      "ろれつが回らない（大人）"
     ]
   },
   { 
-    id: 'stomach', 
-    name: '胃腸の不調', 
-    example: '胃痛、消化不良',
+    id: 'adult-pain', 
+    name: '痛みの症状（大人）', 
+    example: '頭痛、腰痛、関節痛',
     options: [
-      "食後に胃が重たくなる",
-      "胃がむかむかして吐き気がする",
-      "お腹が張って痛む",
-      "食欲不振が続いている",
-      "胸焼けがよくある"
+      "頭痛（大人）",
+      "背中が痛い（大人）",
+      "腰痛（大人）",
+      "首が痛い・肩が痛い（大人）",
+      "しびれ（大人）"
     ]
   },
   { 
-    id: 'fatigue', 
-    name: '疲労・だるさ', 
-    example: '慢性的な疲れ、だるさ',
+    id: 'adult-common', 
+    name: '一般的な症状（大人）', 
+    example: '風邪、発熱、のどの痛み',
     options: [
-      "朝起きても疲れが取れない",
-      "体が重くだるい感じが続く",
-      "些細な活動でも疲れやすい",
-      "集中力が続かない",
-      "疲労感が長期間続いている"
+      "風邪をひいた（大人）",
+      "発熱（大人）",
+      "発疹（大人）",
+      "のどが痛い（大人）",
+      "めまい・ふらつき（大人）"
     ]
   },
   { 
-    id: 'stress', 
-    name: 'ストレス', 
-    example: '不安、イライラ',
+    id: 'adult-digestive', 
+    name: '消化器の症状（大人）', 
+    example: '腹痛、吐き気、便通異常',
     options: [
-      "イライラが続いて落ち着かない",
-      "不安感が強く、心配が止まらない",
-      "気分の浮き沈みが激しい",
-      "やる気が出ない",
-      "緊張が続いて休めない"
+      "腹痛（大人）",
+      "便秘（大人）",
+      "下痢（大人）",
+      "吐き気・嘔吐（大人）",
+      "吐血・下血・血便（大人）"
     ]
   },
   { 
-    id: 'other', 
-    name: 'その他の症状', 
-    example: 'その他の気になる症状',
+    id: 'common-injury', 
+    name: 'けが・やけど', 
+    example: '打撲、切り傷、やけど',
     options: [
-      "風邪のような症状がある",
-      "アレルギー症状が気になる",
-      "皮膚のトラブルがある",
-      "目の疲れや痛みがある",
-      "関節や筋肉の痛みがある"
+      "やけど（大人・こども）",
+      "頭のけが（大人）",
+      "眼のけが（大人・こども）",
+      "手足・顔面のけが（大人・こども）",
+      "胸やおなかをぶつけた・胸やおなかに刺さった（大人・こども）"
+    ]
+  },
+  { 
+    id: 'common-emergency', 
+    name: '誤飲・中毒', 
+    example: '異物誤飲、薬の過剰摂取',
+    options: [
+      "何か固形物を飲み込んだ（大人・こども）",
+      "何か液体を飲んだ（大人・こども）",
+      "薬をたくさん飲んだ・間違った薬を飲んだ（大人・こども）",
+      "熱中症（大人・こども）"
+    ]
+  },
+  { 
+    id: 'child-symptoms', 
+    name: '子供の症状', 
+    example: '発熱、けいれん、泣き止まない',
+    options: [
+      "発熱（こども）",
+      "けいれん（こども）",
+      "せき（こども）",
+      "息が苦しい（こども）",
+      "ぜんそく発作（こども）",
+      "発疹（こども）",
+      "吐き気・嘔吐（こども）",
+      "腹痛（こども）",
+      "便秘（こども）",
+      "便の色の異常（こども）",
+      "頭痛（こども）",
+      "泣き止まない（こども）",
+      "頭のけが・首のけが（こども）"
     ]
   }
 ]
@@ -122,6 +151,79 @@ const COMMON_SYMPTOMS = [
 
 // APIから返される型定義
 type MatchedCategory = { category: string; confidence: number }
+
+// 症状カテゴリーマッピング
+const categoryMapping: { [key: string]: number } = {
+  // 大人の症状
+  '息が苦しい（大人）': 1,
+  '呼吸がゼーゼーする（大人）': 2,
+  'ぜんそく発作（大人）': 3,
+  '動悸（大人・こども）': 4,
+  '意識がおかしい（大人）': 5,
+  'けいれん（大人）': 6,
+  '頭痛（大人）': 7,
+  '胸が痛い（大人）': 8,
+  '背中が痛い（大人）': 9,
+  'ろれつが回らない（大人）': 10,
+  '腰痛（大人）': 11,
+  '風邪をひいた（大人）': 12,
+  '発熱（大人）': 13,
+  '発疹（大人）': 14,
+  'のどが痛い（大人）': 15,
+  '腹痛（大人）': 16,
+  '便秘（大人）': 17,
+  '下痢（大人）': 18,
+  '吐き気・嘔吐（大人）': 19,
+  '吐血・下血・血便（大人）': 20,
+  '尿が出にくい（大人・こども）': 21,
+  '膣からの出血（大人）': 22,
+  'めまい・ふらつき（大人）': 23,
+  'しびれ（大人）': 24,
+  '首が痛い・肩が痛い（大人）': 25,
+
+  // 共通の症状（大人・こども）
+  'アレルギー（大人・こども）': 26,
+  '高血圧（大人）': 27,
+  '眼科関連（大人・こども）': 28,
+  '鼻のけが・鼻血（大人・こども）': 29,
+  '口の中や歯の問題（大人・こども）': 30,
+  '手や腕の問題（大人・こども）': 31,
+  '足（太もものつけ根から足首）の問題（大人・こども）': 32,
+  '足首から先の問題（大人・こども）': 33,
+  '咬まれた・刺された（大人・こども）': 34,
+  'やけど（大人・こども）': 35,
+  '頭のけが（大人）': 36,
+  '眼のけが（大人・こども）': 37,
+  '胸やおなかをぶつけた・胸やおなかに刺さった（大人・こども）': 38,
+  '手足・顔面のけが（大人・こども）': 39,
+  '何か固形物を飲み込んだ（大人・こども）': 40,
+  '何か液体を飲んだ（大人・こども）': 41,
+  '薬をたくさん飲んだ・間違った薬を飲んだ（大人・こども）': 42,
+  '熱中症（大人・こども）': 43,
+
+  // 子供の症状
+  '発熱（こども）': 44,
+  'けいれん（こども）': 45,
+  'せき（こども）': 46,
+  '鼻水・鼻づまり（こども）': 47,
+  'ぜんそく発作（こども）': 48,
+  '息が苦しい（こども）': 49,
+  '発疹（こども）': 50,
+  '吐き気・嘔吐（こども）': 51,
+  '下痢（こども）': 52,
+  '腹痛（こども）': 53,
+  '便秘（こども）': 54,
+  '便の色の異常（こども）': 55,
+  '耳痛・耳だれ（こども）': 56,
+  '頭痛（こども）': 57,
+  '泣き止まない（こども）': 58,
+  '頭のけが・首のけが（こども）': 59
+}
+
+interface SymptomAssessmentResponse {
+  matched_categories: MatchedCategory[]
+  is_child: boolean
+}
 
 export default function Home() {
   const router = useRouter()
@@ -177,6 +279,7 @@ export default function Home() {
 
     if (!symptomText.trim()) {
       setError("相談内容を入力してください。")
+      setLoading(false)
       scrollToSymptomInput()
       return
     }
@@ -199,73 +302,76 @@ export default function Home() {
       })
 
       if (!symptomAssessmentRes.ok) {
-        throw new Error('症状判定に失敗しました')
+        throw new Error(`症状判定APIエラー: ${symptomAssessmentRes.status}`)
       }
 
       const symptomAssessmentData = await symptomAssessmentRes.json()
       console.log('Symptom Assessment Response:', symptomAssessmentData)
 
-      // JSONデータを抽出
-      let matchedCategories = []
-      let isChild = false
+      // JSONデータを抽出して解析
+      let parsedData: SymptomAssessmentResponse | null = null
       try {
-        // カテゴリーIDのマッピング
-        const categoryMapping: { [key: string]: number } = {
-          '息が苦しい（大人）': 1,
-          '息が苦しい（子供）': 2,
-          // 他のカテゴリーも同様に追加
-        }
-        
         // Markdown形式のJSONを抽出
         const jsonMatch = symptomAssessmentData.answer.match(/```json\n([\s\S]*?)\n```/)
         if (jsonMatch) {
           const jsonContent = jsonMatch[1].trim()
           console.log('Extracted JSON content:', jsonContent)
-          const jsonData = JSON.parse(jsonContent)
-          matchedCategories = jsonData.matched_categories.map((mc: MatchedCategory) => categoryMapping[mc.category]).filter(Boolean)
-          isChild = jsonData.is_child
+          parsedData = JSON.parse(jsonContent)
         } else {
           // Markdownでない場合は直接パース
-          const jsonData = JSON.parse(symptomAssessmentData.answer)
-          matchedCategories = jsonData.matched_categories.map((mc: MatchedCategory) => categoryMapping[mc.category]).filter(Boolean)
-          isChild = jsonData.is_child
+          parsedData = JSON.parse(symptomAssessmentData.answer)
         }
-        console.log('Parsed data:', { matchedCategories, isChild })
+        console.log('Parsed assessment data:', parsedData)
       } catch (error) {
         console.error('症状判定結果の解析に失敗しました:', error)
+        throw new Error('症状判定結果の解析に失敗しました')
+      }
+
+      if (!parsedData) {
+        throw new Error('症状判定結果が不正です')
+      }
+
+      // カテゴリーIDに変換
+      const matchedCategoryIds = parsedData.matched_categories
+        .map(mc => categoryMapping[mc.category])
+        .filter(Boolean)
+
+      if (matchedCategoryIds.length === 0) {
+        console.log('マッチするカテゴリーが見つかりませんでした')
       }
 
       // 問診データを作成
-      const res = await fetch('/api/interviews', {
+      const interviewRes = await fetch('/api/interviews', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           symptom_text: symptomText,
-          matched_categories: matchedCategories,
-          is_child: isChild
+          matched_categories: matchedCategoryIds,
+          is_child: parsedData.is_child
         }),
       })
 
-      if (!res.ok) {
-        const errorData = await res.json()
-        console.error('Interview creation failed:', errorData)
-        throw new Error(errorData.details || errorData.error || '問診の開始に失敗しました')
+      if (!interviewRes.ok) {
+        throw new Error('問診データの作成に失敗しました')
       }
 
-      const { interview_id } = await res.json()
+      const interviewData = await interviewRes.json()
+      console.log('Created interview data:', interviewData)
 
-      // 症状カテゴリーが一致した場合は重症度判定画面へ遷移
-      if (matchedCategories && matchedCategories.length > 0) {
-        router.push(`/urgency-assessment?interview_id=${interview_id}&category_id=${matchedCategories[0]}`)
+      // 画面遷移
+      if (matchedCategoryIds.length > 0) {
+        // カテゴリーがマッチした場合は緊急度判定へ
+        router.push(`/urgency-assessment?interview_id=${interviewData.id}&category_id=${matchedCategoryIds[0]}`)
       } else {
-        router.push(`/medical?interview_id=${interview_id}`)
+        // カテゴリーがマッチしなかった場合は問診へ
+        router.push(`/questionnaire?interview_id=${interviewData.id}`)
       }
-
     } catch (error) {
-      console.error('Error in handleStartConsultation:', error)
-      setError(error instanceof Error ? error.message : "予期せぬエラーが発生しました")
+      console.error('エラーが発生しました:', error)
+      setError(error instanceof Error ? error.message : '予期せぬエラーが発生しました')
+      scrollToSymptomInput()
     } finally {
       setLoading(false)
     }

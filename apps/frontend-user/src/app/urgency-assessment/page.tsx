@@ -38,6 +38,37 @@ export default function UrgencyAssessment() {
   useEffect(() => {
     const fetchQuestions = async () => {
       try {
+        if (!categoryId) {
+          router.push('/')
+          return
+        }
+
+        // interview_idがない場合は新規作成
+        if (!interviewId || interviewId === 'undefined') {
+          const res = await fetch('/api/interviews', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              symptom_text: `カテゴリー${categoryId}からの緊急度判定`,
+              matched_categories: [],
+              is_child: false
+            }),
+          })
+
+          if (!res.ok) {
+            const errorData = await res.json()
+            throw new Error(errorData.error || 'インタビューの作成に失敗しました')
+          }
+
+          const data = await res.json()
+          console.log('Created new interview:', data)
+          const newUrl = `/urgency-assessment?interview_id=${data.interview_id}&category_id=${categoryId}`
+          router.replace(newUrl)
+          return
+        }
+
         const res = await fetch(`/api/urgency-questions?category_id=${categoryId}`)
         if (!res.ok) {
           throw new Error('質問の取得に失敗しました')
@@ -51,10 +82,8 @@ export default function UrgencyAssessment() {
       }
     }
 
-    if (categoryId) {
-      fetchQuestions()
-    }
-  }, [categoryId])
+    fetchQuestions()
+  }, [categoryId, interviewId, router])
 
   const questionGroups: QuestionGroup[] = [
     {
@@ -123,6 +152,21 @@ export default function UrgencyAssessment() {
   const handleSubmit = async () => {
     try {
       setLoading(true)
+      setError(null)
+
+      if (!interviewId || interviewId === 'undefined') {
+        throw new Error('セッションの有効期限が切れました。最初からやり直してください。')
+      }
+
+      if (!categoryId || categoryId === 'undefined') {
+        throw new Error('カテゴリーIDが不正です。最初からやり直してください。')
+      }
+
+      if (selectedQuestions.length === 0) {
+        setError('少なくとも1つの症状を選択してください')
+        return
+      }
+
       const urgencyLevel = determineUrgencyLevel()
       setCurrentUrgencyLevel(urgencyLevel)
 
@@ -150,14 +194,24 @@ export default function UrgencyAssessment() {
       })
 
       if (!res.ok) {
-        throw new Error('緊急度判定の保存に失敗しました')
+        const errorData = await res.json()
+        throw new Error(errorData.error || '緊急度判定の保存に失敗しました')
       }
+
+      const data = await res.json()
+      console.log('Urgency assessment saved:', data)
 
       // すべての重症度でmedical画面に遷移
       router.push(`/medical?interview_id=${interviewId}&urgency_level=${urgencyLevel}`)
 
     } catch (error) {
+      console.error('Error in handleSubmit:', error)
       setError(error instanceof Error ? error.message : '予期せぬエラーが発生しました')
+      // エラーメッセージを表示する位置までスクロール
+      const errorElement = document.getElementById('error-message')
+      if (errorElement) {
+        errorElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
     } finally {
       setLoading(false)
     }
@@ -181,6 +235,15 @@ export default function UrgencyAssessment() {
         <div className="bg-white rounded-xl shadow-sm p-8">
           <h1 className="text-2xl font-bold text-gray-900 mb-2">症状チェック</h1>
           <p className="text-gray-500 text-sm mb-8">該当する症状をすべてチェックしてください。</p>
+
+          {error && (
+            <div 
+              id="error-message"
+              className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg"
+            >
+              <p className="text-red-600 text-sm">{error}</p>
+            </div>
+          )}
 
           {/* 症状グループ */}
           {Object.entries(questionGroups).map(([urgencyLevel, group]) => (

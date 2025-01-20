@@ -1,43 +1,56 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
+import { cookies } from 'next/dist/client/components/headers'
 
 export async function POST(request: NextRequest) {
   try {
+    const supabase = createRouteHandlerClient({ cookies })
     const body = await request.json()
-    const { interview_id, category_id, matched_question_ids, urgency_level } = body
+    const { 
+      interview_id, 
+      category_id, 
+      matched_question_ids, 
+      urgency_level,
+      recommended_departments 
+    } = body
 
-    if (!interview_id || !category_id || !Array.isArray(matched_question_ids) || !urgency_level) {
+    // バリデーション
+    if (!interview_id || interview_id === 'undefined') {
       return NextResponse.json(
-        { error: '必要なパラメータが不足しています' },
+        { error: 'interview_idが不正です' },
         { status: 400 }
       )
     }
 
-    const supabase = createRouteHandlerClient({ cookies })
-
-    // 推奨診療科を取得
-    const { data: questions, error: questionsError } = await supabase
-      .from('urgency_questions')
-      .select('recommended_departments')
-      .in('id', matched_question_ids)
-      .not('recommended_departments', 'is', null)
-
-    if (questionsError) {
-      console.error('Questions fetch error:', questionsError)
+    // UUIDの形式チェック
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+    if (!uuidRegex.test(interview_id)) {
       return NextResponse.json(
-        { error: '推奨診療科の取得に失敗しました' },
-        { status: 500 }
+        { error: 'interview_idの形式が不正です' },
+        { status: 400 }
       )
     }
 
-    // 推奨診療科を配列にまとめる
-    const recommendedDepartments = Array.from(
-      new Set(
-        questions
-          .flatMap(q => q.recommended_departments || [])
+    if (!category_id) {
+      return NextResponse.json(
+        { error: 'category_idは必須です' },
+        { status: 400 }
       )
-    )
+    }
+
+    if (!Array.isArray(matched_question_ids)) {
+      return NextResponse.json(
+        { error: 'matched_question_idsは配列である必要があります' },
+        { status: 400 }
+      )
+    }
+
+    if (!urgency_level) {
+      return NextResponse.json(
+        { error: 'urgency_levelは必須です' },
+        { status: 400 }
+      )
+    }
 
     // 判定結果を保存
     const { data: assessment, error: assessmentError } = await supabase
@@ -47,7 +60,7 @@ export async function POST(request: NextRequest) {
         category_id,
         matched_question_ids,
         urgency_level,
-        recommended_departments: recommendedDepartments,
+        recommended_departments: recommended_departments || [],
         created_at: new Date().toISOString()
       })
       .select()
@@ -56,7 +69,10 @@ export async function POST(request: NextRequest) {
     if (assessmentError) {
       console.error('Assessment creation error:', assessmentError)
       return NextResponse.json(
-        { error: '緊急度判定結果の保存に失敗しました' },
+        { 
+          error: '緊急度判定結果の保存に失敗しました',
+          details: assessmentError.message 
+        },
         { status: 500 }
       )
     }
@@ -66,7 +82,10 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Error in POST /api/urgency-assessments:', error)
     return NextResponse.json(
-      { error: '予期せぬエラーが発生しました' },
+      { 
+        error: '予期せぬエラーが発生しました',
+        details: error instanceof Error ? error.message : '不明なエラー'
+      },
       { status: 500 }
     )
   }
