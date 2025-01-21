@@ -22,6 +22,7 @@ import {
 } from 'lucide-react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import Image from 'next/image'
+import { Checkbox } from "@/components/ui/checkbox"
 
 // インターフェース定義
 interface QuestionOption {
@@ -177,7 +178,7 @@ const categoryMapping: { [key: string]: number } = {
   '息が苦しい（大人）': 1,
   '呼吸がゼーゼーする（大人）': 2,
   'ぜんそく発作（大人）': 3,
-  '動悸（大人・こども）': 4,
+  '動悸（大人）': 4,
   '意識がおかしい（大人）': 5,
   'けいれん（大人）': 6,
   '頭痛（大人）': 7,
@@ -192,7 +193,7 @@ const categoryMapping: { [key: string]: number } = {
   '腹痛（大人）': 16,
   '便秘（大人）': 17,
   '下痢（大人）': 18,
-  '吐き気・嘔吐（大人）': 19,
+  '吐き気・吐いた（大人）': 19,
   '吐血・下血・血便（大人）': 20,
   '尿が出にくい（大人・こども）': 21,
   '膣からの出血（大人）': 22,
@@ -228,7 +229,7 @@ const categoryMapping: { [key: string]: number } = {
   'ぜんそく発作（こども）': 48,
   '息が苦しい（こども）': 49,
   '発疹（こども）': 50,
-  '吐き気・嘔吐（こども）': 51,
+  '吐き気・吐いた（こども）': 51,
   '下痢（こども）': 52,
   '腹痛（こども）': 53,
   '便秘（こども）': 54,
@@ -256,6 +257,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null)
   const [showFloatingCTA, setShowFloatingCTA] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState<typeof SYMPTOM_CATEGORIES[0] | null>(null)
+  const [isOver16, setIsOver16] = useState(true)
   const supabase = createClientComponentClient()
   const [showEmergencyCheck, setShowEmergencyCheck] = useState(false)
   const [isEmergencyCase, setIsEmergencyCase] = useState(false)
@@ -333,7 +335,7 @@ export default function Home() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          symptom_text: symptomText,
+          symptom_text: `${symptomText}（対象者は${isOver16 ? '16歳以上' : '16歳未満'}）`,
           is_emergency: hasEmergencySymptoms,
         }),
       })
@@ -357,7 +359,8 @@ export default function Home() {
           },
           body: JSON.stringify({
             inputs: {
-              symptom: symptomText
+              symptom: `${!isOver16 ? '【16歳未満の相談】' : ''}${symptomText}`,
+              is_child: !isOver16
             },
             response_mode: "blocking",
             user: "anonymous"
@@ -412,7 +415,7 @@ export default function Home() {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            symptom_text: symptomText,
+            symptom_text: `${symptomText}（対象者は${isOver16 ? '16歳以上' : '16歳未満'}）`,
             matched_categories: matchedCategoryIds,
             is_child: parsedData.is_child
           }),
@@ -693,6 +696,22 @@ export default function Home() {
                   value={symptomText}
                   onChange={(e) => setSymptomText(e.target.value)}
                 />
+
+                {/* 年齢確認チェックボックス */}
+                <div className="flex items-center space-x-2 mb-4">
+                  <Checkbox
+                    id="age-check"
+                    checked={isOver16}
+                    onCheckedChange={(checked) => setIsOver16(checked as boolean)}
+                    className="data-[state=checked]:text-white"
+                  />
+                  <label
+                    htmlFor="age-check"
+                    className="text-sm text-text-secondary cursor-pointer"
+                  >
+                    相談対象者は16歳以上です
+                  </label>
+                </div>
                 
                 <p className="text-xs text-text-secondary mb-4 text-right">
                   {symptomText.length}/1000文字
