@@ -33,11 +33,22 @@ module.exports = {
           '0%, 100%': { transform: 'translateX(0)' },
           '25%': { transform: 'translateX(-5px)' },
           '75%': { transform: 'translateX(5px)' }
+        },
+        'fade-in-up': {
+          '0%': {
+            opacity: '0',
+            transform: 'translateY(2rem)'
+          },
+          '100%': {
+            opacity: '1',
+            transform: 'translateY(0)'
+          }
         }
       },
       animation: {
         'fade-in': 'fade-in 0.6s ease-out',
-        'shake': 'shake 0.5s ease-in-out'
+        'shake': 'shake 0.5s ease-in-out',
+        'fade-in-up': 'fade-in-up 0.7s ease-out forwards'
       },
       typography: {
         DEFAULT: {
