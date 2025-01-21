@@ -1,5 +1,3 @@
-'use client';
-
 import Link from 'next/link';
 import { client } from '@/lib/microcms/client';
 import { Tag } from '@/lib/microcms/types';
@@ -10,7 +8,6 @@ import { Breadcrumbs } from '@/components/media/Breadcrumbs';
 import { Tag as TagIcon } from 'lucide-react';
 
 export const revalidate = 60;
-export const dynamic = 'force-dynamic';
 
 type TagType = 'symptom' | 'cause' | 'solution';
 
