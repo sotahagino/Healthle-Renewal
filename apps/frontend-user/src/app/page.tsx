@@ -149,6 +149,19 @@ const COMMON_SYMPTOMS = [
   "頭痛が続いて集中できません",
 ]
 
+// 緊急症状のリスト
+const EMERGENCY_SYMPTOMS = [
+  '呼吸をしていない。息がない。',
+  '脈がない。心臓が止まっている。',
+  '沈んでいる。',
+  '冷たくなっている。',
+  '呼びかけても、反応がない。',
+  '（いつもどおり）普通にしゃべれない。',
+  '声が出せない。',
+  '顔色、唇、耳の色が悪い。',
+  '冷汗をかいている。'
+]
+
 // APIから返される型定義
 type MatchedCategory = { category: string; confidence: number }
 
@@ -238,6 +251,9 @@ export default function Home() {
   const [showFloatingCTA, setShowFloatingCTA] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState<typeof SYMPTOM_CATEGORIES[0] | null>(null)
   const supabase = createClientComponentClient()
+  const [showEmergencyCheck, setShowEmergencyCheck] = useState(false)
+  const [isEmergencyCase, setIsEmergencyCase] = useState(false)
+  const [isProcessing, setIsProcessing] = useState(false)
 
   // スクロールに応じてフローティングCTAを表示
   useEffect(() => {
@@ -278,6 +294,207 @@ export default function Home() {
     setSymptomText(symptom)
   }
 
+  // 緊急症状チェックの処理
+  const handleEmergencyCheck = async (hasEmergencySymptoms: boolean) => {
+    setIsEmergencyCase(hasEmergencySymptoms)
+    setShowEmergencyCheck(false)
+    setIsProcessing(true)
+
+    try {
+      // 問診データを作成
+      const interviewRes = await fetch('/api/interviews', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          symptom_text: symptomText,
+          is_emergency: hasEmergencySymptoms,
+        }),
+      })
+
+      if (!interviewRes.ok) {
+        throw new Error('問診データの作成に失敗しました')
+      }
+
+      const interviewData = await interviewRes.json()
+
+      if (hasEmergencySymptoms) {
+        // 緊急症状ありの場合は直接emergency画面へ
+        router.push('/emergency')
+      } else {
+        // 緊急症状なしの場合は通常フロー
+        const symptomAssessmentRes = await fetch('https://api.dify.ai/v1/completion-messages', {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer app-Ymt6FHFyEu2R5sQUlKydYX34',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            inputs: {
+              symptom: symptomText
+            },
+            response_mode: "blocking",
+            user: "anonymous"
+          })
+        })
+
+        if (!symptomAssessmentRes.ok) {
+          throw new Error(`症状判定APIエラー: ${symptomAssessmentRes.status}`)
+        }
+
+        const symptomAssessmentData = await symptomAssessmentRes.json()
+        console.log('Symptom Assessment Response:', symptomAssessmentData)
+
+        // JSONデータを抽出して解析
+        let parsedData: SymptomAssessmentResponse | null = null
+        try {
+          // Markdown形式のJSONを抽出
+          const jsonMatch = symptomAssessmentData.answer.match(/```json\n([\s\S]*?)\n```/)
+          if (jsonMatch) {
+            const jsonContent = jsonMatch[1].trim()
+            console.log('Extracted JSON content:', jsonContent)
+            parsedData = JSON.parse(jsonContent)
+          } else {
+            // Markdownでない場合は直接パース
+            parsedData = JSON.parse(symptomAssessmentData.answer)
+          }
+          console.log('Parsed assessment data:', parsedData)
+        } catch (error) {
+          console.error('症状判定結果の解析に失敗しました:', error)
+          throw new Error('症状判定結果の解析に失敗しました')
+        }
+
+        if (!parsedData) {
+          throw new Error('症状判定結果が不正です')
+        }
+
+        // カテゴリーIDに変換
+        const matchedCategoryIds = parsedData.matched_categories
+          .map(mc => categoryMapping[mc.category])
+          .filter(Boolean)
+
+        if (matchedCategoryIds.length === 0) {
+          console.log('マッチするカテゴリーが見つかりませんでした')
+        }
+
+        // 問診データを作成
+        const interviewRes = await fetch('/api/interviews', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            symptom_text: symptomText,
+            matched_categories: matchedCategoryIds,
+            is_child: parsedData.is_child
+          }),
+        })
+
+        if (!interviewRes.ok) {
+          throw new Error('問診データの作成に失敗しました')
+        }
+
+        const interviewData = await interviewRes.json()
+        console.log('Created interview data:', interviewData)
+
+        // カテゴリーがマッチした場合は緊急度判定へ
+        if (matchedCategoryIds.length > 0) {
+          router.push(`/urgency-assessment?interview_id=${interviewData.interview_id}&category_id=${matchedCategoryIds[0]}`)
+        } else {
+          // カテゴリーがマッチしなかった場合は問診表を生成
+          try {
+            const questionnaireRes = await fetch('https://api.dify.ai/v1/completion-messages', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${process.env.NEXT_PUBLIC_DIFY_QUESTION_API_KEY}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                inputs: {
+                  symptom: symptomText,
+                  is_child: parsedData.is_child
+                },
+                response_mode: "blocking",
+                user: "anonymous"
+              })
+            })
+
+            if (!questionnaireRes.ok) {
+              console.error('問診表生成APIエラー:', await questionnaireRes.text())
+              throw new Error('問診表の生成に失敗しました')
+            }
+
+            const questionnaireData = await questionnaireRes.json()
+            console.log('Questionnaire Response:', questionnaireData)
+
+            // 問診表データを解析
+            let parsedQuestions = null
+            try {
+              const jsonMatch = questionnaireData.answer.match(/```json\n([\s\S]*?)\n```/)
+              if (jsonMatch) {
+                const jsonContent = jsonMatch[1].trim()
+                console.log('Extracted questions JSON:', jsonContent)
+                parsedQuestions = JSON.parse(jsonContent)
+              } else {
+                parsedQuestions = JSON.parse(questionnaireData.answer)
+              }
+              console.log('Parsed questions:', parsedQuestions)
+
+              if (!parsedQuestions || !parsedQuestions.questions) {
+                throw new Error('問診表データの形式が不正です')
+              }
+            } catch (error) {
+              console.error('問診表データの解析に失敗しました:', error)
+              throw new Error('問診表データの解析に失敗しました')
+            }
+
+            // 問診表データを保存
+            const questionsArray = parsedQuestions.questions
+            const questionUpdates = {
+              question_1: questionsArray[0]?.text || null,
+              question_2: questionsArray[1]?.text || null,
+              question_3: questionsArray[2]?.text || null,
+              question_4: questionsArray[3]?.text || null,
+              question_5: questionsArray[4]?.text || null,
+              question_6: questionsArray[5]?.text || null,
+              questions: questionsArray, // 質問の詳細情報も保存
+              updated_at: new Date().toISOString()
+            }
+
+            console.log('Saving questions with interview_id:', interviewData.interview_id)
+
+            const { data: updateData, error: saveError } = await supabase
+              .from('medical_interviews')
+              .update(questionUpdates)
+              .eq('id', interviewData.interview_id)
+              .select()
+
+            if (saveError) {
+              console.error('問診表データの保存に失敗しました:', saveError)
+              throw new Error('問診表データの保存に失敗しました')
+            }
+
+            console.log('Updated interview data:', updateData)
+
+            // 問診ページへ遷移
+            router.push(`/questionnaire?interview_id=${interviewData.interview_id}`)
+          } catch (error) {
+            console.error('問診表の生成中にエラーが発生しました:', error)
+            setError(error instanceof Error ? error.message : '予期せぬエラーが発生しました')
+            scrollToSymptomInput()
+          }
+        }
+      }
+    } catch (error) {
+      console.error('エラーが発生しました:', error)
+      setError(error instanceof Error ? error.message : '予期せぬエラーが発生しました')
+      scrollToSymptomInput()
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
   const handleStartConsultation = async () => {
     setLoading(true)
     setError(null)
@@ -289,176 +506,8 @@ export default function Home() {
       return
     }
 
-    try {
-      // 症状判定APIを呼び出し
-      const symptomAssessmentRes = await fetch('https://api.dify.ai/v1/completion-messages', {
-        method: 'POST',
-        headers: {
-          'Authorization': 'Bearer app-Ymt6FHFyEu2R5sQUlKydYX34',
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          inputs: {
-            symptom: symptomText
-          },
-          response_mode: "blocking",
-          user: "anonymous"
-        })
-      })
-
-      if (!symptomAssessmentRes.ok) {
-        throw new Error(`症状判定APIエラー: ${symptomAssessmentRes.status}`)
-      }
-
-      const symptomAssessmentData = await symptomAssessmentRes.json()
-      console.log('Symptom Assessment Response:', symptomAssessmentData)
-
-      // JSONデータを抽出して解析
-      let parsedData: SymptomAssessmentResponse | null = null
-      try {
-        // Markdown形式のJSONを抽出
-        const jsonMatch = symptomAssessmentData.answer.match(/```json\n([\s\S]*?)\n```/)
-        if (jsonMatch) {
-          const jsonContent = jsonMatch[1].trim()
-          console.log('Extracted JSON content:', jsonContent)
-          parsedData = JSON.parse(jsonContent)
-        } else {
-          // Markdownでない場合は直接パース
-          parsedData = JSON.parse(symptomAssessmentData.answer)
-        }
-        console.log('Parsed assessment data:', parsedData)
-      } catch (error) {
-        console.error('症状判定結果の解析に失敗しました:', error)
-        throw new Error('症状判定結果の解析に失敗しました')
-      }
-
-      if (!parsedData) {
-        throw new Error('症状判定結果が不正です')
-      }
-
-      // カテゴリーIDに変換
-      const matchedCategoryIds = parsedData.matched_categories
-        .map(mc => categoryMapping[mc.category])
-        .filter(Boolean)
-
-      if (matchedCategoryIds.length === 0) {
-        console.log('マッチするカテゴリーが見つかりませんでした')
-      }
-
-      // 問診データを作成
-      const interviewRes = await fetch('/api/interviews', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          symptom_text: symptomText,
-          matched_categories: matchedCategoryIds,
-          is_child: parsedData.is_child
-        }),
-      })
-
-      if (!interviewRes.ok) {
-        throw new Error('問診データの作成に失敗しました')
-      }
-
-      const interviewData = await interviewRes.json()
-      console.log('Created interview data:', interviewData)
-
-      // カテゴリーがマッチした場合は緊急度判定へ
-      if (matchedCategoryIds.length > 0) {
-        router.push(`/urgency-assessment?interview_id=${interviewData.interview_id}&category_id=${matchedCategoryIds[0]}`)
-      } else {
-        // カテゴリーがマッチしなかった場合は問診表を生成
-        try {
-          const questionnaireRes = await fetch('https://api.dify.ai/v1/completion-messages', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${process.env.NEXT_PUBLIC_DIFY_QUESTION_API_KEY}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              inputs: {
-                symptom: symptomText,
-                is_child: parsedData.is_child
-              },
-              response_mode: "blocking",
-              user: "anonymous"
-            })
-          })
-
-          if (!questionnaireRes.ok) {
-            console.error('問診表生成APIエラー:', await questionnaireRes.text())
-            throw new Error('問診表の生成に失敗しました')
-          }
-
-          const questionnaireData = await questionnaireRes.json()
-          console.log('Questionnaire Response:', questionnaireData)
-
-          // 問診表データを解析
-          let parsedQuestions = null
-          try {
-            const jsonMatch = questionnaireData.answer.match(/```json\n([\s\S]*?)\n```/)
-            if (jsonMatch) {
-              const jsonContent = jsonMatch[1].trim()
-              console.log('Extracted questions JSON:', jsonContent)
-              parsedQuestions = JSON.parse(jsonContent)
-            } else {
-              parsedQuestions = JSON.parse(questionnaireData.answer)
-            }
-            console.log('Parsed questions:', parsedQuestions)
-
-            if (!parsedQuestions || !parsedQuestions.questions) {
-              throw new Error('問診表データの形式が不正です')
-            }
-          } catch (error) {
-            console.error('問診表データの解析に失敗しました:', error)
-            throw new Error('問診表データの解析に失敗しました')
-          }
-
-          // 問診表データを保存
-          const questionsArray = parsedQuestions.questions
-          const questionUpdates = {
-            question_1: questionsArray[0]?.text || null,
-            question_2: questionsArray[1]?.text || null,
-            question_3: questionsArray[2]?.text || null,
-            question_4: questionsArray[3]?.text || null,
-            question_5: questionsArray[4]?.text || null,
-            question_6: questionsArray[5]?.text || null,
-            questions: questionsArray, // 質問の詳細情報も保存
-            updated_at: new Date().toISOString()
-          }
-
-          console.log('Saving questions with interview_id:', interviewData.interview_id)
-
-          const { data: updateData, error: saveError } = await supabase
-            .from('medical_interviews')
-            .update(questionUpdates)
-            .eq('id', interviewData.interview_id)
-            .select()
-
-          if (saveError) {
-            console.error('問診表データの保存に失敗しました:', saveError)
-            throw new Error('問診表データの保存に失敗しました')
-          }
-
-          console.log('Updated interview data:', updateData)
-
-          // 問診ページへ遷移
-          router.push(`/questionnaire?interview_id=${interviewData.interview_id}`)
-        } catch (error) {
-          console.error('問診表の生成中にエラーが発生しました:', error)
-          setError(error instanceof Error ? error.message : '予期せぬエラーが発生しました')
-          scrollToSymptomInput()
-        }
-      }
-    } catch (error) {
-      console.error('エラーが発生しました:', error)
-      setError(error instanceof Error ? error.message : '予期せぬエラーが発生しました')
-      scrollToSymptomInput()
-    } finally {
-      setLoading(false)
-    }
+    setLoading(false)
+    setShowEmergencyCheck(true)
   }
 
   return (
@@ -719,6 +768,50 @@ export default function Home() {
               </>
             )}
           </Button>
+        </div>
+      )}
+
+      {/* 緊急症状チェックモーダル */}
+      {showEmergencyCheck && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl w-full max-w-md p-6 relative animate-fade-in">
+            <h3 className="text-xl font-bold mb-4 text-red-600">緊急症状の確認</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              以下の症状に1つでも当てはまる場合は、直ちに救急車を呼ぶことをお勧めします。
+            </p>
+            <div className="space-y-2 mb-6">
+              {EMERGENCY_SYMPTOMS.map((symptom, index) => (
+                <div key={index} className="flex items-center gap-2 text-sm">
+                  <div className="w-2 h-2 bg-red-500 rounded-full flex-shrink-0" />
+                  <span>{symptom}</span>
+                </div>
+              ))}
+            </div>
+            <div className="flex flex-col gap-3">
+              <Button
+                onClick={() => handleEmergencyCheck(true)}
+                className="w-full bg-red-600 hover:bg-red-700 text-white"
+              >
+                上記の症状に当てはまる
+              </Button>
+              <Button
+                onClick={() => handleEmergencyCheck(false)}
+                className="w-full bg-primary hover:bg-primary-hover text-white"
+              >
+                当てはまる症状はない
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 処理中のローディング表示 */}
+      {isProcessing && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
+          <div className="bg-white rounded-xl p-6 flex flex-col items-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent mb-4"></div>
+            <p className="text-lg font-bold">処理中...</p>
+          </div>
         </div>
       )}
 

@@ -63,25 +63,74 @@ function MedicalContent() {
     switch (assessment.urgency_level) {
       case 'red':
         return (
-          <Card className="bg-red-50 border-red-200 mb-6 shadow-lg">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-red-700 flex items-center gap-2">
-                <AlertCircle className="h-6 w-6" />
-                緊急性の高い症状があります
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-red-700 mb-4 text-lg">
-                直ちに救急車を呼ぶことをお勧めします。
-              </p>
-              <Button asChild size="lg" variant="destructive" className="w-full sm:w-auto">
-                <a href="tel:119" className="flex items-center justify-center gap-2">
-                  <Phone className="h-5 w-5" />
-                  119番通報する
+          <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
+            {/* 緊急度表示セクション */}
+            <div className="p-6 md:p-8 bg-red-50">
+              <div className="flex flex-col items-center text-center">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full mb-4 bg-red-100">
+                  <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                </div>
+                
+                <h1 className="text-2xl md:text-3xl font-bold mb-3 text-red-700">
+                  緊急性の高い症状があります
+                </h1>
+                
+                <p className="text-gray-600 text-sm md:text-base leading-relaxed max-w-2xl mb-8">
+                  選択された症状から判断すると、緊急性が非常に高い状態です。
+                  直ちに救急車を呼び、救急医療機関を受診することを強くお勧めします。
+                </p>
+
+                {/* 119番通報ボタン */}
+                <a
+                  href="tel:119"
+                  className="inline-flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white font-medium px-8 py-4 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 w-full sm:w-auto mb-4"
+                >
+                  <Phone className="w-6 h-6" />
+                  <span className="text-lg">119番通報する</span>
                 </a>
-              </Button>
-            </CardContent>
-          </Card>
+
+                <p className="text-sm text-red-600 mt-4">
+                  ※救急車が到着するまでの間、呼吸や意識状態に注意を払い、
+                  状態が急変した場合は再度119番通報してください。
+                </p>
+              </div>
+            </div>
+
+            {/* 注意事項セクション */}
+            <div className="p-6 md:p-8 border-t border-gray-100">
+              <h2 className="text-xl font-bold text-gray-900 mb-4">救急車を呼ぶ際の注意事項</h2>
+              <div className="space-y-3">
+                <div className="p-4 bg-gray-50 rounded-xl border border-gray-200">
+                  <p className="text-gray-700">
+                    1. 落ち着いて、ゆっくりと正確に状況を説明してください。
+                  </p>
+                </div>
+                <div className="p-4 bg-gray-50 rounded-xl border border-gray-200">
+                  <p className="text-gray-700">
+                    2. 現在地の住所や目標となる建物を確認してください。
+                  </p>
+                </div>
+                <div className="p-4 bg-gray-50 rounded-xl border border-gray-200">
+                  <p className="text-gray-700">
+                    3. 可能であれば、救急車の到着を待つ間、玄関や部屋の明かりをつけてください。
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* ホームに戻るボタン */}
+            <div className="p-6 md:p-8 border-t border-gray-100">
+              <button
+                onClick={() => router.push('/')}
+                className="w-full inline-flex items-center justify-center gap-2 bg-white hover:bg-gray-50 text-gray-700 font-medium px-6 py-3 rounded-xl border border-gray-200 transition-all duration-300"
+              >
+                <Home className="w-5 h-5" />
+                <span>ホームに戻る</span>
+              </button>
+            </div>
+          </div>
         )
       case 'yellow':
         return (
@@ -101,19 +150,23 @@ function MedicalContent() {
         )
       case 'green':
         return (
-          <Card className="bg-green-50 border-green-200 mb-6 shadow-lg">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-green-700 flex items-center gap-2">
-                <AlertCircle className="h-6 w-6" />
-                受診をお勧めします
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-green-700 text-lg">
-                体調に応じて医療機関の受診を検討してください。
-              </p>
-            </CardContent>
-          </Card>
+          <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
+            <div className="p-6 md:p-8 bg-green-50">
+              <div className="flex flex-col items-center text-center">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full mb-4 bg-green-100">
+                  <AlertCircle className="w-8 h-8 text-green-600" />
+                </div>
+                
+                <h1 className="text-2xl md:text-3xl font-bold mb-3 text-green-700">
+                  受診をお勧めします
+                </h1>
+                
+                <p className="text-green-700 text-sm md:text-base leading-relaxed max-w-2xl">
+                  体調に応じて医療機関の受診を検討してください。
+                </p>
+              </div>
+            </div>
+          </div>
         )
     }
   }
@@ -167,141 +220,48 @@ function MedicalContent() {
       <Header />
       <main className="min-h-screen bg-gray-50">
         <div className="container mx-auto px-4 py-6 max-w-3xl">
-          <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
-            {/* 緊急度表示セクション */}
-            <div className={`p-6 md:p-8 ${
-              assessment.urgency_level === 'red'
-                ? 'bg-red-50'
-                : assessment.urgency_level === 'yellow'
-                ? 'bg-yellow-50'
-                : 'bg-green-50'
-            }`}>
-              <div className="flex flex-col items-center text-center">
-                <div className={`inline-flex items-center justify-center w-16 h-16 rounded-full mb-4 ${
-                  assessment.urgency_level === 'red'
-                    ? 'bg-red-100'
-                    : assessment.urgency_level === 'yellow'
-                    ? 'bg-yellow-100'
-                    : 'bg-green-100'
-                }`}>
-                  {assessment.urgency_level === 'red' ? (
-                    <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                    </svg>
-                  ) : assessment.urgency_level === 'yellow' ? (
-                    <svg className="w-8 h-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  ) : (
-                    <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  )}
-                </div>
-                
-                <h1 className={`text-2xl md:text-3xl font-bold mb-3 ${
-                  assessment.urgency_level === 'red'
-                    ? 'text-red-700'
-                    : assessment.urgency_level === 'yellow'
-                    ? 'text-yellow-700'
-                    : 'text-green-700'
-                }`}>
-                  {assessment.urgency_level === 'red'
-                    ? '緊急性の高い症状があります'
-                    : assessment.urgency_level === 'yellow'
-                    ? '早めの受診をお勧めします'
-                    : '経過観察を推奨します'}
-                </h1>
-                
-                <p className="text-gray-600 text-sm md:text-base leading-relaxed max-w-2xl">
-                  {assessment.urgency_level === 'red' ? (
-                    <>
-                      選択された症状から判断すると、緊急性が高い状態です。
-                      できるだけ早く医療機関を受診することをお勧めします。
-                      状況に応じて救急車の利用をご検討ください。
-                    </>
-                  ) : assessment.urgency_level === 'yellow' ? (
-                    <>
-                      選択された症状から判断すると、できるだけ早めに（本日中に）
-                      医療機関を受診することをお勧めします。
-                      症状が急激に悪化した場合は、すぐに救急外来を受診してください。
-                    </>
-                  ) : (
-                    <>
-                      選択された症状からは、現時点で緊急性は高くないと判断されます。
-                      ただし、症状が続く場合や悪化する場合は、
-                      かかりつけ医への相談や受診をご検討ください。
-                    </>
-                  )}
-                </p>
-              </div>
-
-              {/* 緊急時の119番通報ボタン - 赤の緊急度の場合のみ表示 */}
-              {assessment.urgency_level === 'red' && (
-                <div className="mt-6 flex justify-center">
-                  <a
-                    href="tel:119"
-                    className="inline-flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white font-medium px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                    </svg>
-                    <span>119番通報する</span>
-                  </a>
-                </div>
-              )}
-            </div>
-
-            {/* 推奨診療科セクション */}
-            <div className="p-6 md:p-8 border-t border-gray-100">
-              <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-4">推奨される診療科</h2>
-              <div className="space-y-3">
-                {assessment.recommended_departments.map((department, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl border border-gray-200"
-                  >
-                    <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center flex-shrink-0 border border-gray-200">
-                      <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                      </svg>
-                    </div>
-                    <span className="text-gray-700 font-medium">{department}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* ナビゲーションボタン */}
-            <div className="p-6 md:p-8 border-t border-gray-100 flex flex-col sm:flex-row gap-4">
-              <button
-                onClick={() => {
-                  const interviewId = searchParams.get('interview_id')
-                  if (interviewId && categoryId) {
-                    router.push(`/urgency-assessment?interview_id=${interviewId}&category_id=${categoryId}`)
-                  } else {
-                    console.error('Required parameters are missing')
-                    setError('必要な情報が不足しています')
-                  }
-                }}
-                className="flex-1 inline-flex items-center justify-center gap-2 bg-white hover:bg-gray-50 text-gray-700 font-medium px-6 py-3 rounded-xl border border-gray-200 transition-all duration-300"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                </svg>
-                <span>症状チェックに戻る</span>
-              </button>
-              <button
-                onClick={() => router.push('/')}
-                className="flex-1 inline-flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-white font-medium px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                </svg>
-                <span>ホームに戻る</span>
-              </button>
-            </div>
+          <div className="mb-8">
+            {renderUrgencyMessage()}
           </div>
+          
+          {/* 推奨診療科セクション - 緊急時（赤）以外の場合のみ表示 */}
+          {assessment && assessment.urgency_level !== 'red' && (
+            <div className="space-y-6">
+              <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
+                <div className="p-6 md:p-8">
+                  <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-4">推奨される診療科</h2>
+                  <div className="space-y-3">
+                    {assessment.recommended_departments.map((department, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl border border-gray-200"
+                      >
+                        <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center flex-shrink-0 border border-gray-200">
+                          <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                          </svg>
+                        </div>
+                        <span className="text-gray-700 font-medium">{department}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* ホームに戻るボタン */}
+              <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
+                <div className="p-6 md:p-8">
+                  <button
+                    onClick={() => router.push('/')}
+                    className="w-full inline-flex items-center justify-center gap-2 bg-white hover:bg-gray-50 text-gray-700 font-medium px-6 py-3 rounded-xl border border-gray-200 transition-all duration-300"
+                  >
+                    <Home className="w-5 h-5" />
+                    <span>ホームに戻る</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </main>
       <Footer />
