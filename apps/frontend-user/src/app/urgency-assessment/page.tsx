@@ -26,6 +26,11 @@ interface QuestionGroup {
   description: string
 }
 
+// greenJudgmentCategoriesの型定義を追加
+type GreenJudgmentCategories = {
+  [key: number]: string[]
+}
+
 function UrgencyAssessmentContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -37,6 +42,25 @@ function UrgencyAssessmentContent() {
   const interviewId = searchParams.get('interview_id')
   const categoryId = searchParams.get('category_id')
   const supabase = createClientComponentClient()
+
+  // greenJudgmentCategoriesに型を指定
+  const greenJudgmentCategories: GreenJudgmentCategories = {
+    2: ['内科', 'かかりつけ'],
+    3: ['内科', 'かかりつけ'],
+    8: ['かかりつけ'],
+    18: ['内科', 'かかりつけ'],
+    21: ['泌尿器科', '内科', '小児科', 'かかりつけ'],
+    23: ['内科'],
+    42: ['内科', 'かかりつけ'],
+    44: ['小児科', 'かかりつけ'],
+    45: ['小児科', 'かかりつけ'],
+    49: ['小児科', 'かかりつけ'],
+    52: ['小児科', 'かかりつけ'],
+    53: ['小児科', 'かかりつけ'],
+    56: ['小児科', 'かかりつけ', '耳鼻咽喉科'],
+    57: ['小児科', 'かかりつけ'],
+    58: ['小児科', 'かかりつけ']
+  }
 
   useEffect(() => {
     const fetchQuestions = async () => {
@@ -116,25 +140,6 @@ function UrgencyAssessmentContent() {
       questions: questions.filter(q => q.urgency_level === 'green')
     }
   ]
-
-  // 推奨診療科の設定を共通化
-  const greenJudgmentCategories = {
-    2: ['内科', 'かかりつけ'],
-    3: ['内科', 'かかりつけ'],
-    8: ['かかりつけ'],
-    18: ['内科', 'かかりつけ'],
-    21: ['泌尿器科', '内科', '小児科', 'かかりつけ'],
-    23: ['内科'],
-    42: ['内科', 'かかりつけ'],
-    44: ['小児科', 'かかりつけ'],
-    45: ['小児科', 'かかりつけ'],
-    49: ['小児科', 'かかりつけ'],
-    52: ['小児科', 'かかりつけ'],
-    53: ['小児科', 'かかりつけ'],
-    56: ['小児科', 'かかりつけ', '耳鼻咽喉科'],
-    57: ['小児科', 'かかりつけ'],
-    58: ['小児科', 'かかりつけ']
-  }
 
   const handleQuestionChange = (questionId: number, checked: boolean | string) => {
     setSelectedQuestions(prev => {
@@ -242,8 +247,7 @@ function UrgencyAssessmentContent() {
         // 選択された質問から推奨診療科を取得
         recommendedDepartments = Array.from(new Set(
           selectedQuestionData
-            .map(q => q.recommended_departments)
-            .filter(Boolean)
+            .map(q => q.recommended_departments || [])  // nullの場合は空配列を返す
             .flat()
         ))
       }
