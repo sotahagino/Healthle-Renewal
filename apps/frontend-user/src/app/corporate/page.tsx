@@ -205,6 +205,14 @@ export default function CorporatePage() {
 
             {/* ドラッグストア向けサービス */}
             <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
+              <div className="relative h-48 md:h-64">
+                <Image
+                  src="https://wojtqrjpxivotuzjtgsc.supabase.co/storage/v1/object/public/Healthle/vendorapp.png"
+                  alt="ドラッグストア・薬局向けアプリ画面"
+                  fill
+                  className="object-cover"
+                />
+              </div>
               <div className="p-8">
                 <h3 className="text-2xl font-bold text-gray-900 mb-4">
                   ドラッグストア・薬局向けサービス
@@ -276,6 +284,50 @@ export default function CorporatePage() {
                 <p className="text-gray-700 leading-relaxed">
                   ヘルスケア領域のスタートアップ・株式会社エムボックスにて約4年間、マーケティング責任者として一般用医薬品の販売促進および新商品開発に従事。消費者インサイトの深掘りや市場データ分析をもとに商品戦略を立案し、実行までを一貫してリードした。データドリブンなアプローチとユーザーファーストの考え方で売上拡大やブランド認知向上に大きく貢献。現在はヘルスル株式会社にて取締役を務め、これまでの知見を活かしたマーケティング戦略の策定やビジネス開発を推進。より多くの人々に科学的根拠に基づくヘルスケアを届けることをミッションに、サービスの普及と社会的価値の創出に注力。
                 </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 会社概要 */}
+      <section className="py-24 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-20">
+            <h2 className="text-4xl font-bold text-gray-900 mb-6 relative inline-block">
+              Company
+              <div className="absolute bottom-0 left-0 w-full h-1 bg-primary/20"></div>
+            </h2>
+          </div>
+          <div className="max-w-3xl mx-auto">
+            <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
+              <div className="divide-y divide-gray-200">
+                <div className="grid grid-cols-3 py-4 px-6">
+                  <dt className="text-gray-600">会社名</dt>
+                  <dd className="col-span-2 text-gray-900">ヘルスル株式会社</dd>
+                </div>
+                <div className="grid grid-cols-3 py-4 px-6">
+                  <dt className="text-gray-600">設立</dt>
+                  <dd className="col-span-2 text-gray-900">2024年1月</dd>
+                </div>
+                <div className="grid grid-cols-3 py-4 px-6">
+                  <dt className="text-gray-600">代表者</dt>
+                  <dd className="col-span-2 text-gray-900">代表取締役CEO 萩野 颯太</dd>
+                </div>
+                <div className="grid grid-cols-3 py-4 px-6">
+                  <dt className="text-gray-600">所在地</dt>
+                  <dd className="col-span-2 text-gray-900">東京都渋谷区</dd>
+                </div>
+                <div className="grid grid-cols-3 py-4 px-6">
+                  <dt className="text-gray-600">事業内容</dt>
+                  <dd className="col-span-2 text-gray-900">
+                    <ul className="list-disc list-inside space-y-2">
+                      <li>ヘルスケアプラットフォームの開発・運営</li>
+                      <li>医薬品ECサイトの運営</li>
+                      <li>健康相談サービスの提供</li>
+                    </ul>
+                  </dd>
+                </div>
               </div>
             </div>
           </div>
