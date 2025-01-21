@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 // @ts-ignore - Next.js 14.1.0の型定義の問題を回避
 import { useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -17,7 +17,7 @@ interface UrgencyAssessment {
   recommended_departments: string[]
 }
 
-export default function MedicalPage() {
+function MedicalContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const [assessment, setAssessment] = useState<UrgencyAssessment | null>(null)
@@ -306,5 +306,13 @@ export default function MedicalPage() {
       </main>
       <Footer />
     </>
+  )
+}
+
+export default function MedicalPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <MedicalContent />
+    </Suspense>
   )
 } 

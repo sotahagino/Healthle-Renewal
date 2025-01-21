@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
 // @ts-ignore - Next.js 14.1.0の型定義の問題を回避
 import { useRouter as useNavigation } from 'next/navigation'
 // @ts-ignore - Next.js 14.1.0の型定義の問題を回避
@@ -58,7 +58,7 @@ interface FollowUpData {
   created_at: string;
 }
 
-export default function ResultPage() {
+function ResultContent() {
   const { user } = useAuth()
   const searchParams = useNavigationSearchParams()
   const [consultationText, setConsultationText] = useState("")
@@ -600,9 +600,9 @@ export default function ResultPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F7FAFC]">
+    <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#E6F3EF] to-white">
       <SiteHeader />
-      <main className="container mx-auto px-4 py-8 sm:px-6 lg:px-8 max-w-4xl mt-16">
+      <main className="flex-grow container mx-auto px-4 py-12 mt-16">
         {error ? (
           <div className="text-red-500 mb-4">{error}</div>
         ) : (
@@ -786,6 +786,14 @@ export default function ResultPage() {
         )}
       </main>
     </div>
+  )
+}
+
+export default function ResultPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <ResultContent />
+    </Suspense>
   )
 }
 

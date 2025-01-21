@@ -6,7 +6,7 @@ const nextConfig = {
   },
   output: 'standalone',
   experimental: {
-    missingSuspenseWithCSRBailout: false
+    // missingSuspenseWithCSRBailoutオプションを削除
   }
 };
 

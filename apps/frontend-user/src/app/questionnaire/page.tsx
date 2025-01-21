@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, Suspense } from 'react'
 // @ts-ignore - Next.js 14.1.0の型定義の問題を回避
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Button } from "@/components/ui/button"
@@ -93,7 +93,7 @@ const callTriageAssistant = async (symptomText: string, answers: any) => {
   }
 }
 
-export default function QuestionnairePage() {
+function QuestionnaireContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [interviewId, setInterviewId] = useState<string | null>(null)
@@ -498,6 +498,14 @@ export default function QuestionnairePage() {
         </form>
       </main>
     </div>
+  )
+}
+
+export default function QuestionnairePage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <QuestionnaireContent />
+    </Suspense>
   )
 }
 

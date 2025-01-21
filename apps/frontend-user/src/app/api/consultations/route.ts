@@ -1,5 +1,5 @@
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/dist/client/components/headers'
+import { cookies } from 'next/headers'
 
 export const dynamic = 'force-dynamic';
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 // @ts-ignore - Next.js 14.1.0の型定義の問題を回避
 import { useSearchParams } from 'next/navigation';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
@@ -17,7 +17,7 @@ interface OrderInfo {
   customer_email: string | null;
 }
 
-export default function CompletePage() {
+function CompleteContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const paymentIntentId = searchParams.get('payment_intent');
@@ -373,5 +373,13 @@ export default function CompletePage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+export default function CompletePage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <CompleteContent />
+    </Suspense>
   );
 } 
