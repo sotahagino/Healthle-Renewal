@@ -23,6 +23,7 @@ import {
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import Image from 'next/image'
 import { Checkbox } from "@/components/ui/checkbox"
+import { Switch } from "@/components/ui/switch"
 
 // インターフェース定義
 interface QuestionOption {
@@ -697,20 +698,33 @@ export default function Home() {
                   onChange={(e) => setSymptomText(e.target.value)}
                 />
 
-                {/* 年齢確認チェックボックス */}
-                <div className="flex items-center space-x-2 mb-4">
-                  <Checkbox
-                    id="age-check"
-                    checked={isOver16}
-                    onCheckedChange={(checked) => setIsOver16(checked as boolean)}
-                    className="data-[state=checked]:text-white"
-                  />
-                  <label
-                    htmlFor="age-check"
-                    className="text-sm text-text-secondary cursor-pointer"
-                  >
-                    相談対象者は16歳以上です
+                {/* 年齢確認スイッチ */}
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 mb-4 bg-secondary/20 rounded-lg">
+                  <label className="text-sm font-medium text-text-primary whitespace-nowrap">
+                    相談対象者の年齢
                   </label>
+                  <div className="flex gap-2 w-full sm:w-auto justify-center">
+                    <button
+                      onClick={() => setIsOver16(false)}
+                      className={`flex-1 sm:flex-initial px-4 py-2 rounded-lg text-sm font-medium transition-colors border-2 whitespace-nowrap ${
+                        !isOver16
+                          ? "bg-primary text-white border-primary"
+                          : "bg-white/80 text-text-secondary border-gray-200 hover:border-primary/50"
+                      }`}
+                    >
+                      16歳未満
+                    </button>
+                    <button
+                      onClick={() => setIsOver16(true)}
+                      className={`flex-1 sm:flex-initial px-4 py-2 rounded-lg text-sm font-medium transition-colors border-2 whitespace-nowrap ${
+                        isOver16
+                          ? "bg-primary text-white border-primary"
+                          : "bg-white/80 text-text-secondary border-gray-200 hover:border-primary/50"
+                      }`}
+                    >
+                      16歳以上
+                    </button>
+                  </div>
                 </div>
                 
                 <p className="text-xs text-text-secondary mb-4 text-right">
