@@ -36,6 +36,9 @@ interface Question {
   options?: QuestionOption[];
 }
 
+// 緑判定が必要なカテゴリーID
+const GREEN_JUDGMENT_CATEGORIES = [2, 3, 8, 18, 21, 23, 42, 44, 45, 49, 52, 53, 56, 57, 58]
+
 // 症状カテゴリーの定義
 const SYMPTOM_CATEGORIES = [
   { 
@@ -153,7 +156,7 @@ const COMMON_SYMPTOMS = [
 const EMERGENCY_SYMPTOMS = [
   '呼吸をしていない。息がない。',
   '脈がない。心臓が止まっている。',
-  '沈んでいる。',
+  '水没している。沈んでいる。',
   '冷たくなっている。',
   '呼びかけても、反応がない。',
   '（いつもどおり）普通にしゃべれない。',
@@ -163,7 +166,10 @@ const EMERGENCY_SYMPTOMS = [
 ]
 
 // APIから返される型定義
-type MatchedCategory = { category: string; confidence: number }
+type MatchedCategory = { 
+  category: string; 
+  confidence: string 
+}
 
 // 症状カテゴリーマッピング
 const categoryMapping: { [key: string]: number } = {
@@ -283,10 +289,29 @@ export default function Home() {
     setSelectedCategory(category)
   }
 
-  const handleOptionSelect = (option: string) => {
-    setSymptomText(option)
+  const handleOptionSelect = (option: string, categoryId: string) => {
+    if (option === "上記の症状に該当しない") {
+      // カテゴリーIDを取得
+      const categoryNumber = Object.entries(categoryMapping).find(([key]) => 
+        key.includes(categoryId.replace(/-/g, ' '))
+      )?.[1]
+
+      if (categoryNumber) {
+        // 緑判定が必要なカテゴリーかチェック
+        const needsGreenJudgment = GREEN_JUDGMENT_CATEGORIES.includes(categoryNumber)
+        
+        if (needsGreenJudgment) {
+          // 緑判定が必要な場合は、緑判定用の症状テキストを設定
+          setSymptomText(`${categoryId}の症状について：上記の症状には該当しないが、気になる症状がある`)
+        } else {
+          // 白判定の場合は、そのまま質問票生成へ
+          setSymptomText(`${categoryId}の症状について：上記の症状には該当しない`)
+        }
+      }
+    } else {
+      setSymptomText(option)
+    }
     setSelectedCategory(null)
-    // 調整したスクロール関数を使用
     scrollToSymptomInput()
   }
 
@@ -369,14 +394,16 @@ export default function Home() {
           throw new Error('症状判定結果が不正です')
         }
 
-        // カテゴリーIDに変換
-        const matchedCategoryIds = parsedData.matched_categories
-          .map(mc => categoryMapping[mc.category])
+        // 最も信頼度の高いカテゴリーを選択
+        const sortedCategories = [...parsedData.matched_categories]
+          .sort((a, b) => Number(b.confidence) - Number(a.confidence))
+        
+        // カテゴリーIDに変換（最も信頼度の高いものを選択）
+        const matchedCategoryIds = [categoryMapping[sortedCategories[0].category]]
           .filter(Boolean)
+          .map(String)
 
-        if (matchedCategoryIds.length === 0) {
-          console.log('マッチするカテゴリーが見つかりませんでした')
-        }
+        console.log('マッチしたカテゴリーID:', matchedCategoryIds)
 
         // 問診データを作成
         const interviewRes = await fetch('/api/interviews', {
@@ -398,11 +425,100 @@ export default function Home() {
         const interviewData = await interviewRes.json()
         console.log('Created interview data:', interviewData)
 
-        // カテゴリーがマッチした場合は緊急度判定へ
-        if (matchedCategoryIds.length > 0) {
-          router.push(`/urgency-assessment?interview_id=${interviewData.interview_id}&category_id=${matchedCategoryIds[0]}`)
-        } else {
-          // カテゴリーがマッチしなかった場合は問診表を生成
+        // 「該当しない」が選択された場合の処理
+        if (symptomText.includes('上記の症状には該当しない')) {
+          const categoryId = parseInt(symptomText.match(/\d+/)?.[0] || '0')
+          
+          if (GREEN_JUDGMENT_CATEGORIES.includes(categoryId)) {
+            // 緑判定が必要なカテゴリーの場合
+            router.push(`/medical?interview_id=${interviewData.interview_id}&urgency_level=green`)
+          } else {
+            // 白判定の場合は質問票生成へ
+            try {
+              const questionnaireRes = await fetch('https://api.dify.ai/v1/completion-messages', {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${process.env.NEXT_PUBLIC_DIFY_QUESTION_API_KEY}`,
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  inputs: {
+                    symptom: symptomText,
+                    is_child: parsedData.is_child
+                  },
+                  response_mode: "blocking",
+                  user: "anonymous"
+                })
+              })
+
+              if (!questionnaireRes.ok) {
+                console.error('問診表生成APIエラー:', await questionnaireRes.text())
+                throw new Error('問診表の生成に失敗しました')
+              }
+
+              const questionnaireData = await questionnaireRes.json()
+              console.log('Questionnaire Response:', questionnaireData)
+
+              // 問診表データを解析
+              let parsedQuestions = null
+              try {
+                const jsonMatch = questionnaireData.answer.match(/```json\n([\s\S]*?)\n```/)
+                if (jsonMatch) {
+                  const jsonContent = jsonMatch[1].trim()
+                  console.log('Extracted questions JSON:', jsonContent)
+                  parsedQuestions = JSON.parse(jsonContent)
+                } else {
+                  parsedQuestions = JSON.parse(questionnaireData.answer)
+                }
+                console.log('Parsed questions:', parsedQuestions)
+
+                if (!parsedQuestions || !parsedQuestions.questions) {
+                  throw new Error('問診表データの形式が不正です')
+                }
+              } catch (error) {
+                console.error('問診表データの解析に失敗しました:', error)
+                throw new Error('問診表データの解析に失敗しました')
+              }
+
+              // 問診表データを保存
+              const questionsArray = parsedQuestions.questions
+              const questionUpdates = {
+                question_1: questionsArray[0]?.text || null,
+                question_2: questionsArray[1]?.text || null,
+                question_3: questionsArray[2]?.text || null,
+                question_4: questionsArray[3]?.text || null,
+                question_5: questionsArray[4]?.text || null,
+                question_6: questionsArray[5]?.text || null,
+                questions: questionsArray, // 質問の詳細情報も保存
+                updated_at: new Date().toISOString()
+              }
+
+              const { data: updateData, error: saveError } = await supabase
+                .from('medical_interviews')
+                .update(questionUpdates)
+                .eq('id', interviewData.interview_id)
+                .select()
+
+              if (saveError) {
+                console.error('問診表データの保存に失敗しました:', saveError)
+                throw new Error('問診表データの保存に失敗しました')
+              }
+
+              // 問診ページへ遷移
+              router.push(`/questionnaire?interview_id=${interviewData.interview_id}`)
+            } catch (error) {
+              console.error('問診表の生成中にエラーが発生しました:', error)
+              setError(error instanceof Error ? error.message : '予期せぬエラーが発生しました')
+              scrollToSymptomInput()
+            }
+          }
+          return
+        }
+
+        // 通常の症状判定フロー
+        if (matchedCategoryIds.length === 0) {
+          console.log('マッチするカテゴリーが見つかりませんでした。質問票生成を開始します。')
+          // 質問票生成APIを呼び出し
           try {
             const questionnaireRes = await fetch('https://api.dify.ai/v1/completion-messages', {
               method: 'POST',
@@ -484,6 +600,9 @@ export default function Home() {
             setError(error instanceof Error ? error.message : '予期せぬエラーが発生しました')
             scrollToSymptomInput()
           }
+        } else {
+          // カテゴリーがマッチした場合は緊急度判定へ
+          router.push(`/urgency-assessment?interview_id=${interviewData.interview_id}&category_id=${matchedCategoryIds[0]}`)
         }
       }
     } catch (error) {
@@ -728,15 +847,25 @@ export default function Home() {
                   </button>
                   <h3 className="text-lg font-bold mb-4">{selectedCategory.name}の症状</h3>
                   <div className="space-y-2">
+                    {/* 通常の選択肢 */}
                     {selectedCategory.options.map((option, index) => (
                       <button
                         key={index}
-                        onClick={() => handleOptionSelect(option)}
+                        onClick={(e) => handleOptionSelect(option, selectedCategory.id)}
                         className="w-full text-left p-3 rounded-lg hover:bg-secondary/20 transition-colors text-sm"
                       >
                         {option}
                       </button>
                     ))}
+                    {/* 区切り線 */}
+                    <div className="border-t border-gray-200 my-2"></div>
+                    {/* 該当しない選択肢 */}
+                    <button
+                      onClick={(e) => handleOptionSelect("上記の症状に該当しない", selectedCategory.id)}
+                      className="w-full text-left p-3 rounded-lg hover:bg-secondary/20 transition-colors text-sm text-gray-600"
+                    >
+                      上記の症状に該当しない
+                    </button>
                   </div>
                 </div>
               </div>

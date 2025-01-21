@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
 import { SiteHeader } from '@/components/site-header'
 import { Footer } from '@/components/footer'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
 interface UrgencyQuestion {
   id: number
@@ -33,9 +34,9 @@ function UrgencyAssessmentContent() {
   const [questions, setQuestions] = useState<UrgencyQuestion[]>([])
   const [selectedQuestions, setSelectedQuestions] = useState<number[]>([])
   const [currentUrgencyLevel, setCurrentUrgencyLevel] = useState<string | null>(null)
-
-  const categoryId = searchParams.get('category_id')
   const interviewId = searchParams.get('interview_id')
+  const categoryId = searchParams.get('category_id')
+  const supabase = createClientComponentClient()
 
   useEffect(() => {
     const fetchQuestions = async () => {
@@ -116,6 +117,25 @@ function UrgencyAssessmentContent() {
     }
   ]
 
+  // 推奨診療科の設定を共通化
+  const greenJudgmentCategories = {
+    2: ['内科', 'かかりつけ'],
+    3: ['内科', 'かかりつけ'],
+    8: ['かかりつけ'],
+    18: ['内科', 'かかりつけ'],
+    21: ['泌尿器科', '内科', '小児科', 'かかりつけ'],
+    23: ['内科'],
+    42: ['内科', 'かかりつけ'],
+    44: ['小児科', 'かかりつけ'],
+    45: ['小児科', 'かかりつけ'],
+    49: ['小児科', 'かかりつけ'],
+    52: ['小児科', 'かかりつけ'],
+    53: ['小児科', 'かかりつけ'],
+    56: ['小児科', 'かかりつけ', '耳鼻咽喉科'],
+    57: ['小児科', 'かかりつけ'],
+    58: ['小児科', 'かかりつけ']
+  }
+
   const handleQuestionChange = (questionId: number, checked: boolean | string) => {
     setSelectedQuestions(prev => {
       if (checked === true) {
@@ -128,6 +148,26 @@ function UrgencyAssessmentContent() {
 
   const determineUrgencyLevel = () => {
     const selectedQuestionData = questions.filter(q => selectedQuestions.includes(q.id))
+    
+    // 「該当しない」が選択された場合
+    if (selectedQuestions.includes(-1)) {
+      const categoryIdNumber = categoryId ? Number(categoryId) : null
+      if (categoryIdNumber && greenJudgmentCategories[categoryIdNumber]) {
+        // 推奨診療科を設定
+        const recommendedDepartments = greenJudgmentCategories[categoryIdNumber]
+        // 緊急度判定の保存時に使用できるように、selectedQuestionDataに推奨診療科を追加
+        selectedQuestionData.push({
+          id: -1,
+          question_text: '該当しない',
+          urgency_level: 'green',
+          recommended_departments: recommendedDepartments,
+          display_order: 0,
+          is_escalator: false
+        })
+        return 'green'
+      }
+      return 'white'
+    }
     
     // エスカレーター質問がチェックされているか確認
     const hasEscalator = selectedQuestionData.some(q => q.is_escalator)
@@ -180,14 +220,33 @@ function UrgencyAssessmentContent() {
       const urgencyLevel = determineUrgencyLevel()
       setCurrentUrgencyLevel(urgencyLevel)
 
-      // 選択された質問から推奨診療科を取得
-      const selectedQuestionData = questions.filter(q => selectedQuestions.includes(q.id))
-      const recommendedDepartments = Array.from(new Set(
-        selectedQuestionData
-          .map(q => q.recommended_departments)
-          .filter(Boolean)
-          .flat()
-      ))
+      // 「該当しない」が選択された場合の推奨診療科を取得
+      let recommendedDepartments: string[] = []
+      let selectedQuestionData = questions.filter(q => selectedQuestions.includes(q.id))
+
+      if (selectedQuestions.includes(-1)) {
+        const categoryIdNumber = Number(categoryId)
+        if (greenJudgmentCategories[categoryIdNumber]) {
+          recommendedDepartments = greenJudgmentCategories[categoryIdNumber]
+          // 該当しない場合の質問データを追加
+          selectedQuestionData = [{
+            id: -1,
+            question_text: '該当しない',
+            urgency_level: 'green',
+            recommended_departments: recommendedDepartments,
+            display_order: 0,
+            is_escalator: false
+          }]
+        }
+      } else {
+        // 選択された質問から推奨診療科を取得
+        recommendedDepartments = Array.from(new Set(
+          selectedQuestionData
+            .map(q => q.recommended_departments)
+            .filter(Boolean)
+            .flat()
+        ))
+      }
 
       const res = await fetch('/api/urgency-assessments', {
         method: 'POST',
@@ -211,7 +270,88 @@ function UrgencyAssessmentContent() {
       const data = await res.json()
       console.log('Urgency assessment saved:', data)
 
-      // すべての重症度でmedical画面に遷移
+      // 白判定の場合は質問票生成APIを呼び出す
+      if (urgencyLevel === 'white') {
+        try {
+          const questionnaireRes = await fetch('https://api.dify.ai/v1/completion-messages', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${process.env.NEXT_PUBLIC_DIFY_QUESTION_API_KEY}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              inputs: {
+                symptom: selectedQuestionData.map(q => q.question_text).join('、'),
+                is_child: false
+              },
+              response_mode: "blocking",
+              user: "anonymous"
+            })
+          })
+
+          if (!questionnaireRes.ok) {
+            console.error('問診表生成APIエラー:', await questionnaireRes.text())
+            throw new Error('問診表の生成に失敗しました')
+          }
+
+          const questionnaireData = await questionnaireRes.json()
+          console.log('Questionnaire Response:', questionnaireData)
+
+          // 問診表データを解析
+          let parsedQuestions = null
+          try {
+            const jsonMatch = questionnaireData.answer.match(/```json\n([\s\S]*?)\n```/)
+            if (jsonMatch) {
+              const jsonContent = jsonMatch[1].trim()
+              console.log('Extracted questions JSON:', jsonContent)
+              parsedQuestions = JSON.parse(jsonContent)
+            } else {
+              parsedQuestions = JSON.parse(questionnaireData.answer)
+            }
+            console.log('Parsed questions:', parsedQuestions)
+
+            if (!parsedQuestions || !parsedQuestions.questions) {
+              throw new Error('問診表データの形式が不正です')
+            }
+          } catch (error) {
+            console.error('問診表データの解析に失敗しました:', error)
+            throw new Error('問診表データの解析に失敗しました')
+          }
+
+          // 問診表データを保存
+          const questionsArray = parsedQuestions.questions
+          const questionUpdates = {
+            question_1: questionsArray[0]?.text || null,
+            question_2: questionsArray[1]?.text || null,
+            question_3: questionsArray[2]?.text || null,
+            question_4: questionsArray[3]?.text || null,
+            question_5: questionsArray[4]?.text || null,
+            question_6: questionsArray[5]?.text || null,
+            questions: questionsArray,
+            updated_at: new Date().toISOString()
+          }
+
+          const { data: updateData, error: saveError } = await supabase
+            .from('medical_interviews')
+            .update(questionUpdates)
+            .eq('id', interviewId)
+            .select()
+
+          if (saveError) {
+            console.error('問診表データの保存に失敗しました:', saveError)
+            throw new Error('問診表データの保存に失敗しました')
+          }
+
+          // 問診ページへ遷移
+          router.push(`/questionnaire?interview_id=${interviewId}`)
+          return
+        } catch (error) {
+          console.error('問診表の生成中にエラーが発生しました:', error)
+          setError(error instanceof Error ? error.message : '予期せぬエラーが発生しました')
+        }
+      }
+
+      // 白判定以外はmedical画面に遷移
       router.push(`/medical?interview_id=${interviewId}&urgency_level=${urgencyLevel}`)
 
     } catch (error) {
@@ -282,31 +422,14 @@ function UrgencyAssessmentContent() {
               )}
 
               <div className="space-y-4 md:space-y-6">
-                {questionGroups.map((group) => (
-                  <div 
-                    key={group.urgency_level}
-                    className={`rounded-xl p-4 md:p-6 ${
-                      group.urgency_level === 'red' 
-                        ? 'bg-red-50/50 border border-red-100' 
-                        : group.urgency_level === 'yellow'
-                        ? 'bg-yellow-50/50 border border-yellow-100'
-                        : 'bg-green-50/50 border border-green-100'
-                    }`}
-                  >
+                {/* 赤のカテゴリー */}
+                {questions.some(q => q.urgency_level === 'red' && !q.is_escalator) && (
+                  <div className="rounded-xl p-4 md:p-6 bg-red-50/50 border border-red-100">
                     <div className="flex items-center gap-3 mb-3 md:mb-4">
-                      <h2 className={`text-base md:text-lg font-bold ${
-                        group.urgency_level === 'red'
-                          ? 'text-red-700'
-                          : group.urgency_level === 'yellow'
-                          ? 'text-yellow-700'
-                          : 'text-green-700'
-                      }`}>
-                        {group.title}
-                      </h2>
+                      <h2 className="text-base md:text-lg font-bold text-red-700">重要な症状</h2>
                     </div>
-
                     <div className="space-y-2 md:space-y-3">
-                      {group.questions.filter(q => !q.is_escalator).map((question) => (
+                      {questions.filter(q => q.urgency_level === 'red' && !q.is_escalator).map((question) => (
                         <div 
                           key={question.id} 
                           className="flex items-center gap-3 p-3 md:p-4 bg-white rounded-lg border border-gray-200 hover:border-gray-300 hover:shadow-sm transition-all duration-200 cursor-pointer group min-h-[3.5rem]"
@@ -316,15 +439,7 @@ function UrgencyAssessmentContent() {
                             id={`question-${question.id}`}
                             checked={selectedQuestions.includes(question.id)}
                             onCheckedChange={(checked) => handleQuestionChange(question.id, checked)}
-                            className={`h-5 w-5 rounded-sm border-2 ${
-                              selectedQuestions.includes(question.id)
-                                ? group.urgency_level === 'red'
-                                  ? 'border-red-500 bg-red-500 text-white'
-                                  : group.urgency_level === 'yellow'
-                                  ? 'border-yellow-500 bg-yellow-500 text-white'
-                                  : 'border-green-500 bg-green-500 text-white'
-                                : 'border-gray-300'
-                            } transition-colors duration-200`}
+                            className="h-5 w-5 rounded-sm border-2 border-red-500 data-[state=checked]:bg-red-500 data-[state=checked]:border-red-500 text-white"
                           />
                           <label
                             htmlFor={`question-${question.id}`}
@@ -336,9 +451,72 @@ function UrgencyAssessmentContent() {
                       ))}
                     </div>
                   </div>
-                ))}
+                )}
+
+                {/* 黄色のカテゴリー */}
+                {questions.some(q => q.urgency_level === 'yellow' && !q.is_escalator) && (
+                  <div className="rounded-xl p-4 md:p-6 bg-yellow-50/50 border border-yellow-100">
+                    <div className="flex items-center gap-3 mb-3 md:mb-4">
+                      <h2 className="text-base md:text-lg font-bold text-yellow-700">一般的な症状</h2>
+                    </div>
+                    <div className="space-y-2 md:space-y-3">
+                      {questions.filter(q => q.urgency_level === 'yellow' && !q.is_escalator).map((question) => (
+                        <div 
+                          key={question.id} 
+                          className="flex items-center gap-3 p-3 md:p-4 bg-white rounded-lg border border-gray-200 hover:border-gray-300 hover:shadow-sm transition-all duration-200 cursor-pointer group min-h-[3.5rem]"
+                          onClick={() => handleQuestionChange(question.id, !selectedQuestions.includes(question.id))}
+                        >
+                          <Checkbox
+                            id={`question-${question.id}`}
+                            checked={selectedQuestions.includes(question.id)}
+                            onCheckedChange={(checked) => handleQuestionChange(question.id, checked)}
+                            className="h-5 w-5 rounded-sm border-2 border-yellow-500 data-[state=checked]:bg-yellow-500 data-[state=checked]:border-yellow-500 text-white"
+                          />
+                          <label
+                            htmlFor={`question-${question.id}`}
+                            className="flex-1 text-gray-700 text-sm md:text-base leading-relaxed cursor-pointer"
+                          >
+                            {question.question_text}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 緑のカテゴリー */}
+                {questions.some(q => q.urgency_level === 'green' && !q.is_escalator) && (
+                  <div className="rounded-xl p-4 md:p-6 bg-green-50/50 border border-green-100">
+                    <div className="flex items-center gap-3 mb-3 md:mb-4">
+                      <h2 className="text-base md:text-lg font-bold text-green-700">付随する症状</h2>
+                    </div>
+                    <div className="space-y-2 md:space-y-3">
+                      {questions.filter(q => q.urgency_level === 'green' && !q.is_escalator).map((question) => (
+                        <div 
+                          key={question.id} 
+                          className="flex items-center gap-3 p-3 md:p-4 bg-white rounded-lg border border-gray-200 hover:border-gray-300 hover:shadow-sm transition-all duration-200 cursor-pointer group min-h-[3.5rem]"
+                          onClick={() => handleQuestionChange(question.id, !selectedQuestions.includes(question.id))}
+                        >
+                          <Checkbox
+                            id={`question-${question.id}`}
+                            checked={selectedQuestions.includes(question.id)}
+                            onCheckedChange={(checked) => handleQuestionChange(question.id, checked)}
+                            className="h-5 w-5 rounded-sm border-2 border-green-500 data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500 text-white"
+                          />
+                          <label
+                            htmlFor={`question-${question.id}`}
+                            className="flex-1 text-gray-700 text-sm md:text-base leading-relaxed cursor-pointer"
+                          >
+                            {question.question_text}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
+              {/* その他の症状（エスカレーター質問） */}
               {questions.some(q => q.is_escalator) && (
                 <div className="mt-4 md:mt-6 rounded-xl p-4 md:p-6 bg-blue-50/50 border border-blue-100">
                   <div className="flex items-center gap-3 mb-3 md:mb-4">
@@ -369,6 +547,29 @@ function UrgencyAssessmentContent() {
                   </div>
                 </div>
               )}
+
+              {/* 該当しないオプション */}
+              <div className="mt-4 md:mt-6 rounded-xl p-4 md:p-6 bg-gray-50 border border-gray-100">
+                <div className="space-y-2 md:space-y-3">
+                  <div 
+                    className="flex items-center gap-3 p-3 md:p-4 bg-white rounded-lg border border-gray-200 hover:border-gray-300 hover:shadow-sm transition-all duration-200 cursor-pointer group min-h-[3.5rem]"
+                    onClick={() => handleQuestionChange(-1, !selectedQuestions.includes(-1))}
+                  >
+                    <Checkbox
+                      id="question-none"
+                      checked={selectedQuestions.includes(-1)}
+                      onCheckedChange={(checked) => handleQuestionChange(-1, checked)}
+                      className="h-5 w-5 rounded-sm border-2 border-gray-300 data-[state=checked]:bg-gray-500 data-[state=checked]:border-gray-500 text-white"
+                    />
+                    <label
+                      htmlFor="question-none"
+                      className="flex-1 text-gray-700 text-sm md:text-base leading-relaxed cursor-pointer"
+                    >
+                      上記の症状に該当しない
+                    </label>
+                  </div>
+                </div>
+              </div>
 
               <div className="mt-6 md:mt-8 flex justify-center px-4">
                 <button
