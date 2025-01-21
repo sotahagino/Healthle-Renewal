@@ -225,6 +225,11 @@ interface SymptomAssessmentResponse {
   is_child: boolean
 }
 
+// 注釈用のスタイル
+const DisclaimerText = ({ children }: { children: React.ReactNode }) => (
+  <p className="text-xs text-gray-500 mt-1">{children}</p>
+)
+
 export default function Home() {
   const router = useRouter()
   const [symptomText, setSymptomText] = useState('')
@@ -463,16 +468,29 @@ export default function Home() {
       <main className="flex-grow pt-12">
         <div className="max-w-md mx-auto animate-fade-in px-5">
           {/* 新しい画像セクション */}
-          <div className="relative w-full h-[300px] mb-4">
-            <div className="absolute inset-0 bg-white"></div>
-            <Image
-              src="https://wojtqrjpxivotuzjtgsc.supabase.co/storage/v1/object/public/Healthle/homepagev4.png"
-              alt="医師の画像"
-              fill
-              style={{ objectFit: 'contain' }}
-              priority
-              className="z-10"
-            />
+          <div className="relative w-full mb-8">
+            <div className="relative h-[250px]">
+              <div className="absolute inset-0 bg-white"></div>
+              <Image
+                src="https://wojtqrjpxivotuzjtgsc.supabase.co/storage/v1/object/public/Healthle/homepagev4.png"
+                alt="医師の画像"
+                fill
+                style={{ objectFit: 'contain' }}
+                priority
+                className="z-10"
+              />
+            </div>
+            <div className="mt-0 px-2">
+              <DisclaimerText>
+                ※本サービスは、ヘルスケアに関する情報提供を行うものであり、医師や専門家が特定の疾病や病気、障害を診断・予防・医療アドバイスをする医療行為ではありません。
+              </DisclaimerText>
+              <DisclaimerText>
+                ※写真はイメージであり、医師よる健康相談サービスではありません。
+              </DisclaimerText>
+              <DisclaimerText>
+                ※2024年11月21日～2024年12月9日の満足度調査の結果n=100
+              </DisclaimerText>
+            </div>
           </div>
 
           {/* メイン相談フォーム */}
@@ -570,9 +588,9 @@ export default function Home() {
             <div className="grid grid-cols-2 gap-4 mb-12 px-1">
               {[
                 { icon: Clock, text: '24時間対応', subtext: '深夜でも休日でも' },
-                { icon: Clipboard, text: '丁寧な質問', subtext: '症状を正確に把握' },
-                { icon: MessageCircle, text: '追加質問無制限', subtext: '気になることは何でも' },
-                { icon: CheckCircle, text: 'すぐに購入', subtext: '推奨薬をお届け' }
+                { icon: Clipboard, text: '寄り沿った質問', subtext: '症状を正確に把握' },
+                { icon: MessageCircle, text: '無制限で質問可能', subtext: '気になることは何でも' },
+                { icon: CheckCircle, text: '簡単に購入', subtext: 'おすすめ商品をお届け' }
               ].map((feature, index) => (
                 <div key={index} className="bg-white p-4 rounded-lg shadow-md">
                   <div className="flex flex-col items-center">
@@ -606,7 +624,7 @@ export default function Home() {
                     },
                     {
                       title: '簡単購入システム',
-                      description: '症状に合わせて提案された医薬品を、その場でワンクリックで購入可能',
+                      description: '症状に合わせて提案された商品をその場で、ワンクリックで購入可能',
                       icon: CheckCircle
                     },
                     {
