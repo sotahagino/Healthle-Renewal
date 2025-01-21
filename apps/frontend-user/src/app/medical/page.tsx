@@ -75,10 +75,10 @@ function MedicalContent() {
                 直ちに救急車を呼ぶことをお勧めします。
               </p>
               <Button asChild size="lg" variant="destructive" className="w-full sm:w-auto">
-                <Link href="tel:119" className="flex items-center justify-center gap-2">
+                <a href="tel:119" className="flex items-center justify-center gap-2">
                   <Phone className="h-5 w-5" />
                   119番通報する
-                </Link>
+                </a>
               </Button>
             </CardContent>
           </Card>

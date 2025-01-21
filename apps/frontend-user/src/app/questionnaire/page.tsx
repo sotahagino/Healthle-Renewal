@@ -114,55 +114,66 @@ function QuestionnaireContent() {
       return
     }
 
-    const data = searchParams.get('data')
-    if (!data) {
-      setError('質問データが見つかりません')
-      return
-    }
-
-    try {
-      const decodedData = decodeURIComponent(data)
-      console.log('Decoded data:', decodedData)
-
-      let parsedQuestions
+    const fetchQuestions = async () => {
       try {
-        parsedQuestions = JSON.parse(decodedData)
-      } catch (parseError) {
-        console.error('JSON parse error:', parseError)
-        throw new Error('質問データの形式が不正です')
-      }
+        console.log('Fetching questions for interview_id:', interview_id)
+        const supabase = getSupabaseClient()
+        const { data, error } = await supabase
+          .from('medical_interviews')
+          .select('questions')
+          .eq('id', interview_id)
+          .single()
 
-      // 質問データの検証
-      if (!Array.isArray(parsedQuestions)) {
-        throw new Error('質問データが配列ではありません')
-      }
+        console.log('Supabase response:', { data, error })
 
-      // 必須フィールドの検証
-      parsedQuestions.forEach((question, index) => {
-        if (!question.id || !question.text || !question.type) {
-          throw new Error(`質問${index + 1}に必須フィールドが不足しています`)
+        if (error) {
+          console.error('Supabase error:', error)
+          throw error
         }
-        if (question.type !== '自由記述' && (!Array.isArray(question.options) || question.options.length === 0)) {
-          throw new Error(`質問${index + 1}の選択肢が不正です`)
+
+        if (!data || !data.questions) {
+          console.error('No questions found in data:', data)
+          throw new Error('質問データが見つかりません')
         }
-      })
 
-      setQuestions(parsedQuestions)
-      
-      // 回答の初期化
-      const initialAnswers: { [key: string]: string | string[] } = {}
-      parsedQuestions.forEach((q: Question) => {
-        initialAnswers[q.id] = q.type === '複数選択' ? [] : ''
-      })
-      setAnswers(initialAnswers)
+        const parsedQuestions = data.questions
+        console.log('Parsed questions:', parsedQuestions)
 
-    } catch (err) {
-      console.error('質問データ解析エラー:', err)
-      setError(err instanceof Error ? err.message : '質問データの読み込みに失敗しました')
-      if (errorRef.current) {
-        errorRef.current.scrollIntoView({ behavior: 'smooth' })
+        // 質問データの検証
+        if (!Array.isArray(parsedQuestions)) {
+          console.error('Questions is not an array:', parsedQuestions)
+          throw new Error('質問データが配列ではありません')
+        }
+
+        // 必須フィールドの検証
+        parsedQuestions.forEach((question, index) => {
+          if (!question.id || !question.text || !question.type) {
+            throw new Error(`質問${index + 1}に必須フィールドが不足しています`)
+          }
+          if (question.type !== '自由記述' && (!Array.isArray(question.options) || question.options.length === 0)) {
+            throw new Error(`質問${index + 1}の選択肢が不正です`)
+          }
+        })
+
+        setQuestions(parsedQuestions)
+        
+        // 回答の初期化
+        const initialAnswers: { [key: string]: string | string[] } = {}
+        parsedQuestions.forEach((q: Question) => {
+          initialAnswers[q.id] = q.type === '複数選択' ? [] : ''
+        })
+        setAnswers(initialAnswers)
+
+      } catch (err) {
+        console.error('質問データ取得エラー:', err)
+        setError(err instanceof Error ? err.message : '質問データの読み込みに失敗しました')
+        if (errorRef.current) {
+          errorRef.current.scrollIntoView({ behavior: 'smooth' })
+        }
       }
     }
+
+    fetchQuestions()
   }, [searchParams])
 
   useEffect(() => {
