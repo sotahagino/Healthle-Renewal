@@ -12,20 +12,20 @@ interface LegalDocument {
   updated_at: string
 }
 
-export default function PrivacyPage() {
-  const [privacy, setPrivacy] = useState<LegalDocument | null>(null)
+export default function TermsPage() {
+  const [terms, setTerms] = useState<LegalDocument | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const fetchPrivacy = async () => {
+    const fetchTerms = async () => {
       try {
-        const response = await fetch('/api/legal-documents?type=privacy')
+        const response = await fetch('/api/legal-documents?type=terms')
         if (!response.ok) {
-          throw new Error('プライバシーポリシーの取得に失敗しました')
+          throw new Error('利用規約の取得に失敗しました')
         }
         const data = await response.json()
-        setPrivacy(data)
+        setTerms(data)
       } catch (err) {
         setError(err instanceof Error ? err.message : '予期せぬエラーが発生しました')
       } finally {
@@ -33,7 +33,7 @@ export default function PrivacyPage() {
       }
     }
 
-    fetchPrivacy()
+    fetchTerms()
   }, [])
 
   if (loading) {
@@ -73,10 +73,10 @@ export default function PrivacyPage() {
     <div className="min-h-screen flex flex-col bg-white">
       <SiteHeader />
       <main className="flex-grow container mx-auto px-4 py-8 max-w-3xl">
-        <h1 className="text-2xl font-bold mb-8">{privacy?.title || 'プライバシーポリシー'}</h1>
+        <h1 className="text-2xl font-bold mb-8">{terms?.title || '利用規約'}</h1>
         
         <div className="prose prose-sm max-w-none">
-          {privacy?.content.split('\n').map((paragraph, index) => (
+          {terms?.content.split('\n').map((paragraph, index) => (
             <p key={index} className="mb-4 whitespace-pre-wrap">
               {paragraph}
             </p>
@@ -84,12 +84,11 @@ export default function PrivacyPage() {
         </div>
 
         <div className="mt-8 text-sm text-gray-500">
-          <p>バージョン: {privacy?.version}</p>
-          <p>最終更新日: {privacy?.updated_at ? new Date(privacy.updated_at).toLocaleDateString('ja-JP') : ''}</p>
+          <p>バージョン: {terms?.version}</p>
+          <p>最終更新日: {terms?.updated_at ? new Date(terms.updated_at).toLocaleDateString('ja-JP') : ''}</p>
         </div>
       </main>
       <Footer />
     </div>
   )
-}
-
+} 

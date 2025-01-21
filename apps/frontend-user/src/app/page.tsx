@@ -636,7 +636,7 @@ export default function Home() {
     <div className="min-h-screen flex flex-col bg-white">
       <SiteHeader />
       
-      <main className="flex-grow pt-12">
+      <main className="flex-grow pt-20">
         <div className="max-w-md mx-auto animate-fade-in px-5">
           {/* 新しい画像セクション */}
           <div className="relative w-full mb-8">
