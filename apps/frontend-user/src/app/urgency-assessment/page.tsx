@@ -39,6 +39,8 @@ function UrgencyAssessmentContent() {
   const [questions, setQuestions] = useState<UrgencyQuestion[]>([])
   const [selectedQuestions, setSelectedQuestions] = useState<number[]>([])
   const [currentUrgencyLevel, setCurrentUrgencyLevel] = useState<string | null>(null)
+  const [isPreparingQuestionnaire, setIsPreparingQuestionnaire] = useState(false)
+  const [isQuestionnaireReady, setIsQuestionnaireReady] = useState(false)
   const interviewId = searchParams.get('interview_id')
   const categoryId = searchParams.get('category_id')
   const supabase = createClientComponentClient()
@@ -110,6 +112,11 @@ function UrgencyAssessmentContent() {
         }
         const data = await res.json()
         setQuestions(data)
+
+        // 質問を取得したら、質問票APIを呼び出す準備を開始
+        setIsPreparingQuestionnaire(true)
+        prepareQuestionnaire(data)
+
       } catch (error) {
         setError(error instanceof Error ? error.message : '予期せぬエラーが発生しました')
       } finally {
@@ -119,6 +126,86 @@ function UrgencyAssessmentContent() {
 
     fetchQuestions()
   }, [categoryId, interviewId, router])
+
+  // 質問票APIを呼び出す関数
+  const prepareQuestionnaire = async (questionData: UrgencyQuestion[]) => {
+    try {
+      const symptomText = `カテゴリー${categoryId}からの緊急度判定`
+      const questionnaireRes = await fetch('https://api.dify.ai/v1/completion-messages', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_DIFY_QUESTION_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          inputs: {
+            symptom: symptomText,
+            is_child: false
+          },
+          response_mode: "blocking",
+          user: "anonymous"
+        })
+      })
+
+      if (!questionnaireRes.ok) {
+        console.error('問診表生成APIエラー:', await questionnaireRes.text())
+        return
+      }
+
+      const questionnaireData = await questionnaireRes.json()
+      console.log('Questionnaire Response:', questionnaireData)
+
+      // 問診表データを解析
+      let parsedQuestions = null
+      try {
+        const jsonMatch = questionnaireData.answer.match(/```json\n([\s\S]*?)\n```/)
+        if (jsonMatch) {
+          const jsonContent = jsonMatch[1].trim()
+          console.log('Extracted questions JSON:', jsonContent)
+          parsedQuestions = JSON.parse(jsonContent)
+        } else {
+          parsedQuestions = JSON.parse(questionnaireData.answer)
+        }
+        console.log('Parsed questions:', parsedQuestions)
+
+        if (!parsedQuestions || !parsedQuestions.questions) {
+          throw new Error('問診表データの形式が不正です')
+        }
+
+        // 問診表データを保存
+        const questionsArray = parsedQuestions.questions
+        const questionUpdates = {
+          question_1: questionsArray[0]?.text || null,
+          question_2: questionsArray[1]?.text || null,
+          question_3: questionsArray[2]?.text || null,
+          question_4: questionsArray[3]?.text || null,
+          question_5: questionsArray[4]?.text || null,
+          question_6: questionsArray[5]?.text || null,
+          questions: questionsArray,
+          updated_at: new Date().toISOString()
+        }
+
+        const { error: saveError } = await supabase
+          .from('medical_interviews')
+          .update(questionUpdates)
+          .eq('id', interviewId)
+          .select()
+
+        if (saveError) {
+          console.error('問診表データの保存に失敗しました:', saveError)
+          return
+        }
+
+        setIsQuestionnaireReady(true)
+      } catch (error) {
+        console.error('問診表データの解析に失敗しました:', error)
+      }
+    } catch (error) {
+      console.error('問診表の生成中にエラーが発生しました:', error)
+    } finally {
+      setIsPreparingQuestionnaire(false)
+    }
+  }
 
   const questionGroups: QuestionGroup[] = [
     {
@@ -274,85 +361,17 @@ function UrgencyAssessmentContent() {
       const data = await res.json()
       console.log('Urgency assessment saved:', data)
 
-      // 白判定の場合は質問票生成APIを呼び出す
+      // 白判定の場合
       if (urgencyLevel === 'white') {
-        try {
-          const questionnaireRes = await fetch('https://api.dify.ai/v1/completion-messages', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${process.env.NEXT_PUBLIC_DIFY_QUESTION_API_KEY}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              inputs: {
-                symptom: selectedQuestionData.map(q => q.question_text).join('、'),
-                is_child: false
-              },
-              response_mode: "blocking",
-              user: "anonymous"
-            })
-          })
-
-          if (!questionnaireRes.ok) {
-            console.error('問診表生成APIエラー:', await questionnaireRes.text())
-            throw new Error('問診表の生成に失敗しました')
-          }
-
-          const questionnaireData = await questionnaireRes.json()
-          console.log('Questionnaire Response:', questionnaireData)
-
-          // 問診表データを解析
-          let parsedQuestions = null
-          try {
-            const jsonMatch = questionnaireData.answer.match(/```json\n([\s\S]*?)\n```/)
-            if (jsonMatch) {
-              const jsonContent = jsonMatch[1].trim()
-              console.log('Extracted questions JSON:', jsonContent)
-              parsedQuestions = JSON.parse(jsonContent)
-            } else {
-              parsedQuestions = JSON.parse(questionnaireData.answer)
-            }
-            console.log('Parsed questions:', parsedQuestions)
-
-            if (!parsedQuestions || !parsedQuestions.questions) {
-              throw new Error('問診表データの形式が不正です')
-            }
-          } catch (error) {
-            console.error('問診表データの解析に失敗しました:', error)
-            throw new Error('問診表データの解析に失敗しました')
-          }
-
-          // 問診表データを保存
-          const questionsArray = parsedQuestions.questions
-          const questionUpdates = {
-            question_1: questionsArray[0]?.text || null,
-            question_2: questionsArray[1]?.text || null,
-            question_3: questionsArray[2]?.text || null,
-            question_4: questionsArray[3]?.text || null,
-            question_5: questionsArray[4]?.text || null,
-            question_6: questionsArray[5]?.text || null,
-            questions: questionsArray,
-            updated_at: new Date().toISOString()
-          }
-
-          const { data: updateData, error: saveError } = await supabase
-            .from('medical_interviews')
-            .update(questionUpdates)
-            .eq('id', interviewId)
-            .select()
-
-          if (saveError) {
-            console.error('問診表データの保存に失敗しました:', saveError)
-            throw new Error('問診表データの保存に失敗しました')
-          }
-
-          // 問診ページへ遷移
-          router.push(`/questionnaire?interview_id=${interviewId}`)
+        // 質問票の準備状態をチェック
+        if (!isQuestionnaireReady && isPreparingQuestionnaire) {
+          // 質問票がまだ準備中の場合
+          setError('問診票を準備中です。しばらくお待ちください...')
           return
-        } catch (error) {
-          console.error('問診表の生成中にエラーが発生しました:', error)
-          setError(error instanceof Error ? error.message : '予期せぬエラーが発生しました')
         }
+        // 問診ページへ遷移
+        router.push(`/questionnaire?interview_id=${interviewId}`)
+        return
       }
 
       // 白判定以外はmedical画面に遷移
