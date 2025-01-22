@@ -308,7 +308,7 @@ export default function CorporatePage() {
                 </div>
                 <div className="grid grid-cols-3 py-4 px-6">
                   <dt className="text-gray-600">設立</dt>
-                  <dd className="col-span-2 text-gray-900">2024年1月</dd>
+                  <dd className="col-span-2 text-gray-900">2025年1月</dd>
                 </div>
                 <div className="grid grid-cols-3 py-4 px-6">
                   <dt className="text-gray-600">代表者</dt>
@@ -316,7 +316,7 @@ export default function CorporatePage() {
                 </div>
                 <div className="grid grid-cols-3 py-4 px-6">
                   <dt className="text-gray-600">所在地</dt>
-                  <dd className="col-span-2 text-gray-900">東京都渋谷区</dd>
+                  <dd className="col-span-2 text-gray-900">〒251-0045 神奈川県藤沢市</dd>
                 </div>
                 <div className="grid grid-cols-3 py-4 px-6">
                   <dt className="text-gray-600">事業内容</dt>

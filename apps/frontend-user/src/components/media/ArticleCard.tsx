@@ -38,13 +38,13 @@ export function ArticleCard({ article }: ArticleCardProps) {
             {article.description}
           </p>
         </CardContent>
-        <CardFooter className="px-4 py-3 border-t flex justify-between text-sm text-gray-500">
-          <div className="flex items-center">
-            <User className="w-4 h-4 mr-1" />
+        <CardFooter className="px-4 py-3 border-t flex justify-between text-[10px] text-gray-500">
+          <div className="flex items-center gap-1">
+            <User className="w-3 h-3" />
             {article.author_name}
           </div>
-          <div className="flex items-center">
-            <Calendar className="w-4 h-4 mr-1" />
+          <div className="flex items-center gap-1">
+            <Calendar className="w-3 h-3" />
             {new Date(article.publishedAt).toLocaleDateString('ja-JP')}
           </div>
         </CardFooter>
