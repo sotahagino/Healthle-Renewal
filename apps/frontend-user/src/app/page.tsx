@@ -353,10 +353,10 @@ export default function Home() {
         router.push('/emergency')
       } else {
         // 緊急症状なしの場合は通常フロー
-        const symptomAssessmentRes = await fetch('https://api.dify.ai/v1/completion-messages', {
+        const symptomAssessmentRes = await fetch(`${process.env.NEXT_PUBLIC_DIFY_API_URL}/completion-messages`, {
           method: 'POST',
           headers: {
-            'Authorization': 'Bearer app-Ymt6FHFyEu2R5sQUlKydYX34',
+            'Authorization': `Bearer ${process.env.NEXT_PUBLIC_DIFY_ASSESSMENT_API_KEY}`,
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
@@ -436,7 +436,7 @@ export default function Home() {
           } else {
             // 白判定の場合は質問票生成へ
             try {
-              const questionnaireRes = await fetch('https://api.dify.ai/v1/completion-messages', {
+              const questionnaireRes = await fetch(`${process.env.NEXT_PUBLIC_DIFY_API_URL}/completion-messages`, {
                 method: 'POST',
                 headers: {
                   'Authorization': `Bearer ${process.env.NEXT_PUBLIC_DIFY_QUESTION_API_KEY}`,
@@ -526,7 +526,7 @@ export default function Home() {
           console.log('マッチするカテゴリーが見つかりませんでした。質問票生成を開始します。')
           // 質問票生成APIを呼び出し
           try {
-            const questionnaireRes = await fetch('https://api.dify.ai/v1/completion-messages', {
+            const questionnaireRes = await fetch(`${process.env.NEXT_PUBLIC_DIFY_API_URL}/completion-messages`, {
               method: 'POST',
               headers: {
                 'Authorization': `Bearer ${process.env.NEXT_PUBLIC_DIFY_QUESTION_API_KEY}`,

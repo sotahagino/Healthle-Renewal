@@ -35,10 +35,10 @@ interface ProhibitedContentResponse {
 // 禁止事項判定APIを呼び出す関数
 const checkProhibitedContent = async (symptomText: string, answers: any) => {
   try {
-    const response = await fetch('https://api.dify.ai/v1/completion-messages', {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_DIFY_API_URL}/completion-messages`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer app-jetDeVCJVsrIVd7RCVeuXNUY`,
+        'Authorization': `Bearer ${process.env.NEXT_PUBLIC_DIFY_PROHIBITED_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
