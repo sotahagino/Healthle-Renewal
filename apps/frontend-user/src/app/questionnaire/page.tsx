@@ -27,57 +27,52 @@ interface Question {
   options: Option[]
 }
 
-// トリアージAPIのレスポンス型
-interface TriageResponse {
-  triageResult: 'self_care' | 'medical_consultation'
-  reason: string
-  recommendedSpecialty: string
+// 禁止事項判定APIのレスポンス型
+interface ProhibitedContentResponse {
+  problem: boolean
 }
 
-// トリアージAPIを呼び出す関数
-const callTriageAssistant = async (symptomText: string, answers: any) => {
+// 禁止事項判定APIを呼び出す関数
+const checkProhibitedContent = async (symptomText: string, answers: any) => {
   try {
     const response = await fetch('https://api.dify.ai/v1/completion-messages', {
       method: 'POST',
       headers: {
-        'Authorization': 'Bearer app-jetDeVCJVsrIVd7RCVeuXNUY',
+        'Authorization': `Bearer app-jetDeVCJVsrIVd7RCVeuXNUY`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        inputs: {},
-        query: JSON.stringify({
-          symptomText,
-          answers
-        }),
-        response_mode: 'blocking',
-        user: 'user',
+        inputs: {
+          text: JSON.stringify({
+            symptom: symptomText,
+            answers: answers
+          })
+        },
+        response_mode: "blocking",
+        user: "user"
       }),
     })
 
     if (!response.ok) {
-      throw new Error('トリアージAPIの呼び出しに失敗しました')
+      throw new Error('禁止事項判定APIの呼び出しに失敗しました')
     }
 
     const data = await response.json()
-    console.log('API Response:', data) // デバッグログ
+    console.log('Prohibited Content API Response:', data)
 
     if (!data || !data.answer) {
       throw new Error('APIレスポンスの形式が不正です')
     }
 
-    // APIの応答から余計なテキストを削除し、JSONを抽出
-    const text = data.answer
-    console.log('Response text:', text) // デバッグログ
-
     try {
       // まず、```json```で囲まれた部分を探す
-      const jsonMatch = text.match(/```json\s*([\s\S]*?)\s*```/)
+      const jsonMatch = data.answer.match(/```json\s*([\s\S]*?)\s*```/)
       if (jsonMatch) {
-        return JSON.parse(jsonMatch[1]) as TriageResponse
+        return JSON.parse(jsonMatch[1]) as ProhibitedContentResponse
       }
 
       // 次に、単純なJSONテキストとして解析を試みる
-      const jsonObject = JSON.parse(text) as TriageResponse
+      const jsonObject = JSON.parse(data.answer) as ProhibitedContentResponse
       if (jsonObject && typeof jsonObject === 'object') {
         return jsonObject
       }
@@ -85,11 +80,11 @@ const callTriageAssistant = async (symptomText: string, answers: any) => {
       throw new Error('JSONの解析に失敗しました')
     } catch (parseError) {
       console.error('JSON parse error:', parseError)
-      throw new Error('トリアージ結果の解析に失敗しました')
+      throw new Error('禁止事項判定結果の解析に失敗しました')
     }
   } catch (error) {
-    console.error('Triage API error:', error)
-    throw new Error('トリアージの判定に失敗しました')
+    console.error('Prohibited Content API error:', error)
+    throw new Error('禁止事項の判定に失敗しました')
   }
 }
 
@@ -282,17 +277,22 @@ function QuestionnaireContent() {
 
       console.log('Save response:', data)
 
-      // トリアージアシスタントを呼び出し
-      const triageResponse = await callTriageAssistant(symptomText, answersArray)
-      
-      // 遷移先の決定
+      // 禁止事項判定を実行
+      const prohibitedContentResponse = await checkProhibitedContent(symptomText, answersArray)
       const encodedAnswers = encodeURIComponent(JSON.stringify(answersArray))
-      const encodedTriageResponse = encodeURIComponent(JSON.stringify(triageResponse))
       
-      if (triageResponse.triageResult === 'medical_consultation') {
-        router.push(`/medical?interview_id=${interview_id}&answers=${encodedAnswers}&triage=${encodedTriageResponse}`)
+      if (prohibitedContentResponse.problem) {
+        // 禁止事項に該当する場合は、黄色判定で精神科・心療内科を推奨
+        const triageData = {
+          triageResult: 'medical_consultation',
+          reason: '精神的なケアが必要と判断されました',
+          recommendedSpecialty: '精神科,心療内科'
+        }
+        const encodedTriageData = encodeURIComponent(JSON.stringify(triageData))
+        router.push(`/medical?interview_id=${interview_id}&answers=${encodedAnswers}&triage=${encodedTriageData}&urgency_level=yellow`)
       } else {
-        router.push(`/result?interview_id=${interview_id}&answers=${encodedAnswers}&triage=${encodedTriageResponse}`)
+        // 問題がない場合はresult画面に遷移
+        router.push(`/result?interview_id=${interview_id}&answers=${encodedAnswers}`)
       }
 
     } catch (error) {

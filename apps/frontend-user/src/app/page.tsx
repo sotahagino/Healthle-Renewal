@@ -404,9 +404,9 @@ export default function Home() {
           .sort((a, b) => Number(b.confidence) - Number(a.confidence))
         
         // カテゴリーIDに変換（最も信頼度の高いものを選択）
-        const matchedCategoryIds = [categoryMapping[sortedCategories[0].category]]
-          .filter(Boolean)
-          .map(String)
+        const matchedCategoryIds = sortedCategories.length > 0 
+          ? [categoryMapping[sortedCategories[0].category]].filter(Boolean).map(String)
+          : []
 
         console.log('マッチしたカテゴリーID:', matchedCategoryIds)
 
@@ -522,7 +522,7 @@ export default function Home() {
         }
 
         // 通常の症状判定フロー
-        if (matchedCategoryIds.length === 0) {
+        if (matchedCategoryIds.length === 0 || !sortedCategories[0]?.category) {
           console.log('マッチするカテゴリーが見つかりませんでした。質問票生成を開始します。')
           // 質問票生成APIを呼び出し
           try {
@@ -568,41 +568,40 @@ export default function Home() {
               if (!parsedQuestions || !parsedQuestions.questions) {
                 throw new Error('問診表データの形式が不正です')
               }
+
+              // 問診表データを保存
+              const questionsArray = parsedQuestions.questions
+              const questionUpdates = {
+                question_1: questionsArray[0]?.text || null,
+                question_2: questionsArray[1]?.text || null,
+                question_3: questionsArray[2]?.text || null,
+                question_4: questionsArray[3]?.text || null,
+                question_5: questionsArray[4]?.text || null,
+                question_6: questionsArray[5]?.text || null,
+                questions: questionsArray, // 質問の詳細情報も保存
+                updated_at: new Date().toISOString()
+              }
+
+              // interview_idを使用してデータを更新
+              const { data: updateData, error: saveError } = await supabase
+                .from('medical_interviews')
+                .update(questionUpdates)
+                .eq('id', interviewId)
+                .select()
+
+              if (saveError) {
+                console.error('問診表データの保存に失敗しました:', saveError)
+                throw new Error('問診表データの保存に失敗しました')
+              }
+
+              console.log('Updated interview data:', updateData)
+
+              // 問診ページへ遷移
+              router.push(`/questionnaire?interview_id=${interviewId}`)
             } catch (error) {
               console.error('問診表データの解析に失敗しました:', error)
               throw new Error('問診表データの解析に失敗しました')
             }
-
-            // 問診表データを保存
-            const questionsArray = parsedQuestions.questions
-            const questionUpdates = {
-              question_1: questionsArray[0]?.text || null,
-              question_2: questionsArray[1]?.text || null,
-              question_3: questionsArray[2]?.text || null,
-              question_4: questionsArray[3]?.text || null,
-              question_5: questionsArray[4]?.text || null,
-              question_6: questionsArray[5]?.text || null,
-              questions: questionsArray, // 質問の詳細情報も保存
-              updated_at: new Date().toISOString()
-            }
-
-            console.log('Saving questions with interview_id:', interviewId)
-
-            const { data: updateData, error: saveError } = await supabase
-              .from('medical_interviews')
-              .update(questionUpdates)
-              .eq('id', interviewId)
-              .select()
-
-            if (saveError) {
-              console.error('問診表データの保存に失敗しました:', saveError)
-              throw new Error('問診表データの保存に失敗しました')
-            }
-
-            console.log('Updated interview data:', updateData)
-
-            // 問診ページへ遷移
-            router.push(`/questionnaire?interview_id=${interviewId}`)
           } catch (error) {
             console.error('問診表の生成中にエラーが発生しました:', error)
             setError(error instanceof Error ? error.message : '予期せぬエラーが発生しました')
