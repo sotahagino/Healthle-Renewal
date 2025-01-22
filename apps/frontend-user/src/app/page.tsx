@@ -346,6 +346,7 @@ export default function Home() {
       }
 
       const interviewData = await interviewRes.json()
+      const interviewId = interviewData.interview_id
 
       if (hasEmergencySymptoms) {
         // 緊急症状ありの場合は直接emergency画面へ
@@ -409,25 +410,21 @@ export default function Home() {
 
         console.log('マッチしたカテゴリーID:', matchedCategoryIds)
 
-        // 問診データを作成
-        const interviewRes = await fetch('/api/interviews', {
-          method: 'POST',
+        // 問診データを更新
+        const updateRes = await fetch(`/api/interviews/${interviewId}`, {
+          method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            symptom_text: `${symptomText}（対象者は${isOver16 ? '16歳以上' : '16歳未満'}）`,
             matched_categories: matchedCategoryIds,
             is_child: parsedData.is_child
           }),
         })
 
-        if (!interviewRes.ok) {
-          throw new Error('問診データの作成に失敗しました')
+        if (!updateRes.ok) {
+          throw new Error('問診データの更新に失敗しました')
         }
-
-        const interviewData = await interviewRes.json()
-        console.log('Created interview data:', interviewData)
 
         // 「該当しない」が選択された場合の処理
         if (symptomText.includes('上記の症状には該当しない')) {
@@ -435,7 +432,7 @@ export default function Home() {
           
           if (GREEN_JUDGMENT_CATEGORIES.includes(categoryId)) {
             // 緑判定が必要なカテゴリーの場合
-            router.push(`/medical?interview_id=${interviewData.interview_id}&urgency_level=green`)
+            router.push(`/medical?interview_id=${interviewId}&urgency_level=green`)
           } else {
             // 白判定の場合は質問票生成へ
             try {
@@ -470,7 +467,9 @@ export default function Home() {
                 if (jsonMatch) {
                   const jsonContent = jsonMatch[1].trim()
                   console.log('Extracted questions JSON:', jsonContent)
-                  parsedQuestions = JSON.parse(jsonContent)
+                  // JSONの整形と不要な空白の削除
+                  const cleanedJson = jsonContent.replace(/\s+(?=(?:[^"]*"[^"]*")*[^"]*$)/g, '')
+                  parsedQuestions = JSON.parse(cleanedJson)
                 } else {
                   parsedQuestions = JSON.parse(questionnaireData.answer)
                 }
@@ -479,37 +478,40 @@ export default function Home() {
                 if (!parsedQuestions || !parsedQuestions.questions) {
                   throw new Error('問診表データの形式が不正です')
                 }
+
+                // 問診表データを保存
+                const questionsArray = parsedQuestions.questions
+                const questionUpdates = {
+                  question_1: questionsArray[0]?.text || null,
+                  question_2: questionsArray[1]?.text || null,
+                  question_3: questionsArray[2]?.text || null,
+                  question_4: questionsArray[3]?.text || null,
+                  question_5: questionsArray[4]?.text || null,
+                  question_6: questionsArray[5]?.text || null,
+                  questions: questionsArray, // 質問の詳細情報も保存
+                  updated_at: new Date().toISOString()
+                }
+
+                // interview_idを使用してデータを更新
+                const { data: updateData, error: saveError } = await supabase
+                  .from('medical_interviews')
+                  .update(questionUpdates)
+                  .eq('id', interviewId)
+                  .select()
+
+                if (saveError) {
+                  console.error('問診表データの保存に失敗しました:', saveError)
+                  throw new Error('問診表データの保存に失敗しました')
+                }
+
+                console.log('Updated interview data:', updateData)
+
+                // 問診ページへ遷移
+                router.push(`/questionnaire?interview_id=${interviewId}`)
               } catch (error) {
                 console.error('問診表データの解析に失敗しました:', error)
                 throw new Error('問診表データの解析に失敗しました')
               }
-
-              // 問診表データを保存
-              const questionsArray = parsedQuestions.questions
-              const questionUpdates = {
-                question_1: questionsArray[0]?.text || null,
-                question_2: questionsArray[1]?.text || null,
-                question_3: questionsArray[2]?.text || null,
-                question_4: questionsArray[3]?.text || null,
-                question_5: questionsArray[4]?.text || null,
-                question_6: questionsArray[5]?.text || null,
-                questions: questionsArray, // 質問の詳細情報も保存
-                updated_at: new Date().toISOString()
-              }
-
-              const { data: updateData, error: saveError } = await supabase
-                .from('medical_interviews')
-                .update(questionUpdates)
-                .eq('id', interviewData.interview_id)
-                .select()
-
-              if (saveError) {
-                console.error('問診表データの保存に失敗しました:', saveError)
-                throw new Error('問診表データの保存に失敗しました')
-              }
-
-              // 問診ページへ遷移
-              router.push(`/questionnaire?interview_id=${interviewData.interview_id}`)
             } catch (error) {
               console.error('問診表の生成中にエラーが発生しました:', error)
               setError(error instanceof Error ? error.message : '予期せぬエラーが発生しました')
@@ -555,7 +557,9 @@ export default function Home() {
               if (jsonMatch) {
                 const jsonContent = jsonMatch[1].trim()
                 console.log('Extracted questions JSON:', jsonContent)
-                parsedQuestions = JSON.parse(jsonContent)
+                // JSONの整形と不要な空白の削除
+                const cleanedJson = jsonContent.replace(/\s+(?=(?:[^"]*"[^"]*")*[^"]*$)/g, '')
+                parsedQuestions = JSON.parse(cleanedJson)
               } else {
                 parsedQuestions = JSON.parse(questionnaireData.answer)
               }
@@ -582,12 +586,12 @@ export default function Home() {
               updated_at: new Date().toISOString()
             }
 
-            console.log('Saving questions with interview_id:', interviewData.interview_id)
+            console.log('Saving questions with interview_id:', interviewId)
 
             const { data: updateData, error: saveError } = await supabase
               .from('medical_interviews')
               .update(questionUpdates)
-              .eq('id', interviewData.interview_id)
+              .eq('id', interviewId)
               .select()
 
             if (saveError) {
@@ -598,7 +602,7 @@ export default function Home() {
             console.log('Updated interview data:', updateData)
 
             // 問診ページへ遷移
-            router.push(`/questionnaire?interview_id=${interviewData.interview_id}`)
+            router.push(`/questionnaire?interview_id=${interviewId}`)
           } catch (error) {
             console.error('問診表の生成中にエラーが発生しました:', error)
             setError(error instanceof Error ? error.message : '予期せぬエラーが発生しました')
@@ -606,7 +610,7 @@ export default function Home() {
           }
         } else {
           // カテゴリーがマッチした場合は緊急度判定へ
-          router.push(`/urgency-assessment?interview_id=${interviewData.interview_id}&category_id=${matchedCategoryIds[0]}`)
+          router.push(`/urgency-assessment?interview_id=${interviewId}&category_id=${matchedCategoryIds[0]}`)
         }
       }
     } catch (error) {

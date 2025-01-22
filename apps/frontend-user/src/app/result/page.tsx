@@ -599,6 +599,11 @@ function ResultContent() {
     }
   };
 
+  // 相談内容から年齢情報を除去する関数を追加
+  const removeAgeInfo = (text: string) => {
+    return text.replace(/（対象者は(16歳以上|16歳未満)）/g, '');
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#E6F3EF] to-white">
       <SiteHeader />
@@ -633,7 +638,7 @@ function ResultContent() {
                       </h2>
                     </div>
                     <div className="prose prose-sm sm:prose-base md:prose-lg max-w-none text-[#4A5568] leading-relaxed">
-                      {consultationText}
+                      {consultationText ? removeAgeInfo(consultationText) : ''}
                     </div>
                   </div>
                 </CardContent>
