@@ -690,42 +690,48 @@ function ResultContent() {
                 </div>
               </h2>
               
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 md:gap-8">
-                {recommendedProducts.map((product) => (
-                  <div 
-                    key={product.id} 
-                    className="group bg-white rounded-xl sm:rounded-2xl overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 touch-manipulation"
-                  >
-                    {product.image_url && (
-                      <div className="relative h-40 sm:h-48 overflow-hidden">
-                        <img 
-                          src={product.image_url} 
-                          alt={`${product.name}の商品画像`}
-                          className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500"
-                          loading="lazy"
-                        />
-                      </div>
-                    )}
-                    <div className="p-4 sm:p-6">
-                      <h3 className="font-bold text-lg sm:text-xl mb-2 sm:mb-3 text-[#2D3748] line-clamp-2">
-                        {product.name}
-                      </h3>
-                      <p className="text-sm sm:text-base text-[#4A5568] mb-3 sm:mb-4 line-clamp-2 leading-relaxed">
-                        {product.description}
-                      </p>
-                      <div className="space-y-3 sm:space-y-4">
-                        <p className="text-xl sm:text-2xl font-bold text-[#2D3748]">
-                          ¥{product.price.toLocaleString()}
+              {recommendedProducts.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 md:gap-8">
+                  {recommendedProducts.map((product) => (
+                    <div 
+                      key={product.id} 
+                      className="group bg-white rounded-xl sm:rounded-2xl overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 touch-manipulation"
+                    >
+                      {product.image_url && (
+                        <div className="relative h-40 sm:h-48 overflow-hidden">
+                          <img 
+                            src={product.image_url} 
+                            alt={`${product.name}の商品画像`}
+                            className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500"
+                            loading="lazy"
+                          />
+                        </div>
+                      )}
+                      <div className="p-4 sm:p-6">
+                        <h3 className="font-bold text-lg sm:text-xl mb-2 sm:mb-3 text-[#2D3748] line-clamp-2">
+                          {product.name}
+                        </h3>
+                        <p className="text-sm sm:text-base text-[#4A5568] mb-3 sm:mb-4 line-clamp-2 leading-relaxed">
+                          {product.description}
                         </p>
-                        <ProductPurchaseButton
-                          product={product}
-                          interviewId={interviewId}
-                        />
+                        <div className="space-y-3 sm:space-y-4">
+                          <p className="text-xl sm:text-2xl font-bold text-[#2D3748]">
+                            ¥{product.price.toLocaleString()}
+                          </p>
+                          <ProductPurchaseButton
+                            product={product}
+                            interviewId={interviewId}
+                          />
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-gray-600">現在、提案できる商品がありません。</p>
+                </div>
+              )}
             </section>
 
             <div className="fixed bottom-20 sm:bottom-24 right-4 sm:right-6 z-40">
