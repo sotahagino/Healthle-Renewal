@@ -41,8 +41,13 @@ interface ProhibitedContentResponse {
 type AnswerValue = string | string[] | { value: string | string[], otherText?: string }
 type Answers = { [key: string]: AnswerValue }
 
+// 回答データの型定義を追加
+interface FormattedAnswers {
+  [key: string]: string;
+}
+
 // 禁止事項判定APIを呼び出す関数
-const checkProhibitedContent = async (symptomText: string, answers: any) => {
+const checkProhibitedContent = async (symptomText: string, formattedAnswers: Record<string, string>) => {
   try {
     const response = await fetch(`${process.env.NEXT_PUBLIC_DIFY_API_URL}/completion-messages`, {
       method: 'POST',
@@ -52,10 +57,8 @@ const checkProhibitedContent = async (symptomText: string, answers: any) => {
       },
       body: JSON.stringify({
         inputs: {
-          text: JSON.stringify({
-            symptom: symptomText,
-            answers: answers
-          })
+          symptom: symptomText,
+          answers: formattedAnswers
         },
         response_mode: "blocking",
         user: "user"
@@ -251,8 +254,25 @@ function QuestionnaireContent() {
     }
 
     try {
+      // Supabaseからsymptom_textを取得
+      const supabaseClient = getSupabaseClient()
+      const { data: interviewData, error: fetchError } = await supabaseClient
+        .from('medical_interviews')
+        .select('symptom_text')
+        .eq('id', interviewId)
+        .single()
+
+      if (fetchError) {
+        console.error('Symptom text fetch error:', fetchError)
+        throw new Error('相談内容の取得に失敗しました')
+      }
+
+      if (!interviewData?.symptom_text) {
+        throw new Error('相談内容が見つかりません')
+      }
+
       // 回答データの整形
-      const formattedAnswers = Object.entries(answers).reduce((acc, [questionId, answer]) => {
+      const formattedAnswers: FormattedAnswers = Object.entries(answers).reduce((acc, [questionId, answer]) => {
         const question = questions.find(q => q.id === questionId)
         if (!question) return acc
 
@@ -288,9 +308,23 @@ function QuestionnaireContent() {
         return {
           ...acc,
           [`question_${questionNumber}`]: question.text,
-          [`answer_${questionNumber}`]: displayAnswer,
+          [`answer_${questionNumber}`]: displayAnswer || '',
         }
-      }, {})
+      }, {} as FormattedAnswers)
+
+      // 禁止事項判定を実行
+      const questionsAndAnswers = Object.entries(formattedAnswers)
+        .filter(([key]) => key.startsWith('question_'))
+        .map(([key, value]) => {
+          const answerKey = `answer_${key.replace('question_', '')}`
+          return `${value}：${formattedAnswers[answerKey] || ''}`
+        })
+        .join('\n')
+
+      const prohibitedContentResponse = await checkProhibitedContent(
+        `相談内容：${interviewData.symptom_text}\n\n質問と回答：\n${questionsAndAnswers}`,
+        formattedAnswers
+      )
 
       // JSONBデータの準備
       const jsonbAnswers = Object.entries(answers).reduce((acc, [questionId, answer]) => {
@@ -309,7 +343,6 @@ function QuestionnaireContent() {
       }, {})
 
       // 回答をDBに保存
-      const supabaseClient = getSupabaseClient()
       const { error: updateError } = await supabaseClient
         .from('medical_interviews')
         .update({
@@ -325,8 +358,6 @@ function QuestionnaireContent() {
         throw updateError
       }
 
-      // 禁止事項判定を実行
-      const prohibitedContentResponse = await checkProhibitedContent(symptomText, formattedAnswers)
       const encodedAnswers = encodeURIComponent(JSON.stringify(formattedAnswers))
       
       if (prohibitedContentResponse.problem) {

@@ -469,8 +469,13 @@ export default function Home() {
                 if (jsonMatch) {
                   const jsonContent = jsonMatch[1].trim()
                   console.log('Extracted questions JSON:', jsonContent)
-                  // JSONの整形と不要な空白の削除
-                  const cleanedJson = jsonContent.replace(/\s+(?=(?:[^"]*"[^"]*")*[^"]*$)/g, '')
+                  // JSONの整形と不要な空白、余分なカンマの削除
+                  const cleanedJson = jsonContent
+                    .replace(/\s+(?=(?:[^"]*"[^"]*")*[^"]*$)/g, '')  // 不要な空白の削除
+                    .replace(/,\s*([}\]])/g, '$1')  // 末尾のカンマを削除
+                    .replace(/,\s*,/g, ',')  // 連続したカンマを1つに
+                    .replace(/\}\s*,\s*\}/g, '}}')  // オブジェクト終端の余分なカンマを削除
+                  console.log('Cleaned JSON:', cleanedJson)
                   parsedQuestions = JSON.parse(cleanedJson)
                 } else {
                   parsedQuestions = JSON.parse(questionnaireData.answer)
@@ -561,8 +566,13 @@ export default function Home() {
               if (jsonMatch) {
                 const jsonContent = jsonMatch[1].trim()
                 console.log('Extracted questions JSON:', jsonContent)
-                // JSONの整形と不要な空白の削除
-                const cleanedJson = jsonContent.replace(/\s+(?=(?:[^"]*"[^"]*")*[^"]*$)/g, '')
+                // JSONの整形と不要な空白、余分なカンマの削除
+                const cleanedJson = jsonContent
+                  .replace(/\s+(?=(?:[^"]*"[^"]*")*[^"]*$)/g, '')  // 不要な空白の削除
+                  .replace(/,\s*([}\]])/g, '$1')  // 末尾のカンマを削除
+                  .replace(/,\s*,/g, ',')  // 連続したカンマを1つに
+                  .replace(/\}\s*,\s*\}/g, '}}')  // オブジェクト終端の余分なカンマを削除
+                console.log('Cleaned JSON:', cleanedJson)
                 parsedQuestions = JSON.parse(cleanedJson)
               } else {
                 parsedQuestions = JSON.parse(questionnaireData.answer)
