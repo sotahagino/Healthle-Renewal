@@ -263,6 +263,7 @@ export default function Home() {
   const [showEmergencyCheck, setShowEmergencyCheck] = useState(false)
   const [isEmergencyCase, setIsEmergencyCase] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
+  const [isGeneratingQuestionnaire, setIsGeneratingQuestionnaire] = useState(false)
 
   // スクロールに応じてフローティングCTAを表示
   useEffect(() => {
@@ -327,6 +328,7 @@ export default function Home() {
     setIsEmergencyCase(hasEmergencySymptoms)
     setShowEmergencyCheck(false)
     setIsProcessing(true)
+    setIsGeneratingQuestionnaire(false)
 
     try {
       // 問診データを作成
@@ -524,6 +526,8 @@ export default function Home() {
         // 通常の症状判定フロー
         if (matchedCategoryIds.length === 0 || !sortedCategories[0]?.category) {
           console.log('マッチするカテゴリーが見つかりませんでした。質問票生成を開始します。')
+          setIsProcessing(false)
+          setIsGeneratingQuestionnaire(true)
           // 質問票生成APIを呼び出し
           try {
             const questionnaireRes = await fetch(`${process.env.NEXT_PUBLIC_DIFY_API_URL}/completion-messages`, {
@@ -618,6 +622,7 @@ export default function Home() {
       scrollToSymptomInput()
     } finally {
       setIsProcessing(false)
+      setIsGeneratingQuestionnaire(false)
     }
   }
 
@@ -755,36 +760,6 @@ export default function Home() {
                     </>
                   )}
                 </Button>
-
-                {loading && (
-                  <div className="mt-4 bg-secondary/30 rounded-lg p-4 animate-pulse">
-                    <div className="flex items-center justify-between mb-3">
-                      <p className="text-sm font-medium text-text-primary">あなたに最適な質問を準備中...</p>
-                      <div className="flex items-center gap-1">
-                        <span className="w-2 h-2 bg-accent rounded-full animate-bounce" style={{ animationDelay: '0s' }}></span>
-                        <span className="w-2 h-2 bg-accent rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></span>
-                        <span className="w-2 h-2 bg-accent rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></span>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-sm text-text-secondary">
-                        <CheckCircle className="w-4 h-4 text-accent" />
-                        <span>入力内容を分析中</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-text-secondary">
-                        <CheckCircle className="w-4 h-4 text-accent" />
-                        <span>症状に合わせた質問を選定中</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-text-secondary">
-                        <CheckCircle className="w-4 h-4 text-accent" />
-                        <span>より適切な回答のために質問を最適化中</span>
-                      </div>
-                    </div>
-                    <p className="mt-3 text-xs text-text-secondary text-center">
-                      お客様に最適な質問票を作成しています。しばらくお待ちください。
-                    </p>
-                  </div>
-                )}
               </CardContent>
             </Card>
 
@@ -976,6 +951,26 @@ export default function Home() {
           <div className="bg-white rounded-xl p-6 flex flex-col items-center">
             <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent mb-4"></div>
             <p className="text-lg font-bold">処理中...</p>
+          </div>
+        </div>
+      )}
+
+      {/* 質問票生成中のモーダル */}
+      {isGeneratingQuestionnaire && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
+            <div className="flex flex-col items-center text-center">
+              <div className="relative w-16 h-16 mb-6">
+                <div className="absolute inset-0 border-4 border-[#4C9A84]/20 rounded-full animate-ping"></div>
+                <div className="absolute inset-0 border-4 border-[#4C9A84] rounded-full animate-pulse"></div>
+              </div>
+              <h3 className="text-lg font-bold mb-6 text-[#2D3748]">
+                あなたに最適な質問票を作成しています
+              </h3>
+              <p className="text-sm text-text-secondary mb-4">
+                AIがあなたの症状に合わせて最適な質問を生成しています。3秒程お待ちください。
+              </p>
+            </div>
           </div>
         </div>
       )}
