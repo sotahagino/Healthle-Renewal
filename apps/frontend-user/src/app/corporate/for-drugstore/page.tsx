@@ -83,7 +83,7 @@ export default function ForDrugstorePage() {
             <p className="text-lg text-gray-700 text-center mb-16 leading-relaxed">
               "不調時の新たな入口"となるヘルスケアプラットフォームを目指し、<br />
               健康に寄り添ったサービスを提供。<br />
-              AIやデジタル技術を活用し、出展者様と消費者双方に新たな価値を提供。<br />
+              AIやデジタル技術を活用し、出店者様と消費者双方に新たな価値を提供。<br />
               健康市場での新しいEC体験をともに築きましょう。
             </p>
             <div className="grid gap-8 mt-12">
@@ -102,7 +102,7 @@ export default function ForDrugstorePage() {
                     </h3>
                     <p className="text-gray-700 leading-relaxed">
                       他のECモールとは異なり、健康相談から始まる購買体験を提供。
-                      健康に関心の高い顧客層をターゲットとし、出展者の商品がより効果的に届く仕組みを実現しています。
+                      健康に関心の高い顧客層をターゲットとし、出店者の商品がより効果的に届く仕組みを実現しています。
                     </p>
                   </div>
                 </div>
@@ -125,7 +125,7 @@ export default function ForDrugstorePage() {
                         <svg className="w-5 h-5 text-primary mr-2 mt-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                         </svg>
-                        <span>競合しないポジション：AmazonやRakutenの前段階のニーズを汲み取り</span>
+                        <span>競合しないポジション：既存ECモールの前段階のニーズを汲み取り</span>
                       </li>
                       <li className="flex items-start">
                         <svg className="w-5 h-5 text-primary mr-2 mt-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">

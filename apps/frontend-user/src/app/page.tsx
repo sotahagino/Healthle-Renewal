@@ -647,7 +647,7 @@ export default function Home() {
             <div className="relative h-[250px]">
               <div className="absolute inset-0 bg-white"></div>
               <Image
-                src="https://wojtqrjpxivotuzjtgsc.supabase.co/storage/v1/object/public/Healthle/homepagev4.png"
+                src="https://wojtqrjpxivotuzjtgsc.supabase.co/storage/v1/object/public/Healthle/homepagev5.png"
                 alt="医師の画像"
                 fill
                 style={{ objectFit: 'contain' }}
@@ -657,13 +657,13 @@ export default function Home() {
             </div>
             <div className="mt-0 px-2">
               <DisclaimerText>
-                ※本サービスは、ヘルスケアに関する情報提供を行うものであり、医師や専門家が特定の疾病や病気、障害を診断・予防・医療アドバイスをする医療行為ではありません。
+                ※1 本サービスはヘルスケアに関する情報提供を行うものであり、医師や専門家が特定の疾病や病気、障害を診断・予防・医療アドバイスをする医療行為ではありません。
               </DisclaimerText>
               <DisclaimerText>
-                ※写真はイメージであり、医師よる健康相談サービスではありません。
+                ※2 写真はイメージであり、医師よる健康相談サービスではありません。
               </DisclaimerText>
               <DisclaimerText>
-                ※2024年11月21日～2024年12月9日の満足度調査の結果n=100
+                ※3 2024年11月21日～2024年12月9日の満足度調査「健康に悩んだ時に、また相談したいと思いますか？」の結果　n=100(凄く思う、少し思うと回答した割合)
               </DisclaimerText>
             </div>
           </div>
