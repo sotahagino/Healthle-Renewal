@@ -36,8 +36,9 @@ export type FaqItem = {
 
 export type ReferenceItem = {
   fieldId: string;
-  text: string;
-  doi?: string;
+  title: string;
+  url?: string;
+  date?: string;
 };
 
 export type Article = {

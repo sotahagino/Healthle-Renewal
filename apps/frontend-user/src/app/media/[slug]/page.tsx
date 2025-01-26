@@ -213,24 +213,27 @@ export default async function ArticlePage({
                 </h2>
                 <ul className="list-none space-y-3 sm:space-y-4 text-gray-600 bg-gray-50 p-4 sm:p-6 rounded-xl text-sm sm:text-base">
                   {safeArticle.references.map((ref: ReferenceItem, index: number) => (
-                    <li key={index} className="flex items-start gap-2 sm:gap-3">
-                      <span className="text-[#4C9A84] font-medium">[{index + 1}]</span>
-                      <div>
-                        {ref.text}
-                        {ref.doi && (
-                          <div className="mt-2">
-                            <span className="font-medium">DOI：</span>
+                    <li key={`ref-${index}`} className="flex items-start gap-2 sm:gap-3">
+                      <span className="text-[#4C9A84] font-medium min-w-[24px]">[{index + 1}]</span>
+                      <div className="flex-1">
+                        <div className="mb-2">
+                          {ref.title}
+                          {ref.url && (
                             <a
-                              href={`https://doi.org/${ref.doi}`}
+                              href={ref.url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-[#4C9A84] hover:underline inline-flex items-center gap-1 break-all"
+                              className="text-[#4C9A84] hover:underline inline-flex items-center gap-1 ml-2"
                             >
-                              {ref.doi}
                               <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 sm:h-4 sm:w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                               </svg>
                             </a>
+                          )}
+                        </div>
+                        {ref.date && (
+                          <div className="text-sm text-gray-500">
+                            参照日：{format(new Date(ref.date), 'yyyy年MM月dd日')}
                           </div>
                         )}
                       </div>
