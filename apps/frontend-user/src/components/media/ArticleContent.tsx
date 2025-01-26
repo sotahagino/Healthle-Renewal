@@ -120,7 +120,7 @@ const ArticleContent: FC<ArticleContentProps> = ({ article: initialArticle }) =>
               <li key={index} className="flex items-start gap-2 sm:gap-3">
                 <span className="text-[#4C9A84] font-medium">[{index + 1}]</span>
                 <div>
-                  {ref.text}
+                  {ref.title}
                   {ref.doi && (
                     <div className="mt-2">
                       <span className="font-medium">DOI：</span>
