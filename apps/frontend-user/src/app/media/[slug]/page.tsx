@@ -156,9 +156,17 @@ export default async function ArticlePage({
             </div>
 
             <div
-              className="prose prose-sm sm:prose-base md:prose-lg max-w-none prose-headings:text-[#333333] prose-headings:font-bold prose-h2:text-xl sm:prose-h2:text-2xl prose-h2:mt-8 sm:prose-h2:mt-12 prose-h2:mb-4 sm:prose-h2:mb-6 prose-h3:text-lg sm:prose-h3:text-xl prose-h3:mt-6 sm:prose-h3:mt-8 prose-h3:mb-3 sm:prose-h3:mb-4 prose-p:text-gray-700 prose-p:leading-relaxed prose-ul:text-gray-700 prose-strong:text-[#333333] prose-blockquote:border-l-4 prose-blockquote:border-[#4C9A84] prose-blockquote:pl-4 sm:prose-blockquote:pl-6 prose-blockquote:text-gray-600 prose-blockquote:bg-gray-50 prose-blockquote:py-2 prose-blockquote:rounded-r-lg prose-a:text-[#4C9A84] prose-a:no-underline hover:prose-a:underline"
+              className="article-content prose prose-sm sm:prose-base md:prose-lg max-w-none prose-headings:text-[#333333] prose-headings:font-bold prose-h2:text-xl sm:prose-h2:text-2xl prose-h2:mt-8 sm:prose-h2:mt-12 prose-h2:mb-4 sm:prose-h2:mb-6 prose-h3:text-lg sm:prose-h3:text-xl prose-h3:mt-6 sm:prose-h3:mt-8 prose-h3:mb-3 sm:prose-h3:mb-4 prose-p:text-gray-700 prose-p:leading-relaxed prose-ul:text-gray-700 prose-strong:text-[#333333] prose-blockquote:border-l-4 prose-blockquote:border-[#4C9A84] prose-blockquote:pl-4 sm:prose-blockquote:pl-6 prose-blockquote:text-gray-600 prose-blockquote:bg-gray-50 prose-blockquote:py-2 prose-blockquote:rounded-r-lg prose-a:text-[#4C9A84] prose-a:no-underline hover:prose-a:underline [&_table]:w-full [&_table]:my-4 [&_table]:border-collapse [&_table]:border [&_table]:border-gray-300 [&_th]:border [&_th]:border-gray-300 [&_th]:bg-gray-50 [&_th]:p-3 [&_th]:text-center [&_td]:border [&_td]:border-gray-300 [&_td]:p-3 [&_td]:align-top [&_td]:min-w-[120px] [&_td:first-child]:min-w-[140px] [&_td:nth-child(2)]:min-w-[100px] [&_td:nth-child(3)]:min-w-[200px] [&_td:nth-child(4)]:min-w-[80px] [&_td:nth-child(4)]:whitespace-nowrap [&_td:nth-child(5)]:min-w-[80px] [&_td:nth-child(5)]:whitespace-nowrap [&_td:nth-child(6)]:min-w-[120px] [&_table_p]:m-0 [&_table_p]:p-0 [&_table_p]:text-left [&_table_th_p]:text-center"
               dangerouslySetInnerHTML={{ 
                 __html: safeArticle.content
+                  .replace(
+                    /<table/g,
+                    '<div class="overflow-x-auto -webkit-overflow-scrolling-touch relative mb-2"><div class="text-center text-sm text-gray-500 mb-2 md:hidden">←スクロールで全体を表示→</div><table'
+                  )
+                  .replace(
+                    /<\/table>/g,
+                    '</table></div>'
+                  )
                   .replace(
                     /<div class="iframely-embed">([\s\S]*?)<\/div><script[\s\S]*?<\/script>/g,
                     (match, content) => `<div class="iframely-embed">${content}</div>`
