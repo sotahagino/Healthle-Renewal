@@ -59,7 +59,7 @@ const ArticleContent: FC<ArticleContentProps> = ({ article: initialArticle }) =>
 
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between text-xs sm:text-sm mb-4 sm:mb-6 space-y-2 sm:space-y-0">
           <div className="flex items-center gap-2">
-            <span className="text-gray-600">{article.author_name}</span>
+            <span className="text-gray-600">{article.author?.name || '執筆者'}</span>
           </div>
           <time dateTime={article.publishedAt} className="text-gray-600">
             {format(new Date(article.publishedAt), 'yyyy年MM月dd日')}
