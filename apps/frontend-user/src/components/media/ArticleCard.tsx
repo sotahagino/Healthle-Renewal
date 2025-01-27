@@ -41,7 +41,7 @@ export function ArticleCard({ article }: ArticleCardProps) {
         <CardFooter className="px-4 py-3 border-t flex justify-between text-[10px] text-gray-500">
           <div className="flex items-center gap-1">
             <User className="w-3 h-3" />
-            {article.author_name}
+            {article.author?.name || '執筆者'}
           </div>
           <div className="flex items-center gap-1">
             <Calendar className="w-3 h-3" />
