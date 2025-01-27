@@ -41,6 +41,28 @@ export type ReferenceItem = {
   date?: string;
 };
 
+export type Author = {
+  id: string;
+  name: string;
+  slug: string;
+  profile: string;
+  avatar?: MicroCMSImage;
+  role?: string;
+  specialties?: string[];
+  qualification?: string;
+  social?: {
+    twitter?: string;
+    facebook?: string;
+    instagram?: string;
+    linkedin?: string;
+  };
+  articles?: Article[];
+  createdAt: string;
+  updatedAt: string;
+  publishedAt: string;
+  revisedAt: string;
+};
+
 export type Article = {
   id: string;
   title: string;
@@ -62,8 +84,7 @@ export type Article = {
     slug: string;
     type?: string;
   }[];
-  author_name: string;
-  author_profile?: string;
+  author: Author;
   faq?: FaqItem[];
   references?: ReferenceItem[];
   publishedAt: string;

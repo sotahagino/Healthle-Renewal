@@ -143,7 +143,32 @@ export default async function ArticlePage({
 
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between text-xs sm:text-sm mb-4 sm:mb-6 space-y-2 sm:space-y-0">
                 <div className="flex items-center gap-2">
-                  <span className="text-gray-600">{safeArticle.author_name}</span>
+                  {safeArticle.author?.slug ? (
+                    <Link
+                      href={`/media/authors/${safeArticle.author.slug}`}
+                      className="text-gray-600 hover:text-[#4C9A84] transition-colors"
+                    >
+                      <div className="flex items-center gap-2">
+                        {safeArticle.author.avatar && (
+                          <div className="w-6 h-6 rounded-full overflow-hidden">
+                            <img
+                              src={safeArticle.author.avatar.url}
+                              alt={safeArticle.author.name}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        )}
+                        <span>{safeArticle.author.name}</span>
+                        {safeArticle.author.role && (
+                          <span className="text-gray-500">（{safeArticle.author.role}）</span>
+                        )}
+                      </div>
+                    </Link>
+                  ) : (
+                    <span className="text-gray-600">
+                      {(safeArticle as any).author_name || (safeArticle.author?.name || '執筆者')}
+                    </span>
+                  )}
                 </div>
                 <time dateTime={safeArticle.publishedAt} className="text-gray-600">
                   {format(new Date(safeArticle.publishedAt), 'yyyy年MM月dd日')}

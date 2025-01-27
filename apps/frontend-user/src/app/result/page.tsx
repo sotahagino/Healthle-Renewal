@@ -76,6 +76,7 @@ function ResultContent() {
   const [productError, setProductError] = useState<string | null>(null)
   const router = useNavigation()
   const [isInitialLoading, setIsInitialLoading] = useState(true)
+  const [showDisclaimerModal, setShowDisclaimerModal] = useState(true)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -228,7 +229,7 @@ function ResultContent() {
       // 初期ローディング状態を表示
       setChatHistory([{ 
         type: 'initial', 
-        text: '回答を生成しています。少々お待ちください...\n\n相談内容と質問票の回答を分析中です。' 
+        text: '回答を準備しています。少々お待ちください...' 
       }])
 
       // 質問と回答のペアを作成
@@ -612,6 +613,24 @@ function ResultContent() {
           <div className="text-red-500 mb-4">{error}</div>
         ) : (
           <>
+            <Dialog open={showDisclaimerModal} onOpenChange={setShowDisclaimerModal}>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle className="text-center text-xl font-bold text-[#2D3748]">免責事項</DialogTitle>
+                </DialogHeader>
+                <div className="text-center space-y-4">
+                  <p className="text-[#4A5568]">
+                    本サービスは、ヘルスケアに関する情報提供を行うものであり、医師や専門家が特定の疾病や病気、障害を診断・治療・予防・医療アドバイスをする医療行為ではありません。
+                  </p>
+                  <Button
+                    onClick={() => setShowDisclaimerModal(false)}
+                    className="bg-[#4C9A84] hover:bg-[#3A8B73] text-white w-full py-2"
+                  >
+                    確認しました
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
             <div className="text-center mb-8 sm:mb-16">
               <div className="inline-flex items-center justify-center bg-white px-6 sm:px-8 py-3 sm:py-4 rounded-full shadow-sm">
                 <MessageCircle className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md-8 mr-3 sm:mr-4 text-[#4C9A84]" />
