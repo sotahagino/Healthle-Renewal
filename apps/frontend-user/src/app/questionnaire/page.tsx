@@ -109,6 +109,7 @@ function QuestionnaireContent() {
   const [error, setError] = useState<string | null>(null)
   const errorRef = useRef<HTMLDivElement>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [isQuestionsLoading, setIsQuestionsLoading] = useState(true)
   const [symptomText, setSymptomText] = useState<string>('')
   const questionRefs = useRef<(HTMLDivElement | null)[]>([])
 
@@ -123,11 +124,12 @@ function QuestionnaireContent() {
 
     const fetchQuestions = async () => {
       try {
+        setIsQuestionsLoading(true)
         console.log('Fetching questions for interview_id:', interview_id)
         const supabase = getSupabaseClient()
         const { data, error } = await supabase
           .from('medical_interviews')
-          .select('questions')
+          .select('questions, status')
           .eq('id', interview_id)
           .single()
 
@@ -138,9 +140,11 @@ function QuestionnaireContent() {
           throw error
         }
 
-        if (!data || !data.questions) {
-          console.error('No questions found in data:', data)
-          throw new Error('質問データが見つかりません')
+        // 質問票がまだ生成されていない場合
+        if (!data?.questions || data.status === 'pending') {
+          // 3秒後に再度チェック
+          setTimeout(() => fetchQuestions(), 3000)
+          return
         }
 
         const parsedQuestions = data.questions
@@ -177,6 +181,7 @@ function QuestionnaireContent() {
           initialAnswers[q.id] = q.type === '複数選択' ? { value: [] } : { value: '' }
         })
         setAnswers(initialAnswers)
+        setIsQuestionsLoading(false)
 
       } catch (err) {
         console.error('質問データ取得エラー:', err)
@@ -184,6 +189,7 @@ function QuestionnaireContent() {
         if (errorRef.current) {
           errorRef.current.scrollIntoView({ behavior: 'smooth' })
         }
+        setIsQuestionsLoading(false)
       }
     }
 
@@ -562,7 +568,15 @@ function QuestionnaireContent() {
       </div>
 
       <main className="flex-grow container max-w-2xl mx-auto px-4 py-6">
-        {error ? (
+        {isQuestionsLoading ? (
+          <div className="min-h-[50vh] flex items-center justify-center">
+            <div className="text-center">
+              <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-primary" />
+              <p className="text-gray-600 font-medium">質問票を準備しています...</p>
+              <p className="text-sm text-gray-500 mt-2">しばらくお待ちください</p>
+            </div>
+          </div>
+        ) : error ? (
           <Card className="mb-6 border-red-200 bg-red-50">
             <CardContent className="p-4 flex items-start gap-3">
               <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
@@ -572,65 +586,65 @@ function QuestionnaireContent() {
               </div>
             </CardContent>
           </Card>
-        ) : null}
-
-        <form onSubmit={handleSubmit} className="space-y-8">
-          {questions.map((question, index) => (
-            <Card 
-              key={question.id} 
-              className="transition-all duration-300 hover:shadow-md"
-              ref={(el: HTMLDivElement | null) => {
-                if (questionRefs.current) {
-                  questionRefs.current[index] = el;
-                }
-              }}
-            >
-              <CardContent className="p-6">
-                <div className="flex items-start gap-4 mb-6">
-                  <div className="w-8 h-8 rounded-full bg-accent text-white flex items-center justify-center flex-shrink-0">
-                    {index + 1}
-                  </div>
-                  <div className="flex-grow">
-                    <h2 className="text-lg font-bold text-text-primary mb-2">
-                      {question.text}
-                    </h2>
-                    {question.type === '複数選択' && (
-                      <p className="text-sm text-text-secondary">
-                        複数選択可能です
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="pl-0">
-                  {renderQuestionInput(question, index)}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-
-          <div className="sticky bottom-6 left-0 right-0 px-4">
-            <div className="max-w-2xl mx-auto">
-              <Button
-                type="submit"
-                disabled={isLoading}
-                className="w-full bg-primary hover:bg-primary-hover text-white py-6 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-all duration-300"
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-8">
+            {questions.map((question, index) => (
+              <Card 
+                key={question.id} 
+                className="transition-all duration-300 hover:shadow-md"
+                ref={(el: HTMLDivElement | null) => {
+                  if (questionRefs.current) {
+                    questionRefs.current[index] = el;
+                  }
+                }}
               >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    <span>送信中...</span>
-                  </>
-                ) : (
-                  <>
-                    <Send className="w-5 h-5" />
-                    <span>回答を送信する</span>
-                  </>
-                )}
-              </Button>
+                <CardContent className="p-6">
+                  <div className="flex items-start gap-4 mb-6">
+                    <div className="w-8 h-8 rounded-full bg-accent text-white flex items-center justify-center flex-shrink-0">
+                      {index + 1}
+                    </div>
+                    <div className="flex-grow">
+                      <h2 className="text-lg font-bold text-text-primary mb-2">
+                        {question.text}
+                      </h2>
+                      {question.type === '複数選択' && (
+                        <p className="text-sm text-text-secondary">
+                          複数選択可能です
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="pl-0">
+                    {renderQuestionInput(question, index)}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+
+            <div className="sticky bottom-6 left-0 right-0 px-4">
+              <div className="max-w-2xl mx-auto">
+                <Button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full bg-primary hover:bg-primary-hover text-white py-6 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-all duration-300"
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      <span>送信中...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-5 h-5" />
+                      <span>回答を送信する</span>
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
-          </div>
-        </form>
+          </form>
+        )}
       </main>
     </div>
   )

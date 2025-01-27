@@ -9,6 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { SiteHeader } from '@/components/site-header'
 import { Footer } from '@/components/footer'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { Dialog, DialogContent } from "@/components/ui/dialog"
 
 interface UrgencyQuestion {
   id: number
@@ -41,6 +42,7 @@ function UrgencyAssessmentContent() {
   const [currentUrgencyLevel, setCurrentUrgencyLevel] = useState<string | null>(null)
   const [isPreparingQuestionnaire, setIsPreparingQuestionnaire] = useState(false)
   const [isQuestionnaireReady, setIsQuestionnaireReady] = useState(false)
+  const [showPreparingModal, setShowPreparingModal] = useState(false)
   const interviewId = searchParams.get('interview_id')
   const categoryId = searchParams.get('category_id')
   const supabase = createClientComponentClient()
@@ -127,8 +129,16 @@ function UrgencyAssessmentContent() {
     fetchQuestions()
   }, [categoryId, interviewId, router])
 
+  // 質問票の準備状態を監視するeffectを追加
+  useEffect(() => {
+    if (showPreparingModal && isQuestionnaireReady) {
+      // 質問票の準備が完了したら質問票画面に遷移
+      router.push(`/questionnaire?interview_id=${interviewId}`)
+    }
+  }, [isQuestionnaireReady, showPreparingModal, interviewId, router])
+
   // 質問票APIを呼び出す関数
-  const prepareQuestionnaire = async (questionData: UrgencyQuestion[]) => {
+  const prepareQuestionnaire = async (questions: UrgencyQuestion[]) => {
     try {
       const symptomText = `カテゴリー${categoryId}からの緊急度判定`
       const questionnaireRes = await fetch('https://api.dify.ai/v1/completion-messages', {
@@ -182,6 +192,7 @@ function UrgencyAssessmentContent() {
           question_5: questionsArray[4]?.text || null,
           question_6: questionsArray[5]?.text || null,
           questions: questionsArray,
+          status: 'completed',  // ステータスを完了に更新
           updated_at: new Date().toISOString()
         }
 
@@ -365,8 +376,9 @@ function UrgencyAssessmentContent() {
       if (urgencyLevel === 'white') {
         // 質問票の準備状態をチェック
         if (!isQuestionnaireReady && isPreparingQuestionnaire) {
-          // 質問票がまだ準備中の場合
-          setError('問診票を準備中です。しばらくお待ちください...')
+          // 質問票がまだ準備中の場合はモーダルを表示
+          setShowPreparingModal(true)
+          setLoading(false)
           return
         }
         // 問診ページへ遷移
@@ -405,6 +417,22 @@ function UrgencyAssessmentContent() {
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#E6F3EF] to-white">
       <SiteHeader />
+      {/* 質問票準備中モーダル */}
+      <Dialog open={showPreparingModal} onOpenChange={setShowPreparingModal}>
+        <DialogContent className="sm:max-w-md">
+          <div className="text-center py-4">
+            <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-primary/10 flex items-center justify-center">
+              <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              質問票を準備しています
+            </h3>
+            <p className="text-sm text-gray-500">
+              しばらくお待ちください...
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
       <main className="flex-grow container mx-auto px-4 py-12 mt-16">
         <div className="min-h-screen bg-gray-50">
           <div className="container mx-auto px-4 py-8 max-w-3xl">
