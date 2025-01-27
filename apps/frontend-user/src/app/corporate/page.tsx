@@ -33,7 +33,7 @@ export default function CorporatePage() {
                 ドラッグストア・薬局向けサービス
               </a>
               <a 
-                href="#contact" 
+                href="/corporate/contact" 
                 className="px-4 py-2 bg-primary text-white rounded-full text-sm font-medium hover:bg-primary/90 transition-colors duration-200"
               >
                 お問い合わせ
@@ -62,7 +62,7 @@ export default function CorporatePage() {
               ドラッグストア・薬局向けサービス
             </a>
             <a 
-              href="#contact" 
+              href="/corporate/contact" 
               className="text-primary hover:text-primary/90 transition-colors duration-200 text-sm font-medium py-2"
             >
               お問い合わせ

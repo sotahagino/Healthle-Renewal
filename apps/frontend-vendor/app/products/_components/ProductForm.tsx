@@ -48,25 +48,51 @@ const productSchema = z.object({
 
   // 医薬品情報
   medicine_type: z.enum(['第1類', '第2類', '第3類', '医薬部外品']),
-  ingredients: z.string().min(1, '有効成分と含有量を入力してください').transform(value => ({ content: value })),
+  manufacturer: z.string().min(1, 'メーカー名/製造元を入力してください'),
+  manufacturing_country: z.string().min(1, '製造国を入力してください'),
+  expiration_date_info: z.string().min(1, '使用期限/有効期限の情報を入力してください'),
+  storage_conditions: z.string().min(1, '保管方法を入力してください'),
+  ingredients: z.string().min(1, '有効成分と含有量を入力してください'),
+  additives: z.array(z.object({
+    name: z.string(),
+    amount: z.string().optional(),
+  })).optional(),
+  drug_interactions: z.array(z.object({
+    drug_name: z.string(),
+    severity: z.enum(['high', 'medium', 'low']),
+    description: z.string(),
+  })).optional(),
+  side_effects: z.array(z.object({
+    name: z.string(),
+    severity: z.enum(['serious', 'common', 'rare']),
+    description: z.string(),
+  })).optional(),
   effects: z.string().min(1, '効能・効果を入力してください'),
   usage_instructions: z.string().min(1, '用法・用量を入力してください'),
   precautions: z.string().min(1, '使用上の注意を入力してください'),
   requires_questionnaire: z.boolean(),
   requires_pharmacist_consultation: z.boolean().default(false),
+  out_of_stock_policy: z.string().min(1, '在庫切れ時の対応方針を入力してください'),
 
   // 配送・取引情報
   shipping_info: z.object({
-    selected_options: z.array(z.string()),
+    shipping_fee: z.string().min(1, '送料を入力してください'),
+    free_shipping_threshold: z.string().optional(),
+    shipping_methods: z.array(z.string()),
+    estimated_delivery: z.string(),
+    return_policy: z.string().min(1, '返品・キャンセル条件を入力してください'),
+    can_combine_shipping: z.boolean(),
     custom_options: z.array(z.object({
       value: z.string(),
       label: z.string()
-    })),
-    return_policy: z.string().min(1, '返品・キャンセル条件を入力してください'),
+    })).optional(),
+    selected_options: z.array(z.object({
+      value: z.string(),
+      label: z.string()
+    })).optional(),
+    selected_method_ids: z.array(z.string()).optional(),
     sale_start_date: z.string().optional(),
     sale_end_date: z.string().optional(),
-    shipping_fee: z.string().min(1, '送料を入力してください'),
-    can_combine_shipping: z.boolean(),
   }),
 
   image_file: z.any().optional(),
@@ -210,26 +236,19 @@ export default function ProductForm({ mode, productId, onSubmit }: ProductFormPr
       const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`
       const filePath = `product-images/${vendorId}/${fileName}`
 
-      console.log('Uploading file:', { filePath, fileSize: file.size, fileType: file.type })
-
       // Supabaseストレージにアップロード
       const { error: uploadError, data } = await supabase.storage
         .from('product-images')
         .upload(filePath, file)
 
       if (uploadError) {
-        console.error('Upload error details:', uploadError)
         throw uploadError
       }
-
-      console.log('Upload successful:', data)
 
       // 画像のURLを取得
       const { data: { publicUrl } } = supabase.storage
         .from('product-images')
         .getPublicUrl(filePath)
-
-      console.log('Public URL:', publicUrl)
 
       // フォームの値を更新
       form.setValue('image_url', publicUrl)
@@ -237,9 +256,9 @@ export default function ProductForm({ mode, productId, onSubmit }: ProductFormPr
       // プレビュー用のURLを設定
       setImagePreview(URL.createObjectURL(file))
 
-    } catch (err) {
-      console.error('Image upload error:', err)
-      setError(err.message || '画像のアップロードに失敗しました')
+    } catch (error: unknown) {
+      console.error('Image upload error:', error)
+      setError(error instanceof Error ? error.message : '画像のアップロードに失敗しました')
     } finally {
       setImageUploading(false)
     }
@@ -248,7 +267,7 @@ export default function ProductForm({ mode, productId, onSubmit }: ProductFormPr
   const [customShippingOptions, setCustomShippingOptions] = useState<Array<{ value: string; label: string }>>(
     form.watch('shipping_info')?.custom_options || []
   )
-  const [selectedShippingOptions, setSelectedShippingOptions] = useState<string[]>(
+  const [selectedShippingOptions, setSelectedShippingOptions] = useState<Array<{ value: string; label: string }>>(
     form.watch('shipping_info')?.selected_options || []
   )
 
@@ -277,21 +296,22 @@ export default function ProductForm({ mode, productId, onSubmit }: ProductFormPr
   )
 
   const handleSubmit = async (data: ProductFormValues) => {
-    const formData = {
-      ...data,
-      shipping_info: {
-        ...data.shipping_info,
-        selected_options: selectedShippingOptions,
-        custom_options: customShippingOptions,
-        selected_method_ids: selectedShippingMethods,
-      },
-    }
-    
-    setLoading(true)
     try {
+      const formData = {
+        ...data,
+        shipping_info: {
+          ...data.shipping_info,
+          selected_options: selectedShippingOptions,
+          custom_options: customShippingOptions,
+          selected_method_ids: selectedShippingMethods,
+        },
+      } as ProductFormValues
+      
+      setLoading(true)
       await onSubmit(formData)
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error submitting product:', error)
+      setError(error instanceof Error ? error.message : '商品の登録に失敗しました')
     } finally {
       setLoading(false)
     }
@@ -322,7 +342,7 @@ export default function ProductForm({ mode, productId, onSubmit }: ProductFormPr
           <Tabs defaultValue="basic" className="w-full">
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="basic">基本情報</TabsTrigger>
-              <TabsTrigger value="medicine">医薬品情報</TabsTrigger>
+              <TabsTrigger value="medical">医薬品情報</TabsTrigger>
               <TabsTrigger value="shipping">配送・取引情報</TabsTrigger>
             </TabsList>
 
@@ -518,12 +538,12 @@ export default function ProductForm({ mode, productId, onSubmit }: ProductFormPr
               </Card>
             </TabsContent>
 
-            <TabsContent value="medicine">
+            <TabsContent value="medical">
               <Card>
                 <CardHeader>
                   <CardTitle>医薬品情報</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-6">
                   <FormField
                     control={form.control}
                     name="medicine_type"
@@ -550,12 +570,313 @@ export default function ProductForm({ mode, productId, onSubmit }: ProductFormPr
 
                   <FormField
                     control={form.control}
+                    name="manufacturer"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>メーカー名/製造元 *</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="例：〇〇製薬株式会社" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="manufacturing_country"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>製造国 *</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="例：日本" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="expiration_date_info"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>使用期限/有効期限の情報 *</FormLabel>
+                        <FormControl>
+                          <Textarea {...field} placeholder="例：製造後3年間" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="storage_conditions"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>保管方法 *</FormLabel>
+                        <FormControl>
+                          <Textarea {...field} placeholder="例：直射日光を避け、涼しい所に保管してください（1～30℃）" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
                     name="ingredients"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>有効成分と含有量 *</FormLabel>
                         <FormControl>
-                          <Textarea {...field} />
+                          <Textarea {...field} placeholder="例：アセトアミノフェン 300mg" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="additives"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>添加物</FormLabel>
+                        <FormControl>
+                          <div className="space-y-2">
+                            {(field.value || []).map((additive, index) => (
+                              <div key={index} className="flex gap-2">
+                                <Input
+                                  value={additive.name}
+                                  onChange={(e) => {
+                                    const newAdditives = [...(field.value || [])]
+                                    newAdditives[index] = {
+                                      ...newAdditives[index],
+                                      name: e.target.value
+                                    }
+                                    field.onChange(newAdditives)
+                                  }}
+                                  placeholder="添加物名"
+                                />
+                                <Input
+                                  value={additive.amount}
+                                  onChange={(e) => {
+                                    const newAdditives = [...(field.value || [])]
+                                    newAdditives[index] = {
+                                      ...newAdditives[index],
+                                      amount: e.target.value
+                                    }
+                                    field.onChange(newAdditives)
+                                  }}
+                                  placeholder="含有量（任意）"
+                                />
+                                <Button
+                                  type="button"
+                                  variant="destructive"
+                                  onClick={() => {
+                                    const newAdditives = (field.value || []).filter((_, i) => i !== index)
+                                    field.onChange(newAdditives)
+                                  }}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            ))}
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => {
+                                const newAdditives = [...(field.value || [])]
+                                newAdditives.push({ name: '', amount: '' })
+                                field.onChange(newAdditives)
+                              }}
+                            >
+                              <Plus className="h-4 w-4 mr-2" />
+                              添加物を追加
+                            </Button>
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="drug_interactions"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>相互作用</FormLabel>
+                        <FormControl>
+                          <div className="space-y-2">
+                            {(field.value || []).map((interaction, index) => (
+                              <div key={index} className="space-y-2 border p-4 rounded-lg">
+                                <Input
+                                  value={interaction.drug_name}
+                                  onChange={(e) => {
+                                    const newInteractions = [...(field.value || [])]
+                                    newInteractions[index] = {
+                                      ...newInteractions[index],
+                                      drug_name: e.target.value
+                                    }
+                                    field.onChange(newInteractions)
+                                  }}
+                                  placeholder="薬剤名"
+                                />
+                                <Select
+                                  value={interaction.severity}
+                                  onValueChange={(value: 'high' | 'medium' | 'low') => {
+                                    const newInteractions = [...(field.value || [])]
+                                    newInteractions[index] = {
+                                      ...newInteractions[index],
+                                      severity: value
+                                    }
+                                    field.onChange(newInteractions)
+                                  }}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="重要度" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="high">高（併用禁忌）</SelectItem>
+                                    <SelectItem value="medium">中（併用注意）</SelectItem>
+                                    <SelectItem value="low">低（注意）</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <Textarea
+                                  value={interaction.description}
+                                  onChange={(e) => {
+                                    const newInteractions = [...(field.value || [])]
+                                    newInteractions[index] = {
+                                      ...newInteractions[index],
+                                      description: e.target.value
+                                    }
+                                    field.onChange(newInteractions)
+                                  }}
+                                  placeholder="相互作用の詳細"
+                                />
+                                <Button
+                                  type="button"
+                                  variant="destructive"
+                                  onClick={() => {
+                                    const newInteractions = (field.value || []).filter((_, i) => i !== index)
+                                    field.onChange(newInteractions)
+                                  }}
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  削除
+                                </Button>
+                              </div>
+                            ))}
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => {
+                                const newInteractions = [...(field.value || [])]
+                                newInteractions.push({
+                                  drug_name: '',
+                                  severity: 'medium',
+                                  description: ''
+                                })
+                                field.onChange(newInteractions)
+                              }}
+                            >
+                              <Plus className="h-4 w-4 mr-2" />
+                              相互作用を追加
+                            </Button>
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="side_effects"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>副作用</FormLabel>
+                        <FormControl>
+                          <div className="space-y-2">
+                            {(field.value || []).map((sideEffect, index) => (
+                              <div key={index} className="space-y-2 border p-4 rounded-lg">
+                                <Input
+                                  value={sideEffect.name}
+                                  onChange={(e) => {
+                                    const newSideEffects = [...(field.value || [])]
+                                    newSideEffects[index] = {
+                                      ...newSideEffects[index],
+                                      name: e.target.value
+                                    }
+                                    field.onChange(newSideEffects)
+                                  }}
+                                  placeholder="副作用名"
+                                />
+                                <Select
+                                  value={sideEffect.severity}
+                                  onValueChange={(value: 'serious' | 'common' | 'rare') => {
+                                    const newSideEffects = [...(field.value || [])]
+                                    newSideEffects[index] = {
+                                      ...newSideEffects[index],
+                                      severity: value
+                                    }
+                                    field.onChange(newSideEffects)
+                                  }}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="重症度" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="serious">重大</SelectItem>
+                                    <SelectItem value="common">一般的</SelectItem>
+                                    <SelectItem value="rare">まれ</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <Textarea
+                                  value={sideEffect.description}
+                                  onChange={(e) => {
+                                    const newSideEffects = [...(field.value || [])]
+                                    newSideEffects[index] = {
+                                      ...newSideEffects[index],
+                                      description: e.target.value
+                                    }
+                                    field.onChange(newSideEffects)
+                                  }}
+                                  placeholder="副作用の詳細"
+                                />
+                                <Button
+                                  type="button"
+                                  variant="destructive"
+                                  onClick={() => {
+                                    const newSideEffects = (field.value || []).filter((_, i) => i !== index)
+                                    field.onChange(newSideEffects)
+                                  }}
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  削除
+                                </Button>
+                              </div>
+                            ))}
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => {
+                                const newSideEffects = [...(field.value || [])]
+                                newSideEffects.push({
+                                  name: '',
+                                  severity: 'common',
+                                  description: ''
+                                })
+                                field.onChange(newSideEffects)
+                              }}
+                            >
+                              <Plus className="h-4 w-4 mr-2" />
+                              副作用を追加
+                            </Button>
+                          </div>
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -598,6 +919,20 @@ export default function ProductForm({ mode, productId, onSubmit }: ProductFormPr
                         <FormLabel>使用上の注意 *</FormLabel>
                         <FormControl>
                           <Textarea {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="out_of_stock_policy"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>在庫切れ時の対応方針 *</FormLabel>
+                        <FormControl>
+                          <Textarea {...field} placeholder="例：在庫切れの場合、入荷まで約1週間かかります。" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -763,13 +1098,13 @@ export default function ProductForm({ mode, productId, onSubmit }: ProductFormPr
                           {DEFAULT_SHIPPING_OPTIONS.map((option) => (
                             <div key={option.value} className="flex items-center space-x-2">
                               <Checkbox
-                                checked={selectedShippingOptions.includes(option.value)}
+                                checked={selectedShippingOptions.some(selected => selected.value === option.value)}
                                 onCheckedChange={(checked) => {
                                   if (checked) {
-                                    setSelectedShippingOptions([...selectedShippingOptions, option.value])
+                                    setSelectedShippingOptions([...selectedShippingOptions, { value: option.value, label: option.label }])
                                   } else {
                                     setSelectedShippingOptions(
-                                      selectedShippingOptions.filter((value) => value !== option.value)
+                                      selectedShippingOptions.filter((selected) => selected.value !== option.value)
                                     )
                                   }
                                 }}
@@ -785,13 +1120,13 @@ export default function ProductForm({ mode, productId, onSubmit }: ProductFormPr
                             {customShippingOptions.map((option, index) => (
                               <div key={option.value} className="flex items-center space-x-2">
                                 <Checkbox
-                                  checked={selectedShippingOptions.includes(option.value)}
+                                  checked={selectedShippingOptions.some(selected => selected.value === option.value)}
                                   onCheckedChange={(checked) => {
                                     if (checked) {
-                                      setSelectedShippingOptions([...selectedShippingOptions, option.value])
+                                      setSelectedShippingOptions([...selectedShippingOptions, { value: option.value, label: option.label }])
                                     } else {
                                       setSelectedShippingOptions(
-                                        selectedShippingOptions.filter((value) => value !== option.value)
+                                        selectedShippingOptions.filter((selected) => selected.value !== option.value)
                                       )
                                     }
                                   }}
