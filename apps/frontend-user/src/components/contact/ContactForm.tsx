@@ -91,75 +91,75 @@ export default function ContactForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
       {error && (
         <div className="bg-red-50 p-4 rounded-md">
           <p className="text-red-600">{error}</p>
         </div>
       )}
 
-      <div>
-        <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+      <div className="space-y-2">
+        <label htmlFor="name" className="block text-base font-medium text-gray-700">
           お名前 <span className="text-red-500">*</span>
         </label>
         <input
           type="text"
           id="name"
           {...register('name')}
-          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
+          className="mt-2 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary py-3 px-4"
         />
         {errors.name && (
-          <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>
+          <p className="mt-2 text-sm text-red-600">{errors.name.message}</p>
         )}
       </div>
 
-      <div>
-        <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+      <div className="space-y-2">
+        <label htmlFor="email" className="block text-base font-medium text-gray-700">
           メールアドレス <span className="text-red-500">*</span>
         </label>
         <input
           type="email"
           id="email"
           {...register('email')}
-          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
+          className="mt-2 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary py-3 px-4"
         />
         {errors.email && (
-          <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>
+          <p className="mt-2 text-sm text-red-600">{errors.email.message}</p>
         )}
       </div>
 
-      <div>
-        <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
+      <div className="space-y-2">
+        <label htmlFor="phone" className="block text-base font-medium text-gray-700">
           電話番号
         </label>
         <input
           type="tel"
           id="phone"
           {...register('phone')}
-          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
+          className="mt-2 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary py-3 px-4"
         />
       </div>
 
-      <div>
-        <label htmlFor="company" className="block text-sm font-medium text-gray-700">
+      <div className="space-y-2">
+        <label htmlFor="company" className="block text-base font-medium text-gray-700">
           会社名
         </label>
         <input
           type="text"
           id="company"
           {...register('company')}
-          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
+          className="mt-2 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary py-3 px-4"
         />
       </div>
 
-      <div>
-        <label htmlFor="type" className="block text-sm font-medium text-gray-700">
+      <div className="space-y-2">
+        <label htmlFor="type" className="block text-base font-medium text-gray-700">
           お問い合わせ種別 <span className="text-red-500">*</span>
         </label>
         <select
           id="type"
           {...register('type')}
-          className="mt-1 block w-full h-10 rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
+          className="mt-2 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary py-3 px-4"
         >
           <option value="">選択してください</option>
           <option value="product">製品について</option>
@@ -169,30 +169,30 @@ export default function ContactForm() {
           <option value="other">その他</option>
         </select>
         {errors.type && (
-          <p className="mt-1 text-sm text-red-600">{errors.type.message}</p>
+          <p className="mt-2 text-sm text-red-600">{errors.type.message}</p>
         )}
       </div>
 
-      <div>
-        <label htmlFor="message" className="block text-sm font-medium text-gray-700">
+      <div className="space-y-2">
+        <label htmlFor="message" className="block text-base font-medium text-gray-700">
           お問い合わせ内容 <span className="text-red-500">*</span>
         </label>
         <textarea
           id="message"
-          rows={5}
+          rows={8}
           {...register('message')}
-          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
+          className="mt-2 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary py-3 px-4"
         />
         {errors.message && (
-          <p className="mt-1 text-sm text-red-600">{errors.message.message}</p>
+          <p className="mt-2 text-sm text-red-600">{errors.message.message}</p>
         )}
       </div>
 
-      <div>
+      <div className="mt-8">
         <button
           type="submit"
           disabled={isSubmitting}
-          className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:bg-primary/50"
+          className="w-full flex justify-center py-4 px-6 border border-transparent rounded-md shadow-sm text-base font-medium text-white bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:bg-primary/50"
         >
           {isSubmitting ? '送信中...' : '送信する'}
         </button>

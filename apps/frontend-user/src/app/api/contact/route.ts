@@ -8,7 +8,7 @@ const contactSchema = z.object({
   email: z.string().email('正しいメールアドレスを入力してください'),
   phone: z.string().optional(),
   company: z.string().optional(),
-  type: z.enum(['product', 'service', 'recruitment', 'other'], {
+  type: z.enum(['product', 'service', 'recruitment', 'ec', 'other'], {
     required_error: 'お問い合わせ種別を選択してください',
   }),
   message: z.string().min(1, 'お問い合わせ内容を入力してください'),

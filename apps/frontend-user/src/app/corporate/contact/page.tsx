@@ -9,14 +9,14 @@ export const metadata: Metadata = {
 
 export default function ContactPage() {
   return (
-    <div className="max-w-3xl mx-auto px-4 py-12">
-      <div className="text-center mb-12">
-        <h1 className="text-4xl font-bold text-gray-900 mb-4">お問い合わせ</h1>
+    <div className="max-w-4xl mx-auto px-4 py-16">
+      <div className="text-center mb-16">
+        <h1 className="text-4xl font-bold text-gray-900 mb-6">お問い合わせ</h1>
         <p className="text-lg text-gray-600">
           Healthleに関するお問い合わせは、以下のフォームよりお願いいたします。
         </p>
       </div>
-      <div className="bg-white rounded-2xl shadow-lg p-8">
+      <div className="bg-white rounded-2xl shadow-lg p-10">
         <Suspense fallback={<div>Loading...</div>}>
           <ContactForm />
         </Suspense>
