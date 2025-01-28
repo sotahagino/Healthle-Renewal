@@ -1,5 +1,6 @@
 import { Metadata } from 'next'
 import ContactForm from '@/components/contact/ContactForm'
+import { Suspense } from 'react'
 
 export const metadata: Metadata = {
   title: 'お問い合わせ | Healthle',
@@ -16,7 +17,9 @@ export default function ContactPage() {
         </p>
       </div>
       <div className="bg-white rounded-2xl shadow-lg p-8">
-        <ContactForm />
+        <Suspense fallback={<div>Loading...</div>}>
+          <ContactForm />
+        </Suspense>
       </div>
     </div>
   )
