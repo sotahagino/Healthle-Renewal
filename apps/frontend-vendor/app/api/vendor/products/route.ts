@@ -48,6 +48,11 @@ export async function POST(request: Request) {
           requires_questionnaire: data.requires_questionnaire,
           requires_pharmacist_consultation: data.requires_pharmacist_consultation,
           shipping_info: data.shipping_info,
+          manufacturer: data.manufacturer,
+          manufacturing_country: data.manufacturing_country,
+          expiration_date_info: data.expiration_date_info,
+          storage_conditions: data.storage_conditions,
+          out_of_stock_policy: data.out_of_stock_policy,
         },
       ])
       .select()

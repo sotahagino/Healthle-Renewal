@@ -45,9 +45,10 @@ const productSchema = z.object({
   stock_quantity: z.string().min(1, '在庫数を入力してください'),
   purchase_limit: z.string().optional(),
   status: z.enum(['on_sale', 'hidden', 'reserved']),
+  stock_status: z.enum(['in_stock', 'low_stock', 'out_of_stock']).default('in_stock'),
 
   // 医薬品情報
-  medicine_type: z.enum(['第1類', '第2類', '第3類', '医薬部外品']),
+  medicine_type: z.enum(['第1類', '第2類', '第3類']),
   manufacturer: z.string().min(1, 'メーカー名/製造元を入力してください'),
   manufacturing_country: z.string().min(1, '製造国を入力してください'),
   expiration_date_info: z.string().min(1, '使用期限/有効期限の情報を入力してください'),
@@ -56,21 +57,21 @@ const productSchema = z.object({
   additives: z.array(z.object({
     name: z.string(),
     amount: z.string().optional(),
-  })).optional(),
+  })).optional().default([]),
   drug_interactions: z.array(z.object({
     drug_name: z.string(),
     severity: z.enum(['high', 'medium', 'low']),
     description: z.string(),
-  })).optional(),
+  })).optional().default([]),
   side_effects: z.array(z.object({
     name: z.string(),
     severity: z.enum(['serious', 'common', 'rare']),
     description: z.string(),
-  })).optional(),
+  })).optional().default([]),
   effects: z.string().min(1, '効能・効果を入力してください'),
   usage_instructions: z.string().min(1, '用法・用量を入力してください'),
   precautions: z.string().min(1, '使用上の注意を入力してください'),
-  requires_questionnaire: z.boolean(),
+  requires_questionnaire: z.boolean().default(false),
   requires_pharmacist_consultation: z.boolean().default(false),
   out_of_stock_policy: z.string().min(1, '在庫切れ時の対応方針を入力してください'),
 
@@ -78,21 +79,29 @@ const productSchema = z.object({
   shipping_info: z.object({
     shipping_fee: z.string().min(1, '送料を入力してください'),
     free_shipping_threshold: z.string().optional(),
-    shipping_methods: z.array(z.string()),
-    estimated_delivery: z.string(),
+    shipping_methods: z.array(z.string()).default([]),
+    estimated_delivery: z.string().optional(),
     return_policy: z.string().min(1, '返品・キャンセル条件を入力してください'),
-    can_combine_shipping: z.boolean(),
-    custom_options: z.array(z.object({
-      value: z.string(),
-      label: z.string()
-    })).optional(),
+    can_combine_shipping: z.boolean().default(false),
     selected_options: z.array(z.object({
       value: z.string(),
       label: z.string()
-    })).optional(),
-    selected_method_ids: z.array(z.string()).optional(),
+    })).default([]),
+    custom_options: z.array(z.object({
+      value: z.string(),
+      label: z.string()
+    })).default([]),
+    selected_method_ids: z.array(z.string()).default([]),
     sale_start_date: z.string().optional(),
     sale_end_date: z.string().optional(),
+  }).default({
+    shipping_fee: '',
+    return_policy: '',
+    shipping_methods: [],
+    can_combine_shipping: false,
+    selected_options: [],
+    custom_options: [],
+    selected_method_ids: []
   }),
 
   image_file: z.any().optional(),
@@ -112,7 +121,7 @@ const productSchema = z.object({
   }).optional(),
 })
 
-type ProductFormValues = z.infer<typeof productSchema>
+export type ProductFormValues = z.infer<typeof productSchema>
 
 interface ProductFormProps {
   mode: 'new' | 'edit'
@@ -153,10 +162,40 @@ export default function ProductForm({ mode, productId, onSubmit }: ProductFormPr
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
     defaultValues: {
+      name: '',
+      description: '',
+      category: '',
+      price: '',
       status: 'hidden',
+      stock_quantity: '',
+      stock_status: 'in_stock',
+      medicine_type: '第2類',
+      manufacturer: '',
+      manufacturing_country: '',
+      expiration_date_info: '',
+      storage_conditions: '',
+      ingredients: '',
+      effects: '',
+      usage_instructions: '',
+      precautions: '',
       requires_questionnaire: false,
+      requires_pharmacist_consultation: false,
+      out_of_stock_policy: '',
+      additives: [],
+      drug_interactions: [],
+      side_effects: [],
       shipping_info: {
-        can_combine_shipping: true,
+        shipping_fee: '',
+        free_shipping_threshold: '',
+        shipping_methods: [],
+        estimated_delivery: '',
+        return_policy: '',
+        can_combine_shipping: false,
+        selected_options: [],
+        custom_options: [],
+        selected_method_ids: [],
+        sale_start_date: '',
+        sale_end_date: '',
       },
     },
   })
@@ -195,16 +234,31 @@ export default function ProductForm({ mode, productId, onSubmit }: ProductFormPr
           if (!data) throw new Error('商品が見つかりません')
 
           // フォームの初期値を設定
-          form.reset({
+          const formData = {
             ...data,
-            price: data.price.toString(),
-            stock_quantity: data.stock_quantity.toString(),
-            purchase_limit: data.purchase_limit?.toString(),
+            price: data.price?.toString() || '',
+            stock_quantity: data.stock_quantity?.toString() || '',
+            purchase_limit: data.purchase_limit?.toString() || '',
             shipping_info: {
               ...data.shipping_info,
-              shipping_fee: data.shipping_info.shipping_fee.toString(),
+              shipping_fee: data.shipping_info?.shipping_fee?.toString() || '',
+              free_shipping_threshold: data.shipping_info?.free_shipping_threshold?.toString() || '',
+              shipping_methods: data.shipping_info?.shipping_methods || [],
+              estimated_delivery: data.shipping_info?.estimated_delivery || '',
+              return_policy: data.shipping_info?.return_policy || '',
+              can_combine_shipping: data.shipping_info?.can_combine_shipping || false,
+              selected_options: data.shipping_info?.selected_options || [],
+              custom_options: data.shipping_info?.custom_options || [],
+              selected_method_ids: data.shipping_info?.selected_method_ids || [],
+              sale_start_date: data.shipping_info?.sale_start_date || '',
+              sale_end_date: data.shipping_info?.sale_end_date || '',
             },
-          })
+            additives: data.additives || [],
+            drug_interactions: data.drug_interactions || [],
+            side_effects: data.side_effects || [],
+          }
+
+          form.reset(formData)
 
           if (data.image_url) {
             setImagePreview(data.image_url)
@@ -212,10 +266,15 @@ export default function ProductForm({ mode, productId, onSubmit }: ProductFormPr
           
           // データの取得に成功したらエラーをクリア
           setError('')
+
+          // 配送関連の状態を更新
+          setSelectedShippingOptions(data.shipping_info?.selected_options || [])
+          setCustomShippingOptions(data.shipping_info?.custom_options || [])
+          setSelectedShippingMethods(data.shipping_info?.selected_method_ids || [])
+
         } catch (err) {
           console.error('Error fetching product:', err)
           setError('商品情報の取得に失敗しました')
-          // エラーが発生した場合はルートページに戻る
           router.push('/products')
         }
       }
@@ -297,21 +356,34 @@ export default function ProductForm({ mode, productId, onSubmit }: ProductFormPr
 
   const handleSubmit = async (data: ProductFormValues) => {
     try {
+      setLoading(true)
+      setError('')
+
+      // 送信前のデータ整形
       const formData = {
         ...data,
         shipping_info: {
           ...data.shipping_info,
+          shipping_methods: selectedShippingMethods,
           selected_options: selectedShippingOptions,
           custom_options: customShippingOptions,
           selected_method_ids: selectedShippingMethods,
         },
-      } as ProductFormValues
-      
-      setLoading(true)
+      }
+
+      console.log('送信データ:', formData)
       await onSubmit(formData)
+      
+      if (mode === 'new') {
+        router.push('/products')
+      }
     } catch (error: unknown) {
       console.error('Error submitting product:', error)
-      setError(error instanceof Error ? error.message : '商品の登録に失敗しました')
+      if (error instanceof Error) {
+        setError(error.message)
+      } else {
+        setError('商品の登録に失敗しました')
+      }
     } finally {
       setLoading(false)
     }
@@ -560,7 +632,6 @@ export default function ProductForm({ mode, productId, onSubmit }: ProductFormPr
                             <SelectItem value="第1類">第1類医薬品</SelectItem>
                             <SelectItem value="第2類">第2類医薬品</SelectItem>
                             <SelectItem value="第3類">第3類医薬品</SelectItem>
-                            <SelectItem value="医薬部外品">医薬部外品</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -1005,7 +1076,116 @@ export default function ProductForm({ mode, productId, onSubmit }: ProductFormPr
                 <CardHeader>
                   <CardTitle>配送・取引情報</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-6">
+                  <div className="space-y-4">
+                    <FormLabel>発送時期 *</FormLabel>
+                    <div className="space-y-2">
+                      {DEFAULT_SHIPPING_OPTIONS.map((option) => (
+                        <div key={option.value} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`shipping-option-${option.value}`}
+                            checked={selectedShippingOptions.some(selected => selected.value === option.value)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedShippingOptions([...selectedShippingOptions, option])
+                              } else {
+                                setSelectedShippingOptions(
+                                  selectedShippingOptions.filter((selected) => selected.value !== option.value)
+                                )
+                              }
+                            }}
+                          />
+                          <label
+                            htmlFor={`shipping-option-${option.value}`}
+                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                          >
+                            {option.label}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+
+                    {customShippingOptions.length > 0 && (
+                      <div className="space-y-2 mt-4">
+                        <FormLabel>カスタム発送時期</FormLabel>
+                        {customShippingOptions.map((option, index) => (
+                          <div key={option.value} className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`custom-shipping-option-${option.value}`}
+                              checked={selectedShippingOptions.some(selected => selected.value === option.value)}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  setSelectedShippingOptions([...selectedShippingOptions, option])
+                                } else {
+                                  setSelectedShippingOptions(
+                                    selectedShippingOptions.filter((selected) => selected.value !== option.value)
+                                  )
+                                }
+                              }}
+                            />
+                            <Input
+                              value={option.label}
+                              onChange={(e) => updateCustomShippingOption(index, e.target.value)}
+                              placeholder="発送時期を入力"
+                              className="flex-1"
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeCustomShippingOption(index)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={addCustomShippingOption}
+                      className="mt-2"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      カスタム発送時期を追加
+                    </Button>
+                  </div>
+
+                  <div className="space-y-4">
+                    <FormLabel>発送方法 *</FormLabel>
+                    <div className="space-y-2">
+                      {DEFAULT_SHIPPING_METHODS.map((method) => (
+                        <div key={method.id} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`shipping-method-${method.id}`}
+                            checked={selectedShippingMethods.includes(method.id)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedShippingMethods([...selectedShippingMethods, method.id])
+                              } else {
+                                setSelectedShippingMethods(
+                                  selectedShippingMethods.filter((id) => id !== method.id)
+                                )
+                              }
+                            }}
+                          />
+                          <label
+                            htmlFor={`shipping-method-${method.id}`}
+                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                          >
+                            <div>
+                              <span className="font-medium">{method.name}</span>
+                              <p className="text-sm text-gray-500">{method.description}</p>
+                            </div>
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
                   <FormField
                     control={form.control}
                     name="shipping_info.return_policy"
@@ -1086,154 +1266,33 @@ export default function ProductForm({ mode, productId, onSubmit }: ProductFormPr
                       </FormItem>
                     )}
                   />
-
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>発送情報</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="space-y-4">
-                        <FormLabel>発送時期 *</FormLabel>
-                        <div className="space-y-2">
-                          {DEFAULT_SHIPPING_OPTIONS.map((option) => (
-                            <div key={option.value} className="flex items-center space-x-2">
-                              <Checkbox
-                                checked={selectedShippingOptions.some(selected => selected.value === option.value)}
-                                onCheckedChange={(checked) => {
-                                  if (checked) {
-                                    setSelectedShippingOptions([...selectedShippingOptions, { value: option.value, label: option.label }])
-                                  } else {
-                                    setSelectedShippingOptions(
-                                      selectedShippingOptions.filter((selected) => selected.value !== option.value)
-                                    )
-                                  }
-                                }}
-                              />
-                              <label>{option.label}</label>
-                            </div>
-                          ))}
-                        </div>
-
-                        {customShippingOptions.length > 0 && (
-                          <div className="space-y-2 mt-4">
-                            <FormLabel>カスタム発送時期</FormLabel>
-                            {customShippingOptions.map((option, index) => (
-                              <div key={option.value} className="flex items-center space-x-2">
-                                <Checkbox
-                                  checked={selectedShippingOptions.some(selected => selected.value === option.value)}
-                                  onCheckedChange={(checked) => {
-                                    if (checked) {
-                                      setSelectedShippingOptions([...selectedShippingOptions, { value: option.value, label: option.label }])
-                                    } else {
-                                      setSelectedShippingOptions(
-                                        selectedShippingOptions.filter((selected) => selected.value !== option.value)
-                                      )
-                                    }
-                                  }}
-                                />
-                                <Input
-                                  value={option.label}
-                                  onChange={(e) => updateCustomShippingOption(index, e.target.value)}
-                                  placeholder="発送時期を入力"
-                                  className="flex-1"
-                                />
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => removeCustomShippingOption(index)}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={addCustomShippingOption}
-                          className="mt-2"
-                        >
-                          <Plus className="h-4 w-4 mr-2" />
-                          カスタム発送時期を追加
-                        </Button>
-                      </div>
-
-                      <div className="space-y-4">
-                        <FormLabel>発送方法 *</FormLabel>
-                        <div className="space-y-2">
-                          {DEFAULT_SHIPPING_METHODS.map((method) => (
-                            <div key={method.id} className="flex items-center space-x-2">
-                              <Checkbox
-                                checked={selectedShippingMethods.includes(method.id)}
-                                onCheckedChange={(checked) => {
-                                  if (checked) {
-                                    setSelectedShippingMethods([...selectedShippingMethods, method.id])
-                                  } else {
-                                    setSelectedShippingMethods(
-                                      selectedShippingMethods.filter((id) => id !== method.id)
-                                    )
-                                  }
-                                }}
-                              />
-                              <div>
-                                <label className="font-medium">{method.name}</label>
-                                <p className="text-sm text-gray-500">{method.description}</p>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      <FormField
-                        control={form.control}
-                        name="shipping_info.shipping_fee"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>送料 *</FormLabel>
-                            <FormControl>
-                              <Input {...field} type="number" min="0" placeholder="送料を入力" />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="shipping_info.can_combine_shipping"
-                        render={({ field }) => (
-                          <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                            <div className="space-y-0.5">
-                              <FormLabel className="text-base">
-                                同梱可能
-                              </FormLabel>
-                              <FormDescription>
-                                他の商品と同梱して配送可能にする
-                              </FormDescription>
-                            </div>
-                            <FormControl>
-                              <Switch
-                                checked={field.value}
-                                onCheckedChange={field.onChange}
-                              />
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
-                    </CardContent>
-                  </Card>
                 </CardContent>
               </Card>
             </TabsContent>
           </Tabs>
 
-          <div className="flex justify-end">
-            <Button type="submit" disabled={loading || imageUploading}>
-              {loading ? (mode === 'new' ? '登録中...' : '更新中...') : (mode === 'new' ? '商品を登録' : '更新する')}
+          <div className="flex justify-end space-x-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => router.back()}
+              disabled={loading}
+            >
+              キャンセル
+            </Button>
+            <Button 
+              type="submit" 
+              disabled={loading || imageUploading}
+              className="min-w-[120px]"
+            >
+              {loading ? (
+                <div className="flex items-center">
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {mode === 'new' ? '登録中...' : '更新中...'}
+                </div>
+              ) : (
+                mode === 'new' ? '商品を登録' : '商品を更新'
+              )}
             </Button>
           </div>
         </form>

@@ -6,9 +6,20 @@ import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ArrowLeft, Pencil } from 'lucide-react'
+import { ArrowLeft, Pencil, Trash2 } from 'lucide-react'
 import Image from 'next/image'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { useToast } from "@/components/ui/use-toast"
 
 interface ProductDetails {
   id: string
@@ -28,6 +39,8 @@ interface ProductDetails {
   precautions: string
   requires_questionnaire: boolean
   requires_pharmacist_consultation: boolean
+  out_of_stock_policy: string
+  package_insert_url?: string
   shipping_info: {
     delivery_time: string
     return_policy: string
@@ -35,6 +48,11 @@ interface ProductDetails {
     sale_end_date?: string
     shipping_fee: string
     can_combine_shipping: boolean
+    free_shipping_threshold?: string
+    shipping_methods: string[]
+    selected_options: Array<{ value: string; label: string }>
+    custom_options: Array<{ value: string; label: string }>
+    selected_method_ids: string[]
   }
   created_at: string
   updated_at: string
@@ -58,7 +76,9 @@ export default function ProductDetailsPage({
   const [product, setProduct] = useState<ProductDetails | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const supabase = createClientComponentClient()
+  const { toast } = useToast()
 
   useEffect(() => {
     const fetchProductDetails = async () => {
@@ -116,6 +136,31 @@ export default function ProductDetailsPage({
     router.push(`/products/${params.id}/edit`)
   }
 
+  const handleDelete = async () => {
+    try {
+      const { error } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', params.id)
+        .eq('vendor_id', vendorId)
+
+      if (error) throw error
+
+      toast({
+        title: "削除完了",
+        description: "商品を削除しました",
+      })
+      router.push('/products')
+    } catch (err) {
+      console.error('Error deleting product:', err)
+      toast({
+        title: "エラー",
+        description: "商品の削除に失敗しました",
+        variant: "destructive",
+      })
+    }
+  }
+
   return (
     <div className="container mx-auto py-10 px-4">
       <div className="flex items-center justify-between mb-6">
@@ -130,11 +175,34 @@ export default function ProductDetailsPage({
           </Button>
           <h1 className="text-2xl font-bold">商品詳細</h1>
         </div>
-        <Button onClick={handleEdit}>
-          <Pencil className="mr-2 h-4 w-4" />
-          編集
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={handleEdit}>
+            <Pencil className="mr-2 h-4 w-4" />
+            編集
+          </Button>
+          <Button variant="destructive" onClick={() => setShowDeleteDialog(true)}>
+            <Trash2 className="mr-2 h-4 w-4" />
+            削除
+          </Button>
+        </div>
       </div>
+
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>商品を削除しますか？</AlertDialogTitle>
+            <AlertDialogDescription>
+              この操作は取り消せません。商品を削除すると、関連するすべてのデータが完全に削除されます。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>キャンセル</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              削除する
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Tabs defaultValue="basic" className="w-full">
         <TabsList>
@@ -232,6 +300,20 @@ export default function ProductDetailsPage({
                 <p className="whitespace-pre-wrap">{product.precautions}</p>
               </div>
 
+              <div>
+                <h3 className="font-semibold">在庫切れ時の対応方針</h3>
+                <p className="whitespace-pre-wrap">{product.out_of_stock_policy}</p>
+              </div>
+
+              {product.package_insert_url && (
+                <div>
+                  <h3 className="font-semibold">添付文書URL</h3>
+                  <a href={product.package_insert_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                    添付文書を表示
+                  </a>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <h3 className="font-semibold">問診必須</h3>
@@ -283,7 +365,51 @@ export default function ProductDetailsPage({
                   <h3 className="font-semibold">同梱可否</h3>
                   <p>{product.shipping_info.can_combine_shipping ? '可能' : '不可'}</p>
                 </div>
+
+                <div>
+                  <h3 className="font-semibold">送料無料条件</h3>
+                  <p>{product.shipping_info.free_shipping_threshold ? `¥${parseInt(product.shipping_info.free_shipping_threshold).toLocaleString()}以上` : '設定なし'}</p>
+                </div>
               </div>
+
+              <div>
+                <h3 className="font-semibold">配送方法</h3>
+                <div className="mt-2">
+                  {(product.shipping_info.shipping_methods || []).map((method, index) => (
+                    <div key={index} className="mb-1">
+                      {method === 'yamato' ? 'クロネコヤマト' :
+                       method === 'sagawa' ? '佐川急便' :
+                       method === 'japan_post' ? '日本郵便' : method}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {(product.shipping_info.selected_options || []).length > 0 && (
+                <div>
+                  <h3 className="font-semibold">配送オプション</h3>
+                  <div className="mt-2">
+                    {(product.shipping_info.selected_options || []).map((option, index) => (
+                      <div key={index} className="mb-1">
+                        {option.label}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {(product.shipping_info.custom_options || []).length > 0 && (
+                <div>
+                  <h3 className="font-semibold">カスタム配送オプション</h3>
+                  <div className="mt-2">
+                    {(product.shipping_info.custom_options || []).map((option, index) => (
+                      <div key={index} className="mb-1">
+                        {option.label}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
